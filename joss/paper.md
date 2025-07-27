@@ -46,7 +46,16 @@ bibliography: paper.bib
 
 # Summary
 
+Parameter estimation is the primary tool for extracting astrophysical
+information from gravitational wave signals.
+
 ## Key features
+
+- **GPU and Machine learning accelerated sampling**
+
+- **Flexible transform system**:
+
+- **Cloud-ready deployment**
 
 # Statement of need
 
