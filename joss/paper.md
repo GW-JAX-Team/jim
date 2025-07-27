@@ -59,6 +59,18 @@ information from gravitational wave signals.
 
 # Statement of need
 
+In the last couple of years, multiple groups have been developing faster parameter estimation codes [@Wong:2023lgb] [@Roulet:2022kot] [@Dax:2021tsq] [@Ashton:2018jfp] to tackle the pressure of the rapidly increasing number of gravitational wave detections. 
+While the development of these codes has been impressive regarding their performance, adoption outside of the core development team remains limited.
+
+
+To make sure the broader community can benefit from these 
+
+<!-- Need for speed -->
+
+<!-- Need for flexibility -->
+
+<!-- Need for production ready infrastructure -->
+
 
 # Acknowledgements
 
