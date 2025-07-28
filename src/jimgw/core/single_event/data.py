@@ -315,7 +315,7 @@ class Data(ABC):
         delta_t = 1 / (2 * fnyq)
         data_td_full = jnp.fft.irfft(data_fd_full) / delta_t
         # check frequencies
-        assert jnp.allclose(
+        assert jnp.array_equal(
             f, jnp.fft.rfftfreq(len(data_td_full), delta_t)
         ), "Generated frequencies do not match the input frequencies"
         # create a Data object
