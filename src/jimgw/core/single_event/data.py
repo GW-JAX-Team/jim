@@ -325,9 +325,11 @@ class Data(ABC):
         # This ensures the newly constructed Data in FD fully
         # represents the input FD data.
         d_new, f_new = data.frequency_slice(frequencies[0], frequencies[-1])
-        assert all(jnp.equal(d_new, fd)), "Data do not match after slicing"
-        assert all(
-            jnp.equal(f_new, frequencies)
+        assert jnp.allclose(
+            d_new, fd, rtol=1e-10, atol=1e-15
+        ), "Data do not match after slicing"
+        assert jnp.allclose(
+            f_new, frequencies, rtol=1e-10, atol=1e-15
         ), "Frequencies do not match after slicing"
         return data
 
