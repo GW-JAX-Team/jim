@@ -142,8 +142,8 @@ class Detector(ABC):
         data, freqs_1 = self.data.frequency_slice(*self.frequency_bounds)
         psd, freqs_2 = self.psd.frequency_slice(*self.frequency_bounds)
 
-        assert jnp.allclose(
-            freqs_1, freqs_2, rtol=1e-10, atol=1e-15
+        assert jnp.array_equal(
+            freqs_1, freqs_2
         ), f"The {self.name} data and PSD must have same frequencies"
 
         self._sliced_frequencies = freqs_1
