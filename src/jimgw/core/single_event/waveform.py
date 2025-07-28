@@ -5,6 +5,7 @@ from jaxtyping import Array, Float
 from ripplegw import FDWaveform
 from ripplegw.waveforms.IMRPhenomXAS import Polarization
 
+
 class Waveform(ABC):
     def __init__(self):
         return NotImplemented
@@ -84,6 +85,7 @@ class RippleIMRPhenomPv2(Waveform):
     def __repr__(self):
         return f"RippleIMRPhenomPv2(f_ref={self.f_ref})"
 
+
 class RippleTaylorF2(Waveform):
     f_ref: float
     use_lambda_tildes: bool
@@ -131,6 +133,7 @@ class RippleTaylorF2(Waveform):
 
     def __repr__(self):
         return f"RippleTaylorF2(f_ref={self.f_ref})"
+
 
 class RippleIMRPhenomD_NRTidalv2(Waveform):
     f_ref: float
@@ -200,11 +203,23 @@ class RippleIMRPhenomD_NRTidalv2(Waveform):
     def __repr__(self):
         return f"RippleIMRPhenomD_NRTidalv2(f_ref={self.f_ref})"
 
+
 class JaxNRSurHyb3dq8(Waveform):
     _waveform: FDWaveform.NRSurHyb3dq8_FD.value
 
-    def __init__(self, target_frequency: Float[Array, " n_sample"], segment_length: float, sampling_rate: int = 4096, alpha_window: float = 0.1):
-        self._waveform = FDWaveform.NRSurHyb3dq8_FD.value(target_frequency, segment_length=segment_length, sampling_rate=sampling_rate, alpha_window=alpha_window)
+    def __init__(
+        self,
+        target_frequency: Float[Array, " n_sample"],
+        segment_length: float,
+        sampling_rate: int = 4096,
+        alpha_window: float = 0.1,
+    ):
+        self._waveform = FDWaveform.NRSurHyb3dq8_FD.value(
+            target_frequency,
+            segment_length=segment_length,
+            sampling_rate=sampling_rate,
+            alpha_window=alpha_window,
+        )
 
     def __call__(
         self, frequency: Float[Array, " n_dim"], params: dict[str, Float]
@@ -213,14 +228,14 @@ class JaxNRSurHyb3dq8(Waveform):
         Mc = params["M_c"]
         q = params["q"]
         eta = q / (1 + q) ** 2
-        M_tot = Mc / (eta ** 0.6)
+        M_tot = Mc / (eta**0.6)
         theta = jnp.array(
             [
                 M_tot,
                 params["d_L"],
-                params['iota'],
-                params['phase_c'],
-                1. / q,
+                params["iota"],
+                params["phase_c"],
+                1.0 / q,
                 params["s1_z"],
                 params["s2_z"],
             ]
@@ -229,13 +244,24 @@ class JaxNRSurHyb3dq8(Waveform):
 
     def __repr__(self):
         return f"JaxNRSurHyb3dq8(segment_length={self._waveform.surrogate.segment_length}, sampling_rate={self._waveform.surrogate.sampling_rate})"
-        
+
 
 class JaxNRSur7dq4(Waveform):
     _waveform: FDWaveform.NRSur7dq4_FD.value
 
-    def __init__(self, target_frequency: Float[Array, " n_sample"], segment_length: float, sampling_rate: int = 4096, alpha_window: float = 0.1):
-        self._waveform = FDWaveform.NRSur7dq4_FD.value(target_frequency, segment_length=segment_length, sampling_rate=sampling_rate, alpha_window=alpha_window)
+    def __init__(
+        self,
+        target_frequency: Float[Array, " n_sample"],
+        segment_length: float,
+        sampling_rate: int = 4096,
+        alpha_window: float = 0.1,
+    ):
+        self._waveform = FDWaveform.NRSur7dq4_FD.value(
+            target_frequency,
+            segment_length=segment_length,
+            sampling_rate=sampling_rate,
+            alpha_window=alpha_window,
+        )
 
     def __call__(
         self, frequency: Float[Array, " n_dim"], params: dict[str, Float]
@@ -243,15 +269,15 @@ class JaxNRSur7dq4(Waveform):
         output = {}
         Mc = params["M_c"]
         q = params["q"]
-        eta = q/(1 + q) ** 2
-        M_tot = Mc / (eta ** 0.6)
+        eta = q / (1 + q) ** 2
+        M_tot = Mc / (eta**0.6)
         theta = jnp.array(
             [
                 M_tot,
                 params["d_L"],
-                params['iota'],
-                params['phase_c'],
-                1./q,
+                params["iota"],
+                params["phase_c"],
+                1.0 / q,
                 params["s1_x"],
                 params["s1_y"],
                 params["s1_z"],
@@ -264,7 +290,6 @@ class JaxNRSur7dq4(Waveform):
 
     def __repr__(self):
         return f"JaxNRSur7dq4(segment_length={self._waveform.surrogate.segment_length}, sampling_rate={self._waveform.surrogate.sampling_rate})"
-
 
 
 waveform_preset = {
