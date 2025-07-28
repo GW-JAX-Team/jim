@@ -218,17 +218,14 @@ class JaxNRSurHyb3dq8(Waveform):
             [
                 M_tot,
                 params["d_L"],
+                params['iota'],
+                params['phase_c'],
                 1. / q,
                 params["s1_z"],
                 params["s2_z"],
             ]
         )
-        result = self._waveform(frequency, theta, {})
-        phi_c = params['phase_c']
-        iota = params['iota']
-        output["p"] = result[Polarization.P] * jnp.exp(1j * phi_c) * (1 / 2 * (1 + jnp.cos(iota) ** 2))
-        output["c"] = -1j * result[Polarization.C] * jnp.exp(1j * phi_c) * jnp.cos(iota)
-        return output
+        return self._waveform(frequency, theta, {})
 
     def __repr__(self):
         return f"JaxNRSurHyb3dq8(segment_length={self._waveform.surrogate.segment_length}, sampling_rate={self._waveform.surrogate.sampling_rate})"
@@ -252,6 +249,8 @@ class JaxNRSur7dq4(Waveform):
             [
                 M_tot,
                 params["d_L"],
+                params['iota'],
+                params['phase_c'],
                 1./q,
                 params["s1_x"],
                 params["s1_y"],
@@ -261,13 +260,7 @@ class JaxNRSur7dq4(Waveform):
                 params["s2_z"],
             ]
         )
-        result = self._waveform(frequency, theta, {})
-        
-        phi_c = params['phase_c']
-        iota = params['iota']
-        output["p"] = result[Polarization.P] * jnp.exp(1j * phi_c) * (1 / 2 * (1 + jnp.cos(iota) ** 2))
-        output["c"] = -1j * result[Polarization.C] * jnp.exp(1j * phi_c) * jnp.cos(iota) 
-        return output
+        return self._waveform(frequency, theta, {})
 
     def __repr__(self):
         return f"JaxNRSur7dq4(segment_length={self._waveform.surrogate.segment_length}, sampling_rate={self._waveform.surrogate.sampling_rate})"
