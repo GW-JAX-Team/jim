@@ -46,16 +46,29 @@ bibliography: paper.bib
 
 # Summary
 
-Parameter estimation is the primary tool for extracting astrophysical
-information from gravitational wave signals.
+Parameter estimation (PE) is the primary tool for extracting astrophysical
+information from gravitational wave signals. Since the first detection of gravitational waves in 2015, the number of detections has been increasing rapidly, with more than 100 events detected by the end of 2023. This has led to a growing need for efficient and flexible parameter estimation codes that can handle the increasing volume of data and the complexity of the signals.
+
+In this paper, we present a production-ready version of the parameter estimation code `jim`. This means on top of fast inference, `jim` aims to deliever a flexible and extensible framework that can be used by the broader community to pursue PE studies for GW signals. At the same time, `jim` provides robust and reproducible infrastructures that can be used for production-level parameter estimation tasks.
 
 ## Key features
 
 - **GPU and Machine learning accelerated sampling**
 
-- **Flexible transform system**:
+`jim` is built on top of `jax` and `flowMC`, which enable GPU-accelerated sampling with machine learning-based proposal distribution. This means `jim` does not rely on specific techniques such as reparamterization or surrogate models to achieve fast inference, but instead uses a general-purpose framework that can be applied to a wide range of PE tasks.
+
+- **Composable transformations**
+
+While `jim` primarily leverages accelerators and machine learning to achieve fast inference, it can still benefit from efficient reparameterization. `jim` provides a composable transform system that allows the users to chain together multiple transformations to achieve efficient reparameterization. This means users can still use their existing knowledge of reparameterization techniques to improve the performance of their PE tasks.
+
+- **Two level of APIs**
+
+`jim` provides a low-level API that grants the user full control over the definition of the model and the sampling process, as well as a high-level API that provides a more structured interface for large scale PE studies with reproducibility in mind.
 
 - **Cloud-ready deployment**
+
+We provide official guides to deploy `jim` on cloud platforms, such that researcher groups that do not have access to high-performance computing clusters can still leverage commerically available cloud resources to run large-scale parameter estimation tasks.
+
 
 # Statement of need
 
