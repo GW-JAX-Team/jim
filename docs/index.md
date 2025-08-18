@@ -11,11 +11,21 @@ Jim is a set of tools to solve a number of inference problems in the field of gr
 
 ### Installing with `uv`
 
-
+The recommended way toinstal
 
 ### Installing with `pip`
 
+You can also install jim with `pip`:
+
+```bash
+pip install jim
+```
+
+Note that there are a number of extras 
+
 ### Container
+
+`jim` is also available as a container image.
 
 ## How to use this documentation
 
