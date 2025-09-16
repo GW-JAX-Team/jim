@@ -361,24 +361,24 @@ class BoundToBound(BijectiveTransform):
     Bound to bound transformation
     """
 
-    original_lower_bound: Float[Array, " n_dim"]
-    original_upper_bound: Float[Array, " n_dim"]
-    target_lower_bound: Float[Array, " n_dim"]
-    target_upper_bound: Float[Array, " n_dim"]
+    original_lower_bound: Float
+    original_upper_bound: Float
+    target_lower_bound: Float
+    target_upper_bound: Float
 
     def __init__(
         self,
         name_mapping: tuple[list[str], list[str]],
-        original_lower_bound: Float[Array, " n_dim"],
-        original_upper_bound: Float[Array, " n_dim"],
-        target_lower_bound: Float[Array, " n_dim"],
-        target_upper_bound: Float[Array, " n_dim"],
+        original_lower_bound: Float,
+        original_upper_bound: Float,
+        target_lower_bound: Float,
+        target_upper_bound: Float,
     ):
         super().__init__(name_mapping)
-        self.original_lower_bound = original_lower_bound
-        self.original_upper_bound = original_upper_bound
-        self.target_lower_bound = target_lower_bound
-        self.target_upper_bound = target_upper_bound
+        self.original_lower_bound = jnp.atleast_1d(original_lower_bound)
+        self.original_upper_bound = jnp.atleast_1d(original_upper_bound)
+        self.target_lower_bound = jnp.atleast_1d(target_lower_bound)
+        self.target_upper_bound = jnp.atleast_1d(target_upper_bound)
 
         self.transform_func = lambda x: {
             name_mapping[1][i]: (x[name_mapping[0][i]] - self.original_lower_bound[i])
