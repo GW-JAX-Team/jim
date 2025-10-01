@@ -743,9 +743,76 @@ def get_V1():
     )
 
 
+def get_ET() -> list[GroundBased2G]:
+    name = "ET"
+    latitude = (43 + 37.0 / 60 + 53.0921 / 3600) * DEG_TO_RAD
+    longitude = (10 + 30.0 / 60 + 16.1887 / 3600) * DEG_TO_RAD
+    xarm_azimuth = 70.5674 * DEG_TO_RAD
+    yarm_azimuth = 130.5674 * DEG_TO_RAD
+    xarm_tilt = 0
+    yarm_tilt = 0
+    elevation = 51.884
+    length = 1e4
+
+    a = EARTH_SEMI_MAJOR_AXIS / 1e3  # Numerical instability avoidance
+    b = EARTH_SEMI_MINOR_AXIS / 1e3
+    earth_approx_radius = (
+        a
+        * b
+        / (
+            jnp.sqrt(
+                a ** (2) * jnp.sin(latitude) ** 2 + b ** (2) * jnp.cos(latitude) ** 2
+            )
+        )
+    )
+    earth_approx_radius *= 1e3
+
+    ifos = []
+    for i in range(3):
+        ifos.append(
+            GroundBased2G(
+                f"{name}{i+1}",
+                latitude=float(latitude),
+                longitude=float(longitude),
+                xarm_azimuth=xarm_azimuth,
+                yarm_azimuth=yarm_azimuth,
+                elevation=elevation,
+                xarm_tilt=xarm_tilt,
+                yarm_tilt=yarm_tilt,
+            )
+        )
+        # Rotate arms
+        xarm_azimuth += (4 / 3) * jnp.pi
+        yarm_azimuth += (4 / 3) * jnp.pi
+        # The detector is taken as a chord that cuts across the earth
+        latitude += 2 * jnp.arcsin(
+            0.5 * length * jnp.sin(xarm_azimuth) / earth_approx_radius
+        )
+        longitude += 2 * jnp.arcsin(
+            0.5 * length * jnp.cos(xarm_azimuth) / earth_approx_radius
+        )
+    return ifos
+
+
+def get_CE():
+    return GroundBased2G(
+        "CE",
+        latitude=(46 + 27.0 / 60 + 18.528 / 3600) * DEG_TO_RAD,
+        longitude=-(119 + 24.0 / 60 + 27.5657 / 3600) * DEG_TO_RAD,
+        xarm_azimuth=125.9994 * DEG_TO_RAD,
+        yarm_azimuth=215.994 * DEG_TO_RAD,
+        xarm_tilt=-6.195e-4,
+        yarm_tilt=1.25e-5,
+        elevation=142.554,
+        modes="pc",
+    )
+
+
 def get_detector_preset():
     return {
         "H1": get_H1(),
         "L1": get_L1(),
         "V1": get_V1(),
+        "ET": get_ET(),
+        "CE": get_CE(),
     }
