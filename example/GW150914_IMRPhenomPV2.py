@@ -11,7 +11,7 @@ from jimgw.core.prior import (
     UniformSpherePrior,
 )
 from jimgw.core.single_event.detector import get_H1, get_L1
-from jimgw.core.single_event.likelihood import TransientLikelihoodFD
+from jimgw.core.single_event.likelihood import BaseTransientLikelihoodFD
 from jimgw.core.single_event.data import Data
 from jimgw.core.single_event.waveform import RippleIMRPhenomPv2
 from jimgw.core.transforms import BoundToUnbound
@@ -202,7 +202,7 @@ likelihood_transforms = [
 ]
 
 
-likelihood = TransientLikelihoodFD(
+likelihood = BaseTransientLikelihoodFD(
     ifos,
     waveform=waveform,
     trigger_time=gps,
