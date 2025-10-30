@@ -170,10 +170,11 @@ class Jim(object):
             [initial_position[key] for key in self.parameter_names]
         ).T
 
-        assert jnp.all(jnp.isfinite(initial_position)), (
-            "Initial positions contain non-finite values (NaN or inf). "
-            "Check your priors and transforms for validity."
-        )
+        if not jnp.all(jnp.isfinite(initial_position)):
+            raise ValueError(
+                "Initial positions contain non-finite values (NaN or inf). "
+                "Check your priors and transforms for validity."
+            )
 
         self.sampler.rng_key = rng_key
 
