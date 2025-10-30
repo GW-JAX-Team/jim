@@ -11,7 +11,7 @@ jax.config.update("jax_enable_x64", True)
 
 prior = CombinePrior(
     [
-        RayleighPrior(["test_r"]),
+        RayleighPrior(sigma=1.0, parameter_names=["test_r"]),
         UniformPrior(0.0, 2.0 * jnp.pi, ["test"]),
     ]
 )
@@ -42,7 +42,7 @@ class CosLikelihood(LikelihoodBase):
 
 likelihood = CosLikelihood()
 
-mass_matrix = jnp.eye(prior.n_dim)
+mass_matrix = jnp.eye(prior.n_dims)
 
 n_local_steps = 1_000
 
@@ -51,29 +51,27 @@ jim = Jim(
     prior,
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    n_loop_training=1,
-    n_loop_production=1,
+    n_training_loops=1,
+    n_production_loops=1,
     n_local_steps=n_local_steps,
-    n_global_steps=0,
+    n_global_steps=1,
     n_chains=1,
     n_epochs=1,
     learning_rate=1e-4,
     n_max_examples=10000,
     n_NFproposal_batch_size=1,
-    momentum=0.9,
     batch_size=100,
-    use_global=False,
-    train_thinning=1,
-    output_thinning=1,
-    local_sampler_arg={"step_size": mass_matrix * 2e-1},
+    local_thinning=1,
+    global_thinning=1,
+    mala_step_size=2e-1,
 )
 
-jim.sample(jax.random.PRNGKey(12345))
-jim.print_summary()
-samples = jim.get_samples()
+jim.sample()
 
 # Uncomment the following code to plot the walker history and histogram
 # import matplotlib.pyplot as plt
+
+# samples = jim.get_samples()
 
 # plt.plot(samples["test"])
 # plt.ylim(0.0, 2.0 * jnp.pi)

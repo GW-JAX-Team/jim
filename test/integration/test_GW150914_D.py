@@ -12,8 +12,8 @@ from jimgw.core.prior import (
     PowerLawPrior,
 )
 from jimgw.core.single_event.data import Data
-from jimgw.core.single_event.detector import H1, L1
-from jimgw.core.single_event.likelihood import TransientLikelihoodFD
+from jimgw.core.single_event.detector import get_detector_preset
+from jimgw.core.single_event.likelihood import BaseTransientLikelihoodFD
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
 from jimgw.core.transforms import BoundToUnbound
 from jimgw.core.single_event.transforms import (
@@ -36,7 +36,8 @@ end = gps + 2
 fmin = 20.0
 fmax = 1024.0
 
-ifos = [H1, L1]
+detector_preset = get_detector_preset()
+ifos = [detector_preset["H1"], detector_preset["L1"]]
 
 for ifo in ifos:
     data = Data.from_gwosc(ifo.name, start, end)
@@ -148,7 +149,7 @@ likelihood_transforms = [
     ComponentMassesToChirpMassSymmetricMassRatioTransform,
 ]
 
-likelihood = TransientLikelihoodFD(
+likelihood = BaseTransientLikelihoodFD(
     ifos,
     waveform=RippleIMRPhenomD(),
     f_min=fmin,
@@ -178,6 +179,6 @@ jim = Jim(
     batch_size=100,
 )
 
-jim.sample(jax.random.PRNGKey(42))
+jim.sample()
 # jim.get_samples()
 # jim.print_summary()

@@ -29,6 +29,12 @@ from jimgw.core.single_event.detector import get_detector_preset
 
 jax.config.update("jax_enable_x64", True)
 
+# Get detector instances
+detector_preset = get_detector_preset()
+H1 = detector_preset["H1"]
+L1 = detector_preset["L1"]
+V1 = detector_preset["V1"]
+
 
 def common_keys_allclose(
     dict_1: dict, dict_2: dict, atol: float = 1e-8, rtol: float = 1e-5

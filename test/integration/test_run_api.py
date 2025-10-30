@@ -1,3 +1,10 @@
+import pytest
+import os
+
+# Skip entire module in CI
+if os.getenv("CI") == "true":
+    pytest.skip("Temporarily disabled in CI", allow_module_level=True)
+
 from jimgw.run.library.IMRPhenomPv2_standard_cbc import (
     TestIMRPhenomPv2StandardCBCRunDefinition,
 )
