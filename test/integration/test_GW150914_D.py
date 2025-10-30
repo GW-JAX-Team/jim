@@ -17,9 +17,8 @@ from jimgw.core.single_event.likelihood import BaseTransientLikelihoodFD
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
 from jimgw.core.transforms import BoundToUnbound
 from jimgw.core.single_event.transforms import (
-    ComponentMassesToChirpMassSymmetricMassRatioTransform,
     SkyFrameToDetectorFrameSkyPositionTransform,
-    ComponentMassesToChirpMassMassRatioTransform,
+    MassRatioToSymmetricMassRatioTransform,
 )
 from jimgw.core.single_event.utils import Mc_q_to_m1_m2
 
@@ -49,16 +48,8 @@ for ifo in ifos:
 
 M_c_min, M_c_max = 10.0, 80.0
 q_min, q_max = 0.125, 1.0
-m_1_prior = UniformPrior(
-    Mc_q_to_m1_m2(M_c_min, q_max)[0],
-    Mc_q_to_m1_m2(M_c_max, q_min)[0],
-    parameter_names=["m_1"],
-)
-m_2_prior = UniformPrior(
-    Mc_q_to_m1_m2(M_c_min, q_min)[1],
-    Mc_q_to_m1_m2(M_c_max, q_max)[1],
-    parameter_names=["m_2"],
-)
+M_c_prior = UniformPrior(M_c_min, M_c_max, parameter_names=["M_c"])
+q_prior = UniformPrior(q_min, q_max, parameter_names=["q"])
 s1z_prior = UniformPrior(-1.0, 1.0, parameter_names=["s1_z"])
 s2z_prior = UniformPrior(-1.0, 1.0, parameter_names=["s2_z"])
 dL_prior = PowerLawPrior(1.0, 2000.0, 2.0, parameter_names=["d_L"])
@@ -71,8 +62,8 @@ dec_prior = CosinePrior(parameter_names=["dec"])
 
 prior = CombinePrior(
     [
-        m_1_prior,
-        m_2_prior,
+        M_c_prior,
+        q_prior,
         s1z_prior,
         s2z_prior,
         dL_prior,
@@ -86,7 +77,6 @@ prior = CombinePrior(
 )
 
 sample_transforms = [
-    ComponentMassesToChirpMassMassRatioTransform,
     SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps, ifos=ifos),
     BoundToUnbound(
         name_mapping=[["M_c"], ["M_c_unbounded"]],
@@ -146,7 +136,7 @@ sample_transforms = [
 ]
 
 likelihood_transforms = [
-    ComponentMassesToChirpMassSymmetricMassRatioTransform,
+    MassRatioToSymmetricMassRatioTransform
 ]
 
 likelihood = BaseTransientLikelihoodFD(
