@@ -10,7 +10,7 @@ from jimgw.core.prior import (
     PowerLawPrior,
     SimpleConstrainedPrior,
 )
-from jimgw.core.single_event.detector import H1, L1, V1
+from jimgw.core.single_event.detector import get_detector_preset
 from jimgw.core.single_event.likelihood import ZeroLikelihood
 from jimgw.core.transforms import BoundToUnbound
 from jimgw.core.single_event.transforms import (
@@ -19,7 +19,6 @@ from jimgw.core.single_event.transforms import (
     GeocentricArrivalTimeToDetectorArrivalTimeTransform,
     GeocentricArrivalPhaseToDetectorArrivalPhaseTransform,
 )
-from flowMC.strategy.optimization import optimization_Adam
 
 jax.config.update("jax_enable_x64", True)
 
@@ -30,7 +29,8 @@ jax.config.update("jax_enable_x64", True)
 # first, fetch a 4s segment centered on GW150914
 gps = 1126259462.4
 
-ifos = [H1, L1, V1]
+detector_preset = get_detector_preset()
+ifos = [detector_preset["H1"], detector_preset["L1"], detector_preset["V1"]]
 
 M_c_prior = UniformPrior(10.0, 80.0, parameter_names=["M_c"])
 dL_prior = SimpleConstrainedPrior([PowerLawPrior(10.0, 2000.0, 2.0, parameter_names=["d_L"])])
@@ -99,11 +99,8 @@ likelihood_transforms = []
 likelihood = ZeroLikelihood()
 
 mass_matrix = jnp.eye(len(prior.base_prior))
-# mass_matrix = mass_matrix.at[1, 1].set(1e-3)
-# mass_matrix = mass_matrix.at[5, 5].set(1e-3)
 local_sampler_arg = {"step_size": mass_matrix * 3e-3}
 
-Adam_optimizer = optimization_Adam(n_steps=5, learning_rate=0.01, noise_level=1)
 
 n_epochs = 2
 n_loop_training = 1
@@ -115,26 +112,19 @@ jim = Jim(
     prior,
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    n_loop_training=n_loop_training,
-    n_loop_production=1,
+    n_training_loops=n_loop_training,
+    n_production_loops=1,
     n_local_steps=2,
     n_global_steps=2,
     n_chains=10,
     n_epochs=n_epochs,
     learning_rate=learning_rate,
     n_max_examples=30,
-    n_flow_samples=100,
-    momentum=0.9,
     batch_size=100,
-    use_global=True,
-    train_thinning=1,
-    output_thinning=1,
-    local_sampler_arg=local_sampler_arg,
-    strategies=["default"],
+    mala_step_size=3e-3,
 )
 
 print("Start sampling")
 key = jax.random.PRNGKey(42)
-jim.sample(key)
-jim.print_summary()
+jim.sample()
 samples = jim.get_samples()
