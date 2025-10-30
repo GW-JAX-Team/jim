@@ -116,25 +116,41 @@ def plot_log_prob(log_prob, label, name, outdir):
 
     
 def plot_chains(chains, name, outdir, truths = None, labels = labels):
-    
+
     chains = np.array(chains)
-    
-    # Check if 3D, then reshape
+
+    # Infer the number of parameters from the chains
     if len(np.shape(chains)) == 3:
-        chains = chains.reshape(-1, 13)
-    
-    # Find index of cos iota and sin dec
-    cos_iota_index = labels.index(r'$\iota$')
-    sin_dec_index = labels.index(r'$\delta$')
-    # Convert cos iota and sin dec to cos and sin
-    chains[:,cos_iota_index] = np.arccos(chains[:,cos_iota_index])
-    chains[:,sin_dec_index] = np.arcsin(chains[:,sin_dec_index])
+        n_params = chains.shape[-1]
+        chains = chains.reshape(-1, n_params)
+    else:
+        n_params = chains.shape[-1]
+
+    # Ensure labels match the number of parameters
+    if len(labels) != n_params:
+        # Use only the first n_params labels or pad if needed
+        if len(labels) > n_params:
+            labels_to_use = labels[:n_params]
+        else:
+            labels_to_use = labels + [f'param_{i}' for i in range(len(labels), n_params)]
+    else:
+        labels_to_use = labels
+
+    # Find index of cos iota and sin dec if they exist
+    if r'$\iota$' in labels_to_use:
+        cos_iota_index = labels_to_use.index(r'$\iota$')
+        chains[:,cos_iota_index] = np.arccos(chains[:,cos_iota_index])
+
+    if r'$\delta$' in labels_to_use:
+        sin_dec_index = labels_to_use.index(r'$\delta$')
+        chains[:,sin_dec_index] = np.arcsin(chains[:,sin_dec_index])
+
     chains = np.asarray(chains)
-    fig = corner.corner(chains, labels = labels, truths = truths, hist_kwargs={'density': True}, **default_corner_kwargs)
+    fig = corner.corner(chains, labels = labels_to_use, truths = truths, hist_kwargs={'density': True}, **default_corner_kwargs)
     fig.savefig(f"{outdir}{name}.png", bbox_inches='tight')  
     
 def plot_chains_from_file(outdir, load_true_params: bool = False):
-    
+
     filename = outdir + 'results_production.npz'
     data = np.load(filename)
     chains = data['chains']
@@ -144,13 +160,13 @@ def plot_chains_from_file(outdir, load_true_params: bool = False):
         values = chains[:, :, i].flatten()
         my_chains.append(values)
     my_chains = np.array(my_chains).T
-    chains = chains.reshape(-1, 13)
+    chains = chains.reshape(-1, n_dim)
     if load_true_params:
         truths = load_true_params_from_config(outdir)
     else:
         truths = None
-    
-    plot_chains(chains, truths, 'results', outdir)
+
+    plot_chains(chains, 'results', outdir, truths=truths)
     
 def plot_accs_from_file(outdir):
     
