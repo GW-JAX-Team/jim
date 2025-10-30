@@ -716,6 +716,10 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
             [initial_position[key] for key in parameter_names]
         ).T
 
+        assert jnp.all(jnp.isfinite(initial_position)), (
+            "Initial positions for optimizer contain non-finite values (NaN or inf). "
+            "Check your priors and transforms for validity."
+        )
         _, best_fit, log_prob = optimizer.optimize(
             jax.random.PRNGKey(12094), y, initial_position, {}
         )
