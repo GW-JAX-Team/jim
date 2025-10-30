@@ -447,7 +447,7 @@ def body(args):
 
         utils.plot_accs(local_accs, "Local accs (training)", "local_accs_training", outdir)
         utils.plot_accs(global_accs, "Global accs (training)", "global_accs_training", outdir)
-        utils.plot_loss_vals(loss_data, "Loss", "loss_vals", outdir)
+        # utils.plot_loss_vals(loss_data, "Loss", "loss_vals", outdir) # FIXME: might be broken
         utils.plot_log_prob(log_prob, "Log probability (training)", "log_prob_training", outdir)
 
     # Get production phase data
