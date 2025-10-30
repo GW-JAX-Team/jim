@@ -6,7 +6,7 @@ COPY --from=uv-source / /
 
 WORKDIR /home
 
-RUN git clone https://github.com/kazewong/jim.git
+RUN git clone https://github.com/GW-JAX-Team/jim.git
 
 WORKDIR /home/jim
 RUN git checkout jim-dev
