@@ -641,6 +641,9 @@ class GroundBased2G(Detector):
         )
         match_filtered_snr /= optimal_snr
 
+        # Store the optimal SNR as an attribute for later access
+        self.injected_signal_snr = float(optimal_snr)
+
         # NOTE: Change this to logging later.
         print(f"For detector {self.name}, the injected signal has:")
         print(f"  - Optimal SNR: {optimal_snr:.4f}")

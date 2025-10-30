@@ -17,7 +17,7 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 from jimgw.core.jim import Jim
 from jimgw.core.single_event.detector import get_H1, get_L1, get_V1
-from jimgw.core.single_event.likelihood import BaseTransientLikelihoodFD, HeterodynedTransientLikelihoodFD
+from jimgw.core.single_event.likelihood import BaseTransientLikelihoodFD, HeterodynedTransientLikelihoodFD, HeterodynedPhaseMarginalizedLikelihoodFD
 from jimgw.core.single_event.waveform import RippleTaylorF2, RippleIMRPhenomD_NRTidalv2
 from jimgw.core.prior import UniformPrior, CombinePrior, CosinePrior, SinePrior
 from jimgw.core.single_event.data import Data
@@ -61,9 +61,9 @@ def body(args):
         "n_loop_training": args.n_loop_training,
         "n_loop_production": args.n_loop_production,
 
-        # Sampler steps
-        "n_local_steps": args.n_local_steps_training,
-        "n_global_steps": args.n_global_steps_training,
+        # Sampler steps (same for both training and production)
+        "n_local_steps": args.n_local_steps,
+        "n_global_steps": args.n_global_steps,
         "n_epochs": args.n_epochs,
         "n_chains": args.n_chains,
 
@@ -185,10 +185,22 @@ def body(args):
         fmax = config["f_sampling"] / 2  # Nyquist frequency
 
         key = jax.random.PRNGKey(config["seed"])
-        
-        # Save the given script hyperparams
-        with open(f"{outdir}script_args.json", 'w') as json_file:
-            json.dump(args.__dict__, json_file)
+
+        # Save all user inputs (args, hyperparameters, config) to a single JSON file for reproducibility
+        # Need to handle the learning rate schedule function
+        hyperparameters_to_save = hyperparameters.copy()
+        if callable(hyperparameters_to_save.get("learning_rate")):
+            hyperparameters_to_save["learning_rate"] = "polynomial_schedule(start_lr=1e-3, end_lr=1e-5, power=4.0)"
+
+        all_inputs = {
+            "argparse_arguments": args.__dict__,
+            "hyperparameters": hyperparameters_to_save,
+            "config": config
+        }
+
+        with open(f"{outdir}run_configuration.json", 'w') as json_file:
+            json.dump(all_inputs, json_file, indent=2)
+        print(f"Saved all user inputs to {outdir}run_configuration.json")
         
         # Start injections
         print("Injecting signals . . .")
@@ -294,7 +306,7 @@ def body(args):
         file.write(str(network_snr))
 
     print("Start prior setup")
-    
+
     # Convert JAX arrays to Python floats for prior initialization
     prior_low_float = [float(x) for x in prior_low]
     prior_high_float = [float(x) for x in prior_high]
@@ -312,17 +324,12 @@ def body(args):
     lambda_2_prior = UniformPrior(prior_low_float[5], prior_high_float[5], parameter_names=['lambda_2'])
     dL_prior       = UniformPrior(prior_low_float[6], prior_high_float[6], parameter_names=['d_L'])
     tc_prior       = UniformPrior(prior_low_float[7], prior_high_float[7], parameter_names=['t_c'])
-    phic_prior     = UniformPrior(prior_low_float[8], prior_high_float[8], parameter_names=['phase_c'])
     cos_iota_prior = CosinePrior(parameter_names=["iota"])
     psi_prior      = UniformPrior(prior_low_float[10], prior_high_float[10], parameter_names=["psi"])
     ra_prior       = UniformPrior(prior_low_float[11], prior_high_float[11], parameter_names=["ra"])
     sin_dec_prior  = SinePrior(parameter_names=["dec"])
-    
-    # Save the prior bounds
-    print("Saving prior bounds")
-    utils.save_prior_bounds(prior_low, prior_high, outdir)
-    
-    # Compose the prior
+
+    # Compose the prior - conditionally include phase_c based on marginalization setting
     prior_list = [
             Mc_prior,
             q_prior,
@@ -332,13 +339,28 @@ def body(args):
             lambda_2_prior,
             dL_prior,
             tc_prior,
-            phic_prior,
+    ]
+
+    # Only include phase_c in prior if NOT marginalizing over phase
+    if not args.marginalize_phase:
+        phic_prior = UniformPrior(prior_low_float[8], prior_high_float[8], parameter_names=['phase_c'])
+        prior_list.append(phic_prior)
+    else:
+        print("INFO: Phase marginalization enabled - phase_c will be marginalized analytically and excluded from the prior")
+
+    prior_list.extend([
             cos_iota_prior,
             psi_prior,
             ra_prior,
             sin_dec_prior,
-    ]
+    ])
+
     complete_prior = CombinePrior(prior_list)
+
+    # Save the prior bounds
+    print("Saving prior bounds")
+    utils.save_prior_bounds(prior_low, prior_high, outdir)
+
     print("Finished prior setup")
 
     print("Initializing likelihood")
@@ -349,8 +371,16 @@ def body(args):
         ref_params = {}
         print("Will search for reference waveform for relative binning")
 
+    # Select likelihood class based on phase marginalization setting
+    if args.marginalize_phase:
+        likelihood_class = HeterodynedPhaseMarginalizedLikelihoodFD
+        print("Using phase-marginalized heterodyned likelihood")
+    else:
+        likelihood_class = HeterodynedTransientLikelihoodFD
+        print("Using standard heterodyned likelihood")
+
     # Use the fmin and fmax defined at the top of the script
-    likelihood = HeterodynedTransientLikelihoodFD(
+    likelihood = likelihood_class(
         ifos,
         waveform=waveform,
         trigger_time=config["trigger_time"],

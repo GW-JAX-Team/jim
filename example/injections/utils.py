@@ -359,28 +359,16 @@ def get_parser(**kwargs):
         help="Number of production loops"
     )
     parser.add_argument(
-        "--n-local-steps-training",
+        "--n-local-steps",
         type=int,
         default=5,
-        help="Number of local steps used in training"
+        help="Number of local steps (MCMC steps) per loop"
     )
     parser.add_argument(
-        "--n-global-steps-training",
+        "--n-global-steps",
         type=int,
         default=400,
-        help="Number of global steps used in training"
-    )
-    parser.add_argument(
-        "--n-local-steps-production",
-        type=int,
-        default=5,
-        help="Number of local steps used in training"
-    )
-    parser.add_argument(
-        "--n-global-steps-production",
-        type=int,
-        default=400,
-        help="Number of global steps used in training"
+        help="Number of global steps (normalizing flow steps) per loop"
     )
     parser.add_argument(
         "--n-epochs",
@@ -570,6 +558,12 @@ def get_parser(**kwargs):
         type=str,
         default=["H1", "L1", "V1"],
         help="List of interferometers to use"
+    )
+    parser.add_argument(
+        "--marginalize-phase",
+        type=bool,
+        default=True,
+        help="Whether to use phase marginalization in the likelihood. If True, phase_c will be marginalized over analytically and removed from the prior."
     )
     return parser
 
