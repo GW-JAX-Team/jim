@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from jax.scipy.special import logit
 from beartype import beartype as typechecker
-from jaxtyping import Float, Array, jaxtyped
+from jaxtyping import Float, jaxtyped
 
 
 class Transform(ABC):
