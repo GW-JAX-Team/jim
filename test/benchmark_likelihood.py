@@ -123,13 +123,30 @@ class OldBaseTransientLikelihoodFD(SingleEventLikelihood):
         return log_likelihood
 
 
-def setup_detectors(gps_time, f_min=20.0, f_max=1024.0):
-    """Setup H1 and L1 detectors with real data."""
+# Cache for detector data to ensure consistency across runs
+_detector_data_cache = {}
+
+def setup_detectors(gps_time, f_min=20.0, f_max=1024.0, use_cache=True):
+    """Setup H1 and L1 detectors with real data.
+    
+    Args:
+        gps_time: GPS time for the event
+        f_min: Minimum frequency
+        f_max: Maximum frequency
+        use_cache: If True, cache and reuse data across calls for consistency
+    """
+    cache_key = (gps_time, f_min, f_max)
+    
+    if use_cache and cache_key in _detector_data_cache:
+        print("  Using cached detector data for consistency...")
+        return _detector_data_cache[cache_key]
+    
     start = gps_time - 2
     end = gps_time + 2
     psd_start = gps_time - 2048
     psd_end = gps_time + 2048
     
+    print("  Fetching detector data from GWOSC...")
     ifos = [get_H1(), get_L1()]
     for ifo in ifos:
         data = Data.from_gwosc(ifo.name, start, end)
@@ -137,6 +154,10 @@ def setup_detectors(gps_time, f_min=20.0, f_max=1024.0):
         psd_data = Data.from_gwosc(ifo.name, psd_start, psd_end)
         psd_fftlength = data.duration * data.sampling_frequency
         ifo.set_psd(psd_data.to_psd(nperseg=psd_fftlength))
+    
+    if use_cache:
+        _detector_data_cache[cache_key] = ifos
+        print("  Data cached for future runs.")
     
     return ifos
 
@@ -159,7 +180,7 @@ def create_test_params():
     }
 
 
-def benchmark_likelihood(likelihood, params, n_evaluations=100, n_vmap=10, n_warmup=20, n_repeat=5):
+def benchmark_likelihood(likelihood, params, n_evaluations=100, n_vmap=10, n_warmup=50, n_repeat=10):
     """
     Benchmark a likelihood function with JIT and vmap, similar to FlowMC's approach.
     
@@ -172,7 +193,7 @@ def benchmark_likelihood(likelihood, params, n_evaluations=100, n_vmap=10, n_war
         n_repeat: Number of times to repeat timing measurements for statistics
     
     Returns:
-        dict with timing results including mean and std
+        dict with timing results including mean, std, and median
     """
     # Create a JIT'd version of evaluate (mimicking FlowMC's approach)
     @jax.jit
@@ -194,20 +215,35 @@ def benchmark_likelihood(likelihood, params, n_evaluations=100, n_vmap=10, n_war
         result = evaluate_jitted(params, {})
         result.block_until_ready()
     
+    # Force a small delay to let any background processes settle
+    time.sleep(0.5)
+    
     # Test single evaluation (JIT compiled) with multiple repeats
-    print(f"  Running {n_evaluations} sequential evaluations x {n_repeat} repeats...")
+    # Use consistent batch size for more stable measurements
+    n_inner_loop = 50  # Balance between measurement time and granularity
+    print(f"  Running {n_inner_loop} sequential evaluations x {n_repeat} repeats...")
     single_times = []
     for repeat in range(n_repeat):
+        # Small delay between repeats to reduce thermal/cache effects
+        if repeat > 0:
+            time.sleep(0.1)
+        
         start = time.time()
-        for _ in range(n_evaluations):
+        for _ in range(n_inner_loop):
             result = evaluate_jitted(params, {})
             result.block_until_ready()
         elapsed = time.time() - start
-        single_times.append(elapsed / n_evaluations)
+        single_times.append(elapsed / n_inner_loop)
+        
+        # Print progress for each repeat
+        print(f"    Repeat {repeat+1}/{n_repeat}: {elapsed/n_inner_loop*1000:.4f} ms per eval")
     
-    single_time_mean = jnp.mean(jnp.array(single_times))
-    single_time_std = jnp.std(jnp.array(single_times))
-    print(f"  Average time per evaluation: {single_time_mean*1000:.4f} ± {single_time_std*1000:.4f} ms")
+    single_times_array = jnp.array(single_times)
+    single_time_mean = jnp.mean(single_times_array)
+    single_time_std = jnp.std(single_times_array)
+    single_time_median = jnp.median(single_times_array)
+    print(f"  Mean: {single_time_mean*1000:.4f} ms, Median: {single_time_median*1000:.4f} ms, Std: {single_time_std*1000:.4f} ms")
+    print(f"  Coefficient of variation: {single_time_std/single_time_mean*100:.2f}%")
     
     # Test vmap (batch evaluation) - FlowMC style
     print(f"  Testing vmap with {n_vmap} parallel evaluations...")
@@ -225,6 +261,7 @@ def benchmark_likelihood(likelihood, params, n_evaluations=100, n_vmap=10, n_war
     eval_vmapped = jax.jit(jax.vmap(eval_with_M_c))
     
     # Compile vmap version
+    print("  Compiling vmap version...")
     start = time.time()
     results = eval_vmapped(M_c_array)
     results.block_until_ready()
@@ -232,24 +269,47 @@ def benchmark_likelihood(likelihood, params, n_evaluations=100, n_vmap=10, n_war
     print(f"  First vmap call (with compilation): {vmap_compile_time:.4f}s")
     print(f"  Results shape: {results.shape}")
     
+    # Extra compilation stabilization for vmap
+    print("  Extra vmap stabilization (10 runs)...")
+    for _ in range(10):
+        results = eval_vmapped(M_c_array)
+        results.block_until_ready()
+    
     # Warmup vmap
+    print(f"  Warming up vmap with {n_warmup} iterations...")
     for _ in range(n_warmup):
         results = eval_vmapped(M_c_array)
         results.block_until_ready()
     
+    # Small delay before measurements
+    time.sleep(0.5)
+    
     # Time vmap evaluation with multiple repeats
+    # Use same inner loop size for consistency
+    n_inner_loop_vmap = 20  # Fewer iterations since vmap is more expensive
+    print(f"  Running {n_inner_loop_vmap} vmap evaluations x {n_repeat} repeats...")
     vmap_times = []
     for repeat in range(n_repeat):
+        # Small delay between repeats
+        if repeat > 0:
+            time.sleep(0.1)
+        
         start = time.time()
-        for _ in range(10):  # Inner loop for more stable measurements
+        for _ in range(n_inner_loop_vmap):
             results = eval_vmapped(M_c_array)
             results.block_until_ready()
         elapsed = time.time() - start
-        vmap_times.append(elapsed / 10)
+        vmap_times.append(elapsed / n_inner_loop_vmap)
+        
+        # Print progress for each repeat
+        print(f"    Repeat {repeat+1}/{n_repeat}: {elapsed/n_inner_loop_vmap*1000:.4f} ms per vmap batch")
     
-    vmap_time_mean = jnp.mean(jnp.array(vmap_times))
-    vmap_time_std = jnp.std(jnp.array(vmap_times))
-    print(f"  Average vmap time ({n_vmap} evaluations): {vmap_time_mean*1000:.4f} ± {vmap_time_std*1000:.4f} ms")
+    vmap_times_array = jnp.array(vmap_times)
+    vmap_time_mean = jnp.mean(vmap_times_array)
+    vmap_time_std = jnp.std(vmap_times_array)
+    vmap_time_median = jnp.median(vmap_times_array)
+    print(f"  Mean: {vmap_time_mean*1000:.4f} ms, Median: {vmap_time_median*1000:.4f} ms, Std: {vmap_time_std*1000:.4f} ms")
+    print(f"  Coefficient of variation: {vmap_time_std/vmap_time_mean*100:.2f}%")
     print(f"  Time per sample in vmap: {vmap_time_mean/n_vmap*1000:.4f} ± {vmap_time_std/n_vmap*1000:.4f} ms")
     print(f"  Speedup vs sequential: {single_time_mean*n_vmap/vmap_time_mean:.2f}x")
     
@@ -257,9 +317,11 @@ def benchmark_likelihood(likelihood, params, n_evaluations=100, n_vmap=10, n_war
         'compile_time': compile_time,
         'single_eval_time': float(single_time_mean),
         'single_eval_time_std': float(single_time_std),
+        'single_eval_time_median': float(single_time_median),
         'vmap_compile_time': vmap_compile_time,
         'vmap_batch_time': float(vmap_time_mean),
         'vmap_batch_time_std': float(vmap_time_std),
+        'vmap_batch_time_median': float(vmap_time_median),
         'vmap_per_sample_time': float(vmap_time_mean / n_vmap),
         'vmap_per_sample_time_std': float(vmap_time_std / n_vmap),
     }
@@ -280,6 +342,12 @@ def main():
     print(f"  Device count: {len(devices)}")
     if jax.default_backend() == 'gpu':
         print(f"  GPU memory: {devices[0].memory_stats()}")
+    print()
+    
+    # Force JAX to initialize and warm up
+    print("Initializing JAX (forcing compilation of basic operations)...")
+    _ = jax.jit(lambda x: x + 1)(jnp.array(1.0))
+    print("JAX initialized.")
     print()
     
     # Setup
@@ -316,6 +384,11 @@ def main():
     old_results = benchmark_likelihood(old_likelihood, params)
     print()
     
+    # Small delay between benchmarks to reduce thermal effects
+    print("Cooling down between benchmarks...")
+    time.sleep(2.0)
+    print()
+    
     # Benchmark new implementation (same bounds - backward compatibility)
     print("-"*80)
     print("NEW IMPLEMENTATION - Same bounds (backward compatibility test)")
@@ -330,12 +403,17 @@ def main():
     new_same_results = benchmark_likelihood(new_likelihood_same, params)
     print()
     
+    # Small delay between benchmarks
+    print("Cooling down between benchmarks...")
+    time.sleep(2.0)
+    print()
+    
     # Benchmark new implementation (different bounds per detector)
     print("-"*80)
     print("NEW IMPLEMENTATION - Different bounds per detector")
     print("-"*80)
-    # Reset detectors for different bounds
-    detectors = setup_detectors(gps_time, f_min, f_max)
+    # Reset detectors for different bounds (use cached data for consistency)
+    detectors = setup_detectors(gps_time, f_min, f_max, use_cache=True)
     new_likelihood_diff = NewBaseTransientLikelihoodFD(
         detectors=detectors,
         waveform=waveform,
@@ -348,32 +426,50 @@ def main():
     
     # Summary
     print("="*80)
-    print("SUMMARY (mean ± std over 5 runs)")
+    print("SUMMARY (mean ± std over 10 runs, median in parentheses)")
     print("="*80)
     print()
-    print(f"{'Metric':<45} {'Old':<20} {'New (same)':<20} {'New (diff)':<20}")
-    print("-"*105)
+    print(f"{'Metric':<50} {'Old':<25} {'New (same)':<25} {'New (diff)':<25}")
+    print("-"*125)
     
-    # Single evaluation times
-    print(f"{'Single evaluation (ms)':<45} "
-          f"{old_results['single_eval_time']*1000:>7.4f}±{old_results['single_eval_time_std']*1000:<7.4f} "
-          f"{new_same_results['single_eval_time']*1000:>7.4f}±{new_same_results['single_eval_time_std']*1000:<7.4f} "
-          f"{new_diff_results['single_eval_time']*1000:>7.4f}±{new_diff_results['single_eval_time_std']*1000:<7.4f}")
+    # Single evaluation times with median
+    print(f"{'Single evaluation (ms)':<50} "
+          f"{old_results['single_eval_time']*1000:>7.4f}±{old_results['single_eval_time_std']*1000:>6.4f} "
+          f"({old_results['single_eval_time_median']*1000:>7.4f}) "
+          f"{new_same_results['single_eval_time']*1000:>7.4f}±{new_same_results['single_eval_time_std']*1000:>6.4f} "
+          f"({new_same_results['single_eval_time_median']*1000:>7.4f}) "
+          f"{new_diff_results['single_eval_time']*1000:>7.4f}±{new_diff_results['single_eval_time_std']*1000:>6.4f} "
+          f"({new_diff_results['single_eval_time_median']*1000:>7.4f})")
     
-    # Vmap batch times
-    print(f"{'Vmap batch time (ms)':<45} "
-          f"{old_results['vmap_batch_time']*1000:>7.4f}±{old_results['vmap_batch_time_std']*1000:<7.4f} "
-          f"{new_same_results['vmap_batch_time']*1000:>7.4f}±{new_same_results['vmap_batch_time_std']*1000:<7.4f} "
-          f"{new_diff_results['vmap_batch_time']*1000:>7.4f}±{new_diff_results['vmap_batch_time_std']*1000:<7.4f}")
+    # Vmap batch times with median
+    print(f"{'Vmap batch time (ms)':<50} "
+          f"{old_results['vmap_batch_time']*1000:>7.4f}±{old_results['vmap_batch_time_std']*1000:>6.4f} "
+          f"({old_results['vmap_batch_time_median']*1000:>7.4f}) "
+          f"{new_same_results['vmap_batch_time']*1000:>7.4f}±{new_same_results['vmap_batch_time_std']*1000:>6.4f} "
+          f"({new_same_results['vmap_batch_time_median']*1000:>7.4f}) "
+          f"{new_diff_results['vmap_batch_time']*1000:>7.4f}±{new_diff_results['vmap_batch_time_std']*1000:>6.4f} "
+          f"({new_diff_results['vmap_batch_time_median']*1000:>7.4f})")
     
     # Vmap per sample
-    print(f"{'Vmap per sample (ms)':<45} "
-          f"{old_results['vmap_per_sample_time']*1000:>7.4f}±{old_results['vmap_per_sample_time_std']*1000:<7.4f} "
-          f"{new_same_results['vmap_per_sample_time']*1000:>7.4f}±{new_same_results['vmap_per_sample_time_std']*1000:<7.4f} "
-          f"{new_diff_results['vmap_per_sample_time']*1000:>7.4f}±{new_diff_results['vmap_per_sample_time_std']*1000:<7.4f}")
+    print(f"{'Vmap per sample (ms)':<50} "
+          f"{old_results['vmap_per_sample_time']*1000:>7.4f}±{old_results['vmap_per_sample_time_std']*1000:>6.4f} "
+          f"            "
+          f"{new_same_results['vmap_per_sample_time']*1000:>7.4f}±{new_same_results['vmap_per_sample_time_std']*1000:>6.4f} "
+          f"            "
+          f"{new_diff_results['vmap_per_sample_time']*1000:>7.4f}±{new_diff_results['vmap_per_sample_time_std']*1000:>6.4f}")
     print()
     
-    # Calculate overhead with error propagation
+    # Calculate overhead with error propagation (using median for robustness)
+    print("Performance Comparison (new vs old):")
+    print()
+    
+    # Use median for more robust comparison
+    overhead_same_median = ((new_same_results['single_eval_time_median'] - old_results['single_eval_time_median']) 
+                            / old_results['single_eval_time_median'] * 100)
+    overhead_diff_median = ((new_diff_results['single_eval_time_median'] - old_results['single_eval_time_median']) 
+                            / old_results['single_eval_time_median'] * 100)
+    
+    # Also calculate using mean
     overhead_same = ((new_same_results['single_eval_time'] - old_results['single_eval_time']) 
                      / old_results['single_eval_time'] * 100)
     overhead_diff = ((new_diff_results['single_eval_time'] - old_results['single_eval_time']) 
@@ -390,23 +486,40 @@ def main():
         (old_results['single_eval_time_std'] / old_results['single_eval_time'])**2
     ) * abs(overhead_diff)
     
-    print(f"Performance comparison (new vs old):")
-    print(f"  Same bounds:      {overhead_same:+7.2f}% ± {rel_std_same:5.2f}%")
-    print(f"  Different bounds: {overhead_diff:+7.2f}% ± {rel_std_diff:5.2f}%")
+    print(f"{'Configuration':<25} {'Mean Overhead':<20} {'Median Overhead':<20}")
+    print("-"*65)
+    print(f"{'Same bounds:':<25} {overhead_same:+7.2f}% ± {rel_std_same:5.2f}% {overhead_same_median:+7.2f}%")
+    print(f"{'Different bounds:':<25} {overhead_diff:+7.2f}% ± {rel_std_diff:5.2f}% {overhead_diff_median:+7.2f}%")
     print()
     
-    # Statistical significance check (simple 2-sigma test)
+    # Statistical significance check (2-sigma test)
     significant_same = abs(overhead_same) > 2 * rel_std_same
     significant_diff = abs(overhead_diff) > 2 * rel_std_diff
     
-    if overhead_same < -5 and significant_same:
-        print("✓ NEW implementation is FASTER! (statistically significant)")
-    elif overhead_same < 5 or not significant_same:
-        print("✓ Performance is equivalent (within measurement uncertainty)")
-    elif overhead_same < 10:
-        print("⚠ Slight overhead detected, but acceptable for added flexibility")
+    # Check coefficient of variation for measurement quality (using vmap batch results)
+    cv_old = old_results['vmap_batch_time_std'] / old_results['vmap_batch_time'] * 100
+    cv_new_same = new_same_results['vmap_batch_time_std'] / new_same_results['vmap_batch_time'] * 100
+    cv_new_diff = new_diff_results['vmap_batch_time_std'] / new_diff_results['vmap_batch_time'] * 100
+    
+    print("Measurement Quality (Coefficient of Variation - Vmap Batch):")
+    print(f"  Old:            {cv_old:.2f}%")
+    print(f"  New (same):     {cv_new_same:.2f}%")
+    print(f"  New (diff):     {cv_new_diff:.2f}%")
+    if max(cv_old, cv_new_same, cv_new_diff) > 5:
+        print("  ⚠ Warning: High variability detected (>5%). Consider running more repeats.")
     else:
-        print("⚠ Significant performance degradation - may need optimization")
+        print("  ✓ Measurements are stable (<5% variation)")
+    print()
+    
+    print("Conclusion:")
+    if overhead_same_median < -5 and significant_same:
+        print("  ✓ NEW implementation is FASTER! (statistically significant)")
+    elif abs(overhead_same_median) < 5 or not significant_same:
+        print("  ✓ Performance is EQUIVALENT (within measurement uncertainty)")
+    elif overhead_same_median < 10:
+        print("  ⚠ Slight overhead detected, but acceptable for added flexibility")
+    else:
+        print("  ⚠ Significant performance degradation - may need optimization")
     print()
 
 
