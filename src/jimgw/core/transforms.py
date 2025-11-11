@@ -269,7 +269,9 @@ class OffsetTransform(BijectiveTransform):
     offset: Float
 
     def __repr__(self):
-        return f"OffsetTransform(name_mapping={self.name_mapping}, offset={self.offset})"
+        return (
+            f"OffsetTransform(name_mapping={self.name_mapping}, offset={self.offset})"
+        )
 
     def __init__(
         self,
@@ -648,7 +650,9 @@ class RayleighTransform(BijectiveTransform):
     """
 
     def __repr__(self):
-        return f"RayleighTransform(name_mapping={self.name_mapping}, sigma={self.sigma})"
+        return (
+            f"RayleighTransform(name_mapping={self.name_mapping}, sigma={self.sigma})"
+        )
 
     def __init__(
         self,
