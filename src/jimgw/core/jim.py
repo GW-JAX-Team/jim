@@ -40,7 +40,7 @@ class Jim(object):
         n_training_loops: int = 20,
         n_production_loops: int = 20,
         n_epochs: int = 20,
-        mala_step_size: Union[float, Array] = 0.01,
+        mala_step_size: Union[float, Float[Array, " n_dims n_dims"]] = 0.01,
         chain_batch_size: int = 0,
         rq_spline_hidden_units: list[int] = [128, 128],
         rq_spline_n_bins: int = 10,
