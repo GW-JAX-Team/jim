@@ -32,6 +32,9 @@ class Transform(ABC):
 class NtoMTransform(Transform):
     transform_func: Callable[[dict[str, Float]], dict[str, Float]]
 
+    def __repr__(self):
+        return f"NtoMTransform(name_mapping={self.name_mapping})"
+
     def forward(self, x: dict[str, Float]) -> dict[str, Float]:
         """
         Push forward the input x to transformed coordinate y.
@@ -60,6 +63,9 @@ class NtoMTransform(Transform):
 
 
 class NtoNTransform(NtoMTransform):
+    def __repr__(self):
+        return f"NtoNTransform(name_mapping={self.name_mapping})"
+
     @property
     def n_dim(self) -> int:
         return len(self.name_mapping[0])
@@ -102,6 +108,9 @@ class NtoNTransform(NtoMTransform):
 
 class BijectiveTransform(NtoNTransform):
     inverse_transform_func: Callable[[dict[str, Float]], dict[str, Float]]
+
+    def __repr__(self):
+        return f"BijectiveTransform(name_mapping={self.name_mapping})"
 
     def inverse(self, y: dict[str, Float]) -> tuple[dict[str, Float], Float]:
         """
@@ -166,6 +175,9 @@ class BijectiveTransform(NtoNTransform):
 
 class ConditionalBijectiveTransform(BijectiveTransform):
     conditional_names: list[str]
+
+    def __repr__(self):
+        return f"ConditionalBijectiveTransform(name_mapping={self.name_mapping}, conditional_names={self.conditional_names})"
 
     def __init__(
         self,
@@ -232,6 +244,9 @@ class ConditionalBijectiveTransform(BijectiveTransform):
 class ScaleTransform(BijectiveTransform):
     scale: Float
 
+    def __repr__(self):
+        return f"ScaleTransform(name_mapping={self.name_mapping}, scale={self.scale})"
+
     def __init__(
         self,
         name_mapping: tuple[list[str], list[str]],
@@ -252,6 +267,9 @@ class ScaleTransform(BijectiveTransform):
 @jaxtyped(typechecker=typechecker)
 class OffsetTransform(BijectiveTransform):
     offset: Float
+
+    def __repr__(self):
+        return f"OffsetTransform(name_mapping={self.name_mapping}, offset={self.offset})"
 
     def __init__(
         self,
@@ -282,6 +300,9 @@ class LogitTransform(BijectiveTransform):
 
     """
 
+    def __repr__(self):
+        return f"LogitTransform(name_mapping={self.name_mapping})"
+
     def __init__(
         self,
         name_mapping: tuple[list[str], list[str]],
@@ -310,6 +331,9 @@ class SineTransform(BijectiveTransform):
             The name mapping between the input and output dictionary.
 
     """
+
+    def __repr__(self):
+        return f"SineTransform(name_mapping={self.name_mapping})"
 
     def __init__(
         self,
@@ -340,6 +364,9 @@ class CosineTransform(BijectiveTransform):
 
     """
 
+    def __repr__(self):
+        return f"CosineTransform(name_mapping={self.name_mapping})"
+
     def __init__(
         self,
         name_mapping: tuple[list[str], list[str]],
@@ -365,6 +392,9 @@ class BoundToBound(BijectiveTransform):
     original_upper_bound: Float
     target_lower_bound: Float
     target_upper_bound: Float
+
+    def __repr__(self):
+        return f"BoundToBound(name_mapping={self.name_mapping}, original_lower_bound={self.original_lower_bound}, original_upper_bound={self.original_upper_bound}, target_lower_bound={self.target_lower_bound}, target_upper_bound={self.target_upper_bound})"
 
     def __init__(
         self,
@@ -404,6 +434,9 @@ class BoundToUnbound(BijectiveTransform):
 
     original_lower_bound: Float
     original_upper_bound: Float
+
+    def __repr__(self):
+        return f"BoundToUnbound(name_mapping={self.name_mapping}, original_lower_bound={self.original_lower_bound}, original_upper_bound={self.original_upper_bound})"
 
     def __init__(
         self,
@@ -446,6 +479,9 @@ class SingleSidedUnboundTransform(BijectiveTransform):
 
     original_lower_bound: Float
 
+    def __repr__(self):
+        return f"SingleSidedUnboundTransform(name_mapping={self.name_mapping}, original_lower_bound={self.original_lower_bound})"
+
     def __init__(
         self,
         name_mapping: tuple[list[str], list[str]],
@@ -479,6 +515,9 @@ class PowerLawTransform(BijectiveTransform):
     xmin: Float
     xmax: Float
     alpha: Float
+
+    def __repr__(self):
+        return f"PowerLawTransform(name_mapping={self.name_mapping}, xmin={self.xmin}, xmax={self.xmax}, alpha={self.alpha})"
 
     def __init__(
         self,
@@ -533,6 +572,9 @@ class CartesianToPolarTransform(BijectiveTransform):
             The name of the parameter to be transformed.
     """
 
+    def __repr__(self):
+        return f"CartesianToPolarTransform(name_mapping={self.name_mapping})"
+
     def __init__(
         self,
         parameter_name: str,
@@ -565,6 +607,9 @@ class PeriodicTransform(BijectiveTransform):
     """
     Periodic transformation
     """
+
+    def __repr__(self):
+        return f"PeriodicTransform(name_mapping={self.name_mapping}, xmin={self.xmin}, xmax={self.xmax})"
 
     def __init__(
         self,
@@ -601,6 +646,9 @@ class RayleighTransform(BijectiveTransform):
     parameter_name : str
             The name of the parameter to be transformed.
     """
+
+    def __repr__(self):
+        return f"RayleighTransform(name_mapping={self.name_mapping}, sigma={self.sigma})"
 
     def __init__(
         self,
