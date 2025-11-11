@@ -6,6 +6,7 @@ from flowMC.resource_strategy_bundle.RQSpline_MALA_PT import RQSpline_MALA_PT_Bu
 from flowMC.resource.buffers import Buffer
 from flowMC.Sampler import Sampler
 from jaxtyping import Array, Float, PRNGKeyArray
+from typing import Union
 
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.prior import Prior
@@ -39,7 +40,7 @@ class Jim(object):
         n_training_loops: int = 20,
         n_production_loops: int = 20,
         n_epochs: int = 20,
-        mala_step_size: float = 0.01,
+        mala_step_size: Union[float, Array] = 0.01,
         chain_batch_size: int = 0,
         rq_spline_hidden_units: list[int] = [128, 128],
         rq_spline_n_bins: int = 10,
@@ -92,7 +93,7 @@ class Jim(object):
             n_training_loops=n_training_loops,
             n_production_loops=n_production_loops,
             n_epochs=n_epochs,
-            mala_step_size=mala_step_size,
+            mala_step_size=mala_step_size,  # type: ignore
             chain_batch_size=chain_batch_size,
             rq_spline_hidden_units=rq_spline_hidden_units,
             rq_spline_n_bins=rq_spline_n_bins,
