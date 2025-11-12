@@ -138,6 +138,8 @@ class Data(ABC):
         Returns:
             Array: Array of frequency mask, usually of 0 and 1, but not necessary.
         """
+        # Developer note: Unless there are good reasons not to, any updates
+        # to self.fd should be immediately followed by applying this mask.
         return self._frequency_mask
 
     @property
@@ -211,6 +213,7 @@ class Data(ABC):
                     "Shape of frequency mask should match with that of frequency array"
                     )
         self._frequency_mask = frequency_mask
+        # Always update the data whenever the mask is updated.
         self.fd *= self.frequency_mask
 
     def set_frequency_mask(
@@ -360,13 +363,16 @@ class Data(ABC):
         data = cls(data_td_full, delta_t, epoch=epoch, name=name)
         data.fd = data_fd_full
 
-        # This ensures the newly constructed Data in FD fully
+        # This ensures the newly constructed Data in FD faithfully
         # represents the input FD data.
         d_new, f_new = data.frequency_slice(frequencies[0], frequencies[-1])
         assert all(jnp.equal(d_new, fd)), "Data do not match after slicing"
         assert all(
             jnp.equal(f_new, frequencies)
         ), "Frequencies do not match after slicing"
+
+        # Only apply the destructive mask after assertion (if set)
+        data.fd *= data.frequency_mask
         return data
 
     @classmethod
