@@ -92,7 +92,7 @@ class Jim(object):
             n_training_loops=n_training_loops,
             n_production_loops=n_production_loops,
             n_epochs=n_epochs,
-            mala_step_size=mala_step_size,  # type: ignore
+            mala_step_size=mala_step_size,  # type: ignore # Type ignored should be removed once the FlowMC fix is published
             chain_batch_size=chain_batch_size,
             rq_spline_hidden_units=rq_spline_hidden_units,
             rq_spline_n_bins=rq_spline_n_bins,
