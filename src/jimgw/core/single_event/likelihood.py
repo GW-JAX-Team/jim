@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from flowMC.strategy.optimization import AdamOptimization
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, Float
-from typing import Optional, Union
+from typing import Optional
 from scipy.interpolate import interp1d
 from jimgw.core.utils import log_i0
 from jimgw.core.prior import Prior
