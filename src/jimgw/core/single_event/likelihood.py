@@ -81,16 +81,12 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
     Args:
         detectors (Sequence[Detector]): List of detector objects containing data and metadata.
         waveform (Waveform): Waveform model to evaluate.
-        f_min (Union[float, dict[str, float]], optional): Minimum frequency for likelihood evaluation.
-            Can be a single float (applied to all detectors) or a dictionary mapping detector names
-            to their respective minimum frequencies. Defaults to 0.
-        f_max (Union[float, dict[str, float]], optional): Maximum frequency for likelihood evaluation.
-            Can be a single float (applied to all detectors) or a dictionary mapping detector names
-            to their respective maximum frequencies. Defaults to infinity.
+        f_min (Float, optional): Minimum frequency for likelihood evaluation. Defaults to 0.
+        f_max (Float, optional): Maximum frequency for likelihood evaluation. Defaults to infinity.
         trigger_time (Float, optional): GPS time of the event trigger. Defaults to 0.
 
     Example:
-        >>> likelihood = BaseTransientLikelihoodFD(detectors, waveform, f_min={'H1': 20, 'L1': 50}, f_max=1024, trigger_time=1234567890)
+        >>> likelihood = BaseTransientLikelihoodFD(detectors, waveform, f_min=20, f_max=1024, trigger_time=1234567890)
         >>> logL = likelihood.evaluate(params, data)
     """
 
@@ -99,8 +95,8 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         detectors: Sequence[Detector],
         waveform: Waveform,
         fixed_parameters: Optional[dict[str, Float]] = None,
-        f_min: Union[float, dict[str, float]] = 0.0,
-        f_max: Union[float, dict[str, float]] = float("inf"),
+        f_min: Float = 0,
+        f_max: Float = float("inf"),
         trigger_time: Float = 0,
     ) -> None:
         """Initializes the BaseTransientLikelihoodFD class.
@@ -110,45 +106,21 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         Args:
             detectors (Sequence[Detector]): List of detector objects.
             waveform (Waveform): Waveform model.
-            f_min (Union[float, dict[str, float]], optional): Minimum frequency. Can be a single float
-                (applied to all detectors) or a dictionary mapping detector names to their respective
-                minimum frequencies. Defaults to 0.
-            f_max (Union[float, dict[str, float]], optional): Maximum frequency. Can be a single float
-                (applied to all detectors) or a dictionary mapping detector names to their respective
-                maximum frequencies. Defaults to infinity.
+            f_min (Float, optional): Minimum frequency. Defaults to 0.
+            f_max (Float, optional): Maximum frequency. Defaults to infinity.
             trigger_time (Float, optional): Event trigger time. Defaults to 0.
         """
         super().__init__(detectors, waveform, fixed_parameters)
         # Set the frequency bounds for the detectors
         _frequencies = []
         for detector in detectors:
-            detector_name = detector.name
-            if isinstance(f_min, dict):
-                if detector_name not in f_min:
-                    raise ValueError(
-                        f"f_min dictionary must contain an entry for detector {detector_name}"
-                    )
-                f_min = f_min[detector_name]
-            if isinstance(f_max, dict):
-                if detector_name not in f_max:
-                    raise ValueError(
-                        f"f_max dictionary must contain an entry for detector {detector_name}"
-                    )
-                f_max = f_max[detector_name]
             detector.set_frequency_bounds(f_min, f_max)
             _frequencies.append(detector.sliced_frequencies)
         _frequencies = jnp.array(_frequencies)
-        delta_f = _frequencies[:, 1] - _frequencies[:, 0]
-        assert jnp.all(delta_f == delta_f[0]), "Detectors must have the same delta_f"
-        self.df = delta_f[0]
-        self.frequencies = jnp.arange(
-            _frequencies[:, 0].min(), _frequencies[:, -1].max() + self.df, self.df
-        )
-        self.frequency_mask = {
-            detector.name: (self.frequencies >= detector.sliced_frequencies[0])
-            & (self.frequencies <= detector.sliced_frequencies[-1])
-            for detector in detectors
-        }
+        assert jnp.array_equal(
+            _frequencies[:-1], _frequencies[1:]
+        ), "The frequency arrays are not all the same."
+        self.frequencies = _frequencies[0]
         self.trigger_time = trigger_time
         self.gmst = compute_gmst(self.trigger_time)
 
@@ -175,21 +147,19 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         """Core likelihood evaluation method for frequency-domain transient events."""
         waveform_sky = self.waveform(self.frequencies, params)
         log_likelihood = 0.0
+        df = (
+            self.detectors[0].sliced_frequencies[1]
+            - self.detectors[0].sliced_frequencies[0]
+        )
         for ifo in self.detectors:
             freqs, ifo_data, psd = (
                 ifo.sliced_frequencies,
                 ifo.sliced_fd_data,
                 ifo.sliced_psd,
             )
-            mask = self.frequency_mask[ifo.name]
-            waveform_sky_sliced = {
-                "p": waveform_sky["p"][mask],
-                "c": waveform_sky["c"][mask],
-            }
-
-            h_dec = ifo.fd_response(freqs, waveform_sky_sliced, params)
-            match_filter_SNR = inner_product(h_dec, ifo_data, psd, self.df)
-            optimal_SNR = inner_product(h_dec, h_dec, psd, self.df)
+            h_dec = ifo.fd_response(freqs, waveform_sky, params)
+            match_filter_SNR = inner_product(h_dec, ifo_data, psd, df)
+            optimal_SNR = inner_product(h_dec, h_dec, psd, df)
             log_likelihood += match_filter_SNR - optimal_SNR / 2
         return log_likelihood
 
