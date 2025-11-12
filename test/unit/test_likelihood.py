@@ -77,7 +77,7 @@ class TestBaseTransientLikelihoodFD:
     def test_evaluation(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = BaseTransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min={'H1': fmin, 'L1': fmin + 10.0}, f_max=fmax, trigger_time=gps
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
         )
         params = example_params(likelihood.gmst)
 
@@ -86,6 +86,8 @@ class TestBaseTransientLikelihoodFD:
 
         log_likelihood_jit = jax.jit(likelihood.evaluate)(params, {})
         assert np.isfinite(log_likelihood_jit), "Log likelihood should be finite"
+
+        assert log_likelihood == log_likelihood_jit, "JIT and non-JIT results should match"
 
 
 # class TestTimeMarginalizedLikelihoodFD:
