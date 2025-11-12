@@ -127,6 +127,20 @@ class Data(ABC):
         return jnp.fft.rfftfreq(self.n_time, self.delta_t)
 
     @property
+    def frequency_mask(self) -> Float[Array, " n_time // 2 + 1"]:
+        """Masks data in Fourier domain.
+
+        Different from frequency slicing, which alters the shape of the output
+        array. The primary use case of this is to mask out data quality issues.
+
+        This mask also allows for more adaptive changes such as data notching.
+
+        Returns:
+            Array: Array of frequency mask, usually of 0 and 1, but not necessary.
+        """
+        return self._frequency_mask
+
+    @property
     def has_fd(self) -> bool:
         """Checks if Fourier domain data exists.
 
@@ -161,6 +175,7 @@ class Data(ABC):
             self.set_tukey_window()
         else:
             self.window = window
+        self._frequency_mask = jnp.ones_like(self.frequencies)
 
     def __repr__(self):
         return (
@@ -187,6 +202,27 @@ class Data(ABC):
         logging.info(f"Setting Tukey window to {self.name} data")
         self.window = jnp.array(tukey(self.n_time, alpha))
 
+    @frequency_mask.setter
+    def frequency_mask(
+            self, frequency_mask: Float[Array, " n_time // 2 + 1"]
+    ) -> None:
+        if not frequency_mask.shape == self.frequencies.shape:
+            raise ValueError(
+                    "Shape of frequency mask should match with that of frequency array"
+                    )
+        self._frequency_mask = frequency_mask
+        self.fd *= self.frequency_mask
+
+    def set_frequency_mask(
+            self,
+            f_min: Optional[Float] = None,
+            f_max: Optional[Float] = None,
+    ) -> None:
+        if f_min is not None:
+            self.frequency_mask *= self.frequencies >= f_min
+        elif f_max is not None:
+            self.frequency_mask *= self.frequencies <= f_max
+
     def fft(
         self, window: Optional[Float[Array, " n_time"]] = None
     ) -> Complex[Array, " n_freq"]:
@@ -207,6 +243,8 @@ class Data(ABC):
 
         logging.info(f"Computing FFT of {self.name} data")
         self.fd = jnp.fft.rfft(self.td * window) * self.delta_t
+        # TODO: Consider adding a setter function for fd that always applies the mask
+        self.fd *= self.frequency_mask
         self.window = window
         return self.fd
 
