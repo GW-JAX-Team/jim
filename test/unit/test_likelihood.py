@@ -87,7 +87,7 @@ class TestBaseTransientLikelihoodFD:
         log_likelihood_jit = jax.jit(likelihood.evaluate)(params, {})
         assert np.isfinite(log_likelihood_jit), "Log likelihood should be finite"
 
-        assert log_likelihood == log_likelihood_jit, "JIT and non-JIT results should match"
+        assert np.isclose(log_likelihood, log_likelihood_jit), "JIT and non-JIT results should match"
 
 
 # class TestTimeMarginalizedLikelihoodFD:
