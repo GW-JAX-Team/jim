@@ -1,8 +1,8 @@
 site_name: jim
 site_description: A JAX-based gravitational-wave inference toolkit
-site_author: Kaze Wong
-repo_url: https://github.com/kazewong/jim
-repo_name: kazewong/jim
+site_author: GW JAX Team
+repo_url: https://github.com/GW-JAX-Team/jim
+repo_name: GW-JAX-Team/jim
 
 theme:
     name: material
@@ -26,9 +26,6 @@ theme:
           toggle:
              icon: material/brightness-2
              name: Light mode
-
-    twitter_name: "@physicskaze"
-    twitter_url: "https://twitter.com/physicskaze"
 
 markdown_extensions:
     - pymdownx.arithmatex:  # Render LaTeX via MathJax

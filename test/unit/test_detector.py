@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 from copy import deepcopy
 from scipy.signal import welch
-from jimgw.single_event.data import Data, PowerSpectrum
+from jimgw.core.single_event.data import Data, PowerSpectrum
 
 
 class TestDataInterface:

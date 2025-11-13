@@ -29,7 +29,7 @@ pip install jimGW
 
 You may install the bleeding edge version by cloning this repo, or doing
 ```
-pip install git+https://github.com/kazewong/jim
+pip install git+https://github.com/GW-JAX-Team/jim
 ```
 
 If you would like to take advantage of CUDA, you will additionally need to install a specific version of JAX by doing

@@ -2,8 +2,9 @@ name: CI
 
 on:
   pull_request:
+    branches: [main, jim-dev]
   push:
-    branches: [main]
+    branches: [main, jim-dev]
 
 jobs:
   build:
@@ -29,7 +30,9 @@ jobs:
           uv run coverage run --source=src -m pytest test
           uv run coveralls --service=github-actions
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+          COVERALLS_SERVICE_NAME: github-actions
 
       - name: Run build
         run: uv build
