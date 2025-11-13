@@ -139,7 +139,7 @@ class Data(ABC):
             Array: Array of frequency mask, usually of 0 and 1, but not necessary.
         """
         # Developer note: Unless there are good reasons not to, any updates
-        # to self.fd should be immediately followed by applying this mask.
+        # to self.fd should be immediately followed by applying this mask.
         return self._frequency_mask
 
     @property
@@ -205,21 +205,19 @@ class Data(ABC):
         self.window = jnp.array(tukey(self.n_time, alpha))
 
     @frequency_mask.setter
-    def frequency_mask(
-            self, frequency_mask: Float[Array, " n_time // 2 + 1"]
-    ) -> None:
+    def frequency_mask(self, frequency_mask: Float[Array, " n_time // 2 + 1"]) -> None:
         if not frequency_mask.shape == self.frequencies.shape:
             raise ValueError(
-                    "Shape of frequency mask should match with that of frequency array"
-                    )
+                "Shape of frequency mask should match with that of frequency array"
+            )
         self._frequency_mask = frequency_mask
         # Always update the data whenever the mask is updated.
         self.fd *= self.frequency_mask
 
     def set_frequency_mask(
-            self,
-            f_min: Optional[Float] = None,
-            f_max: Optional[Float] = None,
+        self,
+        f_min: Optional[Float] = None,
+        f_max: Optional[Float] = None,
     ) -> None:
         if f_min is not None:
             self.frequency_mask *= self.frequencies >= f_min
