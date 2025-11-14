@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from flowMC.strategy.optimization import AdamOptimization
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, Float
-from typing import Optional
+from typing import Optional, Union
 from scipy.interpolate import interp1d
 from jimgw.core.utils import log_i0
 from jimgw.core.prior import Prior
@@ -81,12 +81,16 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
     Args:
         detectors (Sequence[Detector]): List of detector objects containing data and metadata.
         waveform (Waveform): Waveform model to evaluate.
-        f_min (Float, optional): Minimum frequency for likelihood evaluation. Defaults to 0.
-        f_max (Float, optional): Maximum frequency for likelihood evaluation. Defaults to infinity.
+        f_min (Union[float, dict[str, float]], optional): Minimum frequency for likelihood evaluation.
+            Can be a single float (applied to all detectors) or a dictionary mapping detector names
+            to their respective minimum frequencies. Defaults to 0.
+        f_max (Union[float, dict[str, float]], optional): Maximum frequency for likelihood evaluation.
+            Can be a single float (applied to all detectors) or a dictionary mapping detector names
+            to their respective maximum frequencies. Defaults to infinity.
         trigger_time (Float, optional): GPS time of the event trigger. Defaults to 0.
 
     Example:
-        >>> likelihood = BaseTransientLikelihoodFD(detectors, waveform, f_min=20, f_max=1024, trigger_time=1234567890)
+        >>> likelihood = BaseTransientLikelihoodFD(detectors, waveform, f_min={'H1': 20, 'L1': 50}, f_max=1024, trigger_time=1234567890)
         >>> logL = likelihood.evaluate(params, data)
     """
 
@@ -95,8 +99,8 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         detectors: Sequence[Detector],
         waveform: Waveform,
         fixed_parameters: Optional[dict[str, Float]] = None,
-        f_min: Float = 0,
-        f_max: Float = float("inf"),
+        f_min: Union[float, dict[str, float]] = 0.0,
+        f_max: Union[float, dict[str, float]] = float("inf"),
         trigger_time: Float = 0,
     ) -> None:
         """Initializes the BaseTransientLikelihoodFD class.
@@ -106,21 +110,51 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         Args:
             detectors (Sequence[Detector]): List of detector objects.
             waveform (Waveform): Waveform model.
-            f_min (Float, optional): Minimum frequency. Defaults to 0.
-            f_max (Float, optional): Maximum frequency. Defaults to infinity.
+            f_min (Union[float, dict[str, float]], optional): Minimum frequency. Can be a single float
+                (applied to all detectors) or a dictionary mapping detector names to their respective
+                minimum frequencies. Defaults to 0.
+            f_max (Union[float, dict[str, float]], optional): Maximum frequency. Can be a single float
+                (applied to all detectors) or a dictionary mapping detector names to their respective
+                maximum frequencies. Defaults to infinity.
             trigger_time (Float, optional): Event trigger time. Defaults to 0.
         """
         super().__init__(detectors, waveform, fixed_parameters)
-        # Set the frequency bounds for the detectors
+        
+        # Determine global frequency bounds
+        f_min_min = min(f_min.values()) if isinstance(f_min, dict) else f_min
+        f_max_max = max(f_max.values()) if isinstance(f_max, dict) else f_max
+        
+        # Set frequency bounds and masks for each detector
         _frequencies = []
         for detector in detectors:
-            detector.set_frequency_bounds(f_min, f_max)
+            detector.set_frequency_bounds(f_min_min, f_max_max)
             _frequencies.append(detector.sliced_frequencies)
+            
+            # Determine detector-specific frequency mask
+            f_min_ifo = f_min[detector.name] if isinstance(f_min, dict) else None
+            f_max_ifo = f_max[detector.name] if isinstance(f_max, dict) else None
+            
+            cond_1 = f_min_ifo is not None and f_min_ifo > f_min_min
+            cond_2 = f_max_ifo is not None and f_max_ifo < f_max_max
+            if cond_1 or cond_2:
+                if cond_1:
+                    logging.warning(
+                        f"{detector.name} has f_min={f_min_ifo}, which is higher than the global minimum frequency {f_min_min}. Truncating data accordingly."
+                    )
+                if cond_2:
+                    logging.warning(
+                        f"{detector.name} has f_max={f_max_ifo}, which is lower than the global maximum frequency {f_max_max}. Truncating data accordingly."
+                    )
+                detector.data.set_frequency_mask(f_min_ifo, f_max_ifo)
+        
+        # Validate frequency grids are consistent across detectors
         _frequencies = jnp.array(_frequencies)
-        assert jnp.all(
-            jnp.array(_frequencies)[:-1] == jnp.array(_frequencies)[1:]
-        ), "The frequency arrays are not all the same."
+        assert jnp.array_equal(_frequencies[:-1], _frequencies[1:]), (
+            "Detectors must have the same frequency grid"
+        )
+        
         self.frequencies = _frequencies[0]
+        self.df = self.frequencies[1] - self.frequencies[0]
         self.trigger_time = trigger_time
         self.gmst = compute_gmst(self.trigger_time)
 
@@ -147,19 +181,11 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         """Core likelihood evaluation method for frequency-domain transient events."""
         waveform_sky = self.waveform(self.frequencies, params)
         log_likelihood = 0.0
-        df = (
-            self.detectors[0].sliced_frequencies[1]
-            - self.detectors[0].sliced_frequencies[0]
-        )
         for ifo in self.detectors:
-            freqs, ifo_data, psd = (
-                ifo.sliced_frequencies,
-                ifo.sliced_fd_data,
-                ifo.sliced_psd,
-            )
-            h_dec = ifo.fd_response(freqs, waveform_sky, params)
-            match_filter_SNR = inner_product(h_dec, ifo_data, psd, df)
-            optimal_SNR = inner_product(h_dec, h_dec, psd, df)
+            psd = ifo.sliced_psd
+            h_dec = ifo.fd_response(self.frequencies, waveform_sky, params)
+            match_filter_SNR = inner_product(h_dec, ifo.sliced_fd_data, psd, self.df)
+            optimal_SNR = inner_product(h_dec, h_dec, psd, self.df)
             log_likelihood += match_filter_SNR - optimal_SNR / 2
         return log_likelihood
 
