@@ -119,21 +119,21 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
             trigger_time (Float, optional): Event trigger time. Defaults to 0.
         """
         super().__init__(detectors, waveform, fixed_parameters)
-        
+
         # Determine global frequency bounds
         f_min_min = min(f_min.values()) if isinstance(f_min, dict) else f_min
         f_max_max = max(f_max.values()) if isinstance(f_max, dict) else f_max
-        
+
         # Set frequency bounds and masks for each detector
         _frequencies = []
         for detector in detectors:
             detector.set_frequency_bounds(f_min_min, f_max_max)
             _frequencies.append(detector.sliced_frequencies)
-            
+
             # Determine detector-specific frequency mask
             f_min_ifo = f_min[detector.name] if isinstance(f_min, dict) else None
             f_max_ifo = f_max[detector.name] if isinstance(f_max, dict) else None
-            
+
             cond_1 = f_min_ifo is not None and f_min_ifo > f_min_min
             cond_2 = f_max_ifo is not None and f_max_ifo < f_max_max
             if cond_1 or cond_2:
@@ -146,13 +146,13 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
                         f"{detector.name} has f_max={f_max_ifo}, which is lower than the global maximum frequency {f_max_max}. Truncating data accordingly."
                     )
                 detector.data.set_frequency_mask(f_min_ifo, f_max_ifo)
-        
+
         # Validate frequency grids are consistent across detectors
         _frequencies = jnp.array(_frequencies)
-        assert jnp.array_equal(_frequencies[:-1], _frequencies[1:]), (
-            "Detectors must have the same frequency grid"
-        )
-        
+        assert jnp.array_equal(
+            _frequencies[:-1], _frequencies[1:]
+        ), "Detectors must have the same frequency grid"
+
         self.frequencies = _frequencies[0]
         self.df = self.frequencies[1] - self.frequencies[0]
         self.trigger_time = trigger_time
