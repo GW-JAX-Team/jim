@@ -308,9 +308,14 @@ class Data(ABC):
             fnyq = fnyq + delta_f
         f = jnp.arange(0, fnyq + delta_f, delta_f)
         # Form full data array
-        data_fd_full = jnp.where(
-            (frequencies[0] <= f) & (f <= frequencies[-1]), fd, 0.0 + 0.0j
-        )
+        start_idx = jnp.searchsorted(f, frequencies[0])
+        # TODO: Check if this could be replaced with zeros.at[cond].set(fd)
+        # Potential issue with naive slicing is the jit compilation.
+        data_fd_full = jax.lax.dynamic_update_slice(
+            jnp.zeros_like(f), fd, (start_idx, ))
+        # data_fd_full = jnp.where(
+        #     (frequencies[0] <= f) & (f <= frequencies[-1]), fd, 0.0 + 0.0j
+        # )
         # IFFT into time domain
         delta_t = 1 / (2 * fnyq)
         data_td_full = jnp.fft.irfft(data_fd_full) / delta_t
