@@ -87,7 +87,25 @@ class TestBaseTransientLikelihoodFD:
         log_likelihood_jit = jax.jit(likelihood.evaluate)(params, {})
         assert np.isfinite(log_likelihood_jit), "Log likelihood should be finite"
 
-        assert np.isclose(log_likelihood, log_likelihood_jit), "JIT and non-JIT results should match"
+        assert np.isclose(
+            log_likelihood, log_likelihood_jit
+        ), "JIT and non-JIT results should match"
+
+        likelihood = BaseTransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min={"H1": fmin, "L1": fmin + 1.0},
+            f_max=fmax,
+            trigger_time=gps,
+        )
+        log_likelihood_diff_fmin = likelihood.evaluate(params, {})
+        assert np.isfinite(
+            log_likelihood_diff_fmin
+        ), "Log likelihood with different f_min should be finite"
+
+        assert np.isclose(
+            log_likelihood, log_likelihood_diff_fmin, atol=1e-2
+        ), "Log likelihoods should be close with small differences"
 
 
 # class TestTimeMarginalizedLikelihoodFD:
@@ -148,5 +166,5 @@ class TestBaseTransientLikelihoodFD:
 #         params = example_params(likelihood.gmst)
 #         result = likelihood.evaluate(params, {})
 #         assert np.isfinite(result)
-        
+
 # Need to add tests for running the heterodyned likelihood with different parameters
