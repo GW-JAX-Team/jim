@@ -117,8 +117,8 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
             detector.set_frequency_bounds(f_min, f_max)
             _frequencies.append(detector.sliced_frequencies)
         _frequencies = jnp.array(_frequencies)
-        assert jnp.all(
-            jnp.array(_frequencies)[:-1] == jnp.array(_frequencies)[1:]
+        assert jnp.array_equal(
+            _frequencies[:-1], _frequencies[1:]
         ), "The frequency arrays are not all the same."
         self.frequencies = _frequencies[0]
         self.trigger_time = trigger_time

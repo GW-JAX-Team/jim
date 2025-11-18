@@ -167,10 +167,6 @@ class Data(ABC):
             f"{self.__class__.__name__}(name='{self.name}', "
             + f"delta_t={self.delta_t}, epoch={self.epoch})"
         )
-        return (
-            f"{self.__class__.__name__}(name='{self.name}', "
-            + f"delta_t={self.delta_t}, epoch={self.epoch})"
-        )
 
     def __bool__(self) -> bool:
         """Check if the data is empty."""

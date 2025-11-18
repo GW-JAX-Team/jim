@@ -1,4 +1,4 @@
-from typing import Sequence, Optional
+from typing import Sequence, Optional, Union
 import logging
 import jax
 import jax.numpy as jnp
@@ -39,7 +39,7 @@ class Jim(object):
         n_training_loops: int = 20,
         n_production_loops: int = 20,
         n_epochs: int = 20,
-        mala_step_size: float = 0.01,
+        mala_step_size: Union[float, Float[Array, " n_dims n_dims"]] = 0.01,
         chain_batch_size: int = 0,
         rq_spline_hidden_units: list[int] = [128, 128],
         rq_spline_n_bins: int = 10,
@@ -92,7 +92,7 @@ class Jim(object):
             n_training_loops=n_training_loops,
             n_production_loops=n_production_loops,
             n_epochs=n_epochs,
-            mala_step_size=mala_step_size,
+            mala_step_size=mala_step_size,  # type: ignore # Type ignored should be removed once the FlowMC fix is published
             chain_batch_size=chain_batch_size,
             rq_spline_hidden_units=rq_spline_hidden_units,
             rq_spline_n_bins=rq_spline_n_bins,

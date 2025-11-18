@@ -41,6 +41,9 @@ class SpinAnglesToCartesianSpinTransform(ConditionalBijectiveTransform):
 
     freq_ref: Float
 
+    def __repr__(self):
+        return f"SpinAnglesToCartesianSpinTransform(freq_ref={self.freq_ref})"
+
     def __init__(
         self,
         freq_ref: Float,
@@ -122,6 +125,9 @@ class SphereSpinToCartesianSpinTransform(BijectiveTransform):
     Spin to Cartesian spin transformation
     """
 
+    def __repr__(self):
+        return f"SphereSpinToCartesianSpinTransform(name_mapping={self.name_mapping})"
+
     def __init__(
         self,
         label: str,
@@ -168,6 +174,9 @@ class SkyFrameToDetectorFrameSkyPositionTransform(BijectiveTransform):
     gmst: Float
     rotation: Float[Array, " 3 3"]
     rotation_inv: Float[Array, " 3 3"]
+
+    def __repr__(self):
+        return f"SkyFrameToDetectorFrameSkyPositionTransform(gmst={self.gmst})"
 
     def __init__(
         self,
@@ -221,6 +230,9 @@ class GeocentricArrivalTimeToDetectorArrivalTimeTransform(
 
     gmst: Float
     ifo: GroundBased2G
+
+    def __repr__(self):
+        return f"GeocentricArrivalTimeToDetectorArrivalTimeTransform(gmst={self.gmst}, ifo={self.ifo.name})"
 
     def __init__(
         self,
@@ -285,6 +297,9 @@ class GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
 
     gmst: Float
     ifo: GroundBased2G
+
+    def __repr__(self):
+        return f"GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(gmst={self.gmst}, ifo={self.ifo.name})"
 
     def __init__(
         self,
@@ -353,6 +368,9 @@ class DistanceToSNRWeightedDistanceTransform(ConditionalBijectiveTransform):
 
     gmst: Float
     ifos: Sequence[GroundBased2G]
+
+    def __repr__(self):
+        return f"DistanceToSNRWeightedDistanceTransform(gmst={self.gmst}, ifos={[ifo.name for ifo in self.ifos]})"
 
     def __init__(
         self,
