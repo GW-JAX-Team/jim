@@ -621,7 +621,7 @@ class GroundBased2G(Detector):
         self.set_data(
             Data.from_fd(
                 name=f"{self.name}_injected",
-                fd=strain_data,
+                fd_strain=strain_data,
                 frequencies=self.frequencies,
                 epoch=self.data.epoch,
             )
