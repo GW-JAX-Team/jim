@@ -199,4 +199,3 @@ waveform_preset = {
     "RippleTaylorF2": RippleTaylorF2,
     "RippleIMRPhenomD_NRTidalv2": RippleIMRPhenomD_NRTidalv2,
 }
-
