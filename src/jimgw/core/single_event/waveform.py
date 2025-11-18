@@ -13,8 +13,8 @@ class Waveform(ABC):
         return NotImplemented
 
     def __call__(
-        self, axis: Float[Array, " n_dim"], params: dict[str, Float]
-    ) -> dict[str, Float[Array, " n_dim"]]:
+        self, axis: Float[Array, " n_freq"], params: dict[str, Float]
+    ) -> dict[str, Float[Array, " n_freq"]]:
         return NotImplemented
 
 
@@ -25,8 +25,8 @@ class RippleIMRPhenomD(Waveform):
         self.f_ref = f_ref
 
     def __call__(
-        self, frequency: Float[Array, " n_dim"], params: dict[str, Float]
-    ) -> dict[str, Float[Array, " n_dim"]]:
+        self, frequency: Float[Array, " n_freq"], params: dict[str, Float]
+    ) -> dict[str, Float[Array, " n_freq"]]:
         output = {}
         theta = jnp.array(
             [
@@ -56,8 +56,8 @@ class RippleIMRPhenomPv2(Waveform):
         self.f_ref = f_ref
 
     def __call__(
-        self, frequency: Float[Array, " n_dim"], params: dict[str, Float]
-    ) -> dict[str, Float[Array, " n_dim"]]:
+        self, frequency: Float[Array, " n_freq"], params: dict[str, Float]
+    ) -> dict[str, Float[Array, " n_freq"]]:
         output = {}
         theta = jnp.array(
             [
@@ -93,8 +93,8 @@ class RippleTaylorF2(Waveform):
         self.use_lambda_tildes = use_lambda_tildes
 
     def __call__(
-        self, frequency: Float[Array, " n_dim"], params: dict[str, Float]
-    ) -> dict[str, Float[Array, " n_dim"]]:
+        self, frequency: Float[Array, " n_freq"], params: dict[str, Float]
+    ) -> dict[str, Float[Array, " n_freq"]]:
         output = {}
 
         if self.use_lambda_tildes:
@@ -152,8 +152,8 @@ class RippleIMRPhenomD_NRTidalv2(Waveform):
         self.no_taper = no_taper
 
     def __call__(
-        self, frequency: Float[Array, " n_dim"], params: dict[str, Float]
-    ) -> dict[str, Float[Array, " n_dim"]]:
+        self, frequency: Float[Array, " n_freq"], params: dict[str, Float]
+    ) -> dict[str, Float[Array, " n_freq"]]:
         output = {}
 
         if self.use_lambda_tildes:
