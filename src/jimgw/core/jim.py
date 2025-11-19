@@ -267,9 +267,38 @@ class Jim(object):
             chains = jax.vmap(sample_transform.backward)(chains)
 
         if n_samples > 0:
-            log_probs = log_probs.reshape(-1)
-            downsample_indices = jax.random.categorical(
-                rng_key, log_probs, shape=(n_samples,)
+            n_total_samples = chains[list(chains.keys())[0]].shape[0]
+
+            # If requesting more samples than available, just return all
+            if n_samples >= n_total_samples:
+                return chains
+
+            # For large sample sets, do two-stage sampling to avoid OOM
+            # Use adaptive factor based on the ratio of total to requested samples
+            intermediate_factor = max(10, min(100, n_total_samples // n_samples // 10))
+            n_intermediate = min(n_samples * intermediate_factor, n_total_samples)
+
+            log_probs_intermediate = log_probs.reshape(-1)
+
+            if n_intermediate < n_total_samples:
+                # Stage 1: Uniform random downsample to intermediate size
+                rng_key, subkey = jax.random.split(rng_key)
+                downsample_indices_1 = jax.random.choice(
+                    subkey, n_total_samples, (n_intermediate,), replace=False
+                )
+                log_probs_intermediate = log_probs_intermediate[downsample_indices_1]
+                chains_intermediate = {
+                    key: val[downsample_indices_1] for key, val in chains.items()
+                }
+            else:
+                chains_intermediate = chains
+
+            # Stage 2: Weighted resample from intermediate set
+            downsample_indices_2 = jax.random.categorical(
+                rng_key, log_probs_intermediate, shape=(n_samples,)
             )
-            chains = {key: val[downsample_indices] for key, val in chains.items()}
+            chains = {
+                key: val[downsample_indices_2]
+                for key, val in chains_intermediate.items()
+            }
         return chains
