@@ -211,20 +211,33 @@ class Jim(object):
         self.sampler.sample(initial_position, {})
 
     def get_samples(
-        self, training: bool = False
+        self,
+        n_samples: int = 0,
+        rng_key: PRNGKeyArray = jax.random.PRNGKey(21),
+        training: bool = False,
     ) -> dict[str, Float[Array, " n_chains n_dims"]]:
         """
-        Get the samples from the sampler
+        Get the samples from the sampler, with optional weighted resampling.
+
+        When `n_samples` > 0, performs weighted resampling where each sample is selected
+        with probability proportional to its posterior probability (exponential of log_prob).
+        This helps focus the returned samples on high-probability regions of the posterior.
 
         Parameters
         ----------
+        n_samples : int, optional
+            Number of samples to return via weighted resampling. If 0, return all samples
+            with transforms applied, by default 0
+        rng_key : PRNGKeyArray, optional
+            RNG key for weighted resampling, by default jax.random.PRNGKey(21)
         training : bool, optional
             Whether to get the training samples or the production samples, by default False
 
         Returns
         -------
         dict
-            Dictionary of samples
+            Dictionary of samples with parameter names as keys and sample arrays as values.
+            All sample transforms are reversed to return samples in the prior parameter space.
 
         """
         if training:
@@ -232,14 +245,31 @@ class Jim(object):
                 chains := self.sampler.resources["positions_training"], Buffer
             )
             chains = chains.data
+
+            assert isinstance(
+                log_probs := self.sampler.resources["log_prob_training"], Buffer
+            )
+            log_probs = log_probs.data
         else:
             assert isinstance(
                 chains := self.sampler.resources["positions_production"], Buffer
             )
             chains = chains.data
 
+            assert isinstance(
+                log_probs := self.sampler.resources["log_prob_production"], Buffer
+            )
+            log_probs = log_probs.data
+
         chains = chains.reshape(-1, self.prior.n_dims)
         chains = jax.vmap(self.add_name)(chains)
         for sample_transform in reversed(self.sample_transforms):
             chains = jax.vmap(sample_transform.backward)(chains)
+
+        if n_samples > 0:
+            log_probs = log_probs.reshape(-1)
+            downsample_indices = jax.random.categorical(
+                rng_key, log_probs, shape=(n_samples,)
+            )
+            chains = {key: val[downsample_indices] for key, val in chains.items()}
         return chains
