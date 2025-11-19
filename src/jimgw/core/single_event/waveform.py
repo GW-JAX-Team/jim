@@ -6,6 +6,8 @@ from ripplegw.waveforms.IMRPhenomD import gen_IMRPhenomD_hphc
 from ripplegw.waveforms.IMRPhenomPv2 import gen_IMRPhenomPv2_hphc
 from ripplegw.waveforms.TaylorF2 import gen_TaylorF2_hphc
 from ripplegw.waveforms.IMRPhenomD_NRTidalv2 import gen_IMRPhenomD_NRTidalv2_hphc
+from ripplegw.waveforms.IMRPhenomXAS import gen_IMRPhenomXAS_hphc
+from ripplegw.waveforms.IMRPhenomXAS_NRTidalv3 import gen_IMRPhenomXAS_NRTidalv3_hphc
 
 
 class Waveform(ABC):
@@ -193,9 +195,122 @@ class RippleIMRPhenomD_NRTidalv2(Waveform):
         return f"RippleIMRPhenomD_NRTidalv2(f_ref={self.f_ref})"
 
 
+class RippleIMRPhenomXAS(Waveform):
+    f_ref: float
+
+    def __init__(
+        self,
+        f_ref: float = 20.0,
+    ):
+        """
+        Initialize the waveform.
+
+        Args:
+            f_ref (float, optional): Reference frequency in Hz. Defaults to 20.0.
+            use_lambda_tildes (bool, optional): Whether we sample over lambda_tilde and delta_lambda_tilde, as defined for instance in Equation (5) and Equation (6) of arXiv:1402.5156, rather than lambda_1 and lambda_2. Defaults to False.
+            no_taper (bool, optional): Whether to remove the Planck taper in the amplitude of the waveform, which we use for relative binning runs. Defaults to False.
+        """
+        self.f_ref = f_ref
+
+    def __call__(
+        self, frequency: Float[Array, " n_dim"], params: dict[str, Float]
+    ) -> dict[str, Float[Array, " n_dim"]]:
+        output = {}
+
+        theta = jnp.array(
+            [
+                params["M_c"],
+                params["eta"],
+                params["s1_z"],
+                params["s2_z"],
+                params["d_L"],
+                0,
+                params["phase_c"],
+                params["iota"],
+            ]
+        )
+
+        hp, hc = gen_IMRPhenomXAS_hphc(
+            frequency,
+            theta,
+            self.f_ref,
+        )
+        output["p"] = hp
+        output["c"] = hc
+        return output
+
+    def __repr__(self):
+        return f"RippleIMRPhenomXAS(f_ref={self.f_ref})"
+    
+
+class RippleIMRPhenomXAS_NRTidalv3(Waveform):
+    f_ref: float
+    use_lambda_tildes: bool
+
+    def __init__(
+        self,
+        f_ref: float = 20.0,
+        use_lambda_tildes: bool = False,
+        no_taper: bool = False,
+    ):
+        """
+        Initialize the waveform.
+
+        Args:
+            f_ref (float, optional): Reference frequency in Hz. Defaults to 20.0.
+            use_lambda_tildes (bool, optional): Whether we sample over lambda_tilde and delta_lambda_tilde, as defined for instance in Equation (5) and Equation (6) of arXiv:1402.5156, rather than lambda_1 and lambda_2. Defaults to False.
+            no_taper (bool, optional): Whether to remove the Planck taper in the amplitude of the waveform, which we use for relative binning runs. Defaults to False.
+        """
+        self.f_ref = f_ref
+        self.use_lambda_tildes = use_lambda_tildes
+        self.no_taper = no_taper
+
+    def __call__(
+        self, frequency: Float[Array, " n_dim"], params: dict[str, Float]
+    ) -> dict[str, Float[Array, " n_dim"]]:
+        output = {}
+
+        if self.use_lambda_tildes:
+            first_lambda_param = params["lambda_tilde"]
+            second_lambda_param = params["delta_lambda_tilde"]
+        else:
+            first_lambda_param = params["lambda_1"]
+            second_lambda_param = params["lambda_2"]
+
+        theta = jnp.array(
+            [
+                params["M_c"],
+                params["eta"],
+                params["s1_z"],
+                params["s2_z"],
+                first_lambda_param,
+                second_lambda_param,
+                params["d_L"],
+                0,
+                params["phase_c"],
+                params["iota"],
+            ]
+        )
+
+        hp, hc = gen_IMRPhenomXAS_NRTidalv3_hphc(
+            frequency,
+            theta,
+            self.f_ref,
+            use_lambda_tildes=self.use_lambda_tildes,
+            no_taper=self.no_taper,
+        )
+        output["p"] = hp
+        output["c"] = hc
+        return output
+
+    def __repr__(self):
+        return f"RippleIMRPhenomXAS_NRTidalv3(f_ref={self.f_ref})"
+
 waveform_preset = {
     "RippleIMRPhenomD": RippleIMRPhenomD,
     "RippleIMRPhenomPv2": RippleIMRPhenomPv2,
     "RippleTaylorF2": RippleTaylorF2,
     "RippleIMRPhenomD_NRTidalv2": RippleIMRPhenomD_NRTidalv2,
+    "RippleIMRPhenomXAS": RippleIMRPhenomXAS,
+    "RippleIMRPhenomXAS_NRTidalv3": RippleIMRPhenomXAS_NRTidalv3,
 }

@@ -581,6 +581,18 @@ def get_parser(**kwargs):
         default=True,
         help="Whether to use phase marginalization in the likelihood. If True, phase_c will be marginalized over analytically and removed from the prior."
     )
+    parser.add_argument(
+        "--sampler",
+        type=str,
+        default="flowMC",
+        help="Which sampler to use. Options are 'flowMC' and 'blackjax-ns'"
+    )
+    parser.add_argument(
+        "--n_live",
+        type=int,
+        default=1000,
+        help="Number of live points for nested sampling"
+    )
     return parser
 
 def main():
