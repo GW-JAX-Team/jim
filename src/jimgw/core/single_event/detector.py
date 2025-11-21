@@ -540,7 +540,7 @@ class GroundBased2G(Detector):
         """Add data to the detector.
 
         Args:
-            data (Union[Data, Array]): Data to be added to the detector, either as a `Data` object
+            data (Data | Array): Data to be added to the detector, either as a `Data` object
                 or as a timeseries array.
             **kws (dict): Additional keyword arguments to pass to `Data` constructor.
 
@@ -559,7 +559,7 @@ class GroundBased2G(Detector):
         """Add PSD to the detector.
 
         Args:
-            psd (Union[PowerSpectrum, Array]): PSD to be added to the detector, either as a `PowerSpectrum`
+            psd (PowerSpectrum | Array): PSD to be added to the detector, either as a `PowerSpectrum`
                 object or as a timeseries array.
             **kws (dict): Additional keyword arguments to pass to `PowerSpectrum` constructor.
 

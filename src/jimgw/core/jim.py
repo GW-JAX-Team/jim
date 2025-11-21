@@ -1,4 +1,4 @@
-from typing import Sequence, Optional, Union
+from typing import Sequence, Optional
 import logging
 import jax
 import jax.numpy as jnp
@@ -39,7 +39,7 @@ class Jim(object):
         n_training_loops: int = 20,
         n_production_loops: int = 20,
         n_epochs: int = 20,
-        mala_step_size: Union[float, Float[Array, " n_dims n_dims"]] = 0.01,
+        mala_step_size: Float | Float[Array, " n_dims n_dims"] = 0.01,
         chain_batch_size: int = 0,
         rq_spline_hidden_units: list[int] = [128, 128],
         rq_spline_n_bins: int = 10,
