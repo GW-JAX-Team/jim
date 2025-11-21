@@ -129,12 +129,16 @@ class TestDataInterface:
 
         # Set up observation parameters
 <<<<<<< HEAD
+<<<<<<< HEAD
         duration = 6.0
         f_min, f_max = 20.0, 1024.0
         sampling_frequency = f_max * 2
 
 =======
         duration = 4.0
+=======
+        duration = 6.0
+>>>>>>> 96e6be5 (Update observation duration in signal injection test to 6.0 seconds)
         f_min, f_max = 20.0, 1024.0
         sampling_frequency = f_max * 2
         
