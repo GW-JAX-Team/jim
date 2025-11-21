@@ -128,15 +128,26 @@ class TestDataInterface:
         detector.load_and_set_psd()
 
         # Set up observation parameters
+<<<<<<< HEAD
         duration = 6.0
         f_min, f_max = 20.0, 1024.0
         sampling_frequency = f_max * 2
 
+=======
+        duration = 4.0
+        f_min, f_max = 20.0, 1024.0
+        sampling_frequency = f_max * 2
+        
+>>>>>>> 4977d38 (Update signal injection test to use dynamic frequency bounds and GPS time)
         detector.frequency_bounds = (f_min, f_max)
 
         # Set up waveform model and parameters
         waveform = RippleIMRPhenomD(f_ref=20.0)
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 4977d38 (Update signal injection test to use dynamic frequency bounds and GPS time)
         gps_time = 1126259462.0  # example GPS time
         # Simple parameter set
         params = {
