@@ -1,8 +1,13 @@
 import jax
+
+jax.config.update("jax_enable_x64", True)
+
 import jax.numpy as jnp
 from copy import deepcopy
 from scipy.signal import welch
 from jimgw.core.single_event.data import Data, PowerSpectrum
+from jimgw.core.single_event.detector import get_H1
+from jimgw.core.single_event.waveform import RippleIMRPhenomD
 
 
 class TestDataInterface:
@@ -110,6 +115,85 @@ class TestDataInterface:
         fd_data_white = fd_data / jnp.sqrt(self.psd.values / 2 / self.psd.delta_t)
         td_data_white = jnp.fft.irfft(fd_data_white) / self.psd.delta_t
         assert jnp.allclose(jnp.var(td_data_white), 1, rtol=1e-1)
+
+    def test_inject_signal(self):
+        """Test signal injection into detector."""
+        # Set up detector
+        detector = get_H1()
+        
+        # Load default PSD (this is a known working setup)
+        detector.load_and_set_psd()
+        
+        # Set up observation parameters
+        duration = 4.0
+        sampling_frequency = 2048.0
+        f_min, f_max = 20.0, 1024.0
+        
+        detector.frequency_bounds = (f_min, f_max)
+        
+        # Set up waveform model and parameters
+        waveform = RippleIMRPhenomD(f_ref=20.0)
+        
+        # Simple parameter set
+        params = {
+            "M_c": 28.0,
+            "eta": 0.25,
+            "s1_z": 0.0,
+            "s2_z": 0.0,
+            "d_L": 440.0,
+            "phase_c": 0.0,
+            "iota": 0.0,
+            "ra": 1.5,
+            "dec": 0.5,
+            "psi": 0.3,
+            "trigger_time": 0.0,
+            "t_c": 0.0,
+            "gmst": 0.0,
+        }
+        
+        # Test injection with zero noise
+        detector.inject_signal(
+            duration=duration,
+            sampling_frequency=sampling_frequency,
+            epoch=0.0,
+            waveform_model=waveform,
+            parameters=params,
+            is_zero_noise=True,
+            rng_key=jax.random.PRNGKey(0),
+        )
+        
+        # Check that data was created
+        assert detector.data is not None
+        assert len(detector.data.td) == int(duration * sampling_frequency)
+        assert detector.data.epoch == 0.0
+        
+        # Check that frequency domain data is non-zero in the frequency band
+        assert jnp.any(jnp.abs(detector.sliced_fd_data) > 0)
+        
+        # Check that sliced frequencies match bounds
+        assert jnp.all(detector.sliced_frequencies >= f_min)
+        assert jnp.all(detector.sliced_frequencies <= f_max)
+        
+        # Test injection with noise
+        detector_with_noise = get_H1()
+        detector_with_noise.load_and_set_psd()
+        detector_with_noise.frequency_bounds = (f_min, f_max)
+        
+        detector_with_noise.inject_signal(
+            duration=duration,
+            sampling_frequency=sampling_frequency,
+            epoch=0.0,
+            waveform_model=waveform,
+            parameters=params,
+            is_zero_noise=False,
+            rng_key=jax.random.PRNGKey(42),
+        )
+        
+        # Check that data with noise differs from zero-noise data
+        # (they should differ due to the noise component)
+        assert not jnp.allclose(
+            detector.sliced_fd_data, detector_with_noise.sliced_fd_data
+        )
 
     # def test_user_provide_data(self):
 
