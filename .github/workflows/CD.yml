@@ -45,7 +45,7 @@ jobs:
       - name: Run build
         run: uv build
       - name: Publish package
-        uses: pypa/gh-action-pypi-publish@v1.10.3
+        uses: pypa/gh-action-pypi-publish@v1.13.0
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
