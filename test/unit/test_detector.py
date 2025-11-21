@@ -8,6 +8,9 @@ from scipy.signal import welch
 from jimgw.core.single_event.data import Data, PowerSpectrum
 from jimgw.core.single_event.detector import get_H1
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
+from jimgw.core.single_event.gps_times import (
+    greenwich_mean_sidereal_time as compute_gmst,
+)
 
 
 class TestDataInterface:
@@ -126,18 +129,19 @@ class TestDataInterface:
         
         # Set up observation parameters
         duration = 4.0
-        sampling_frequency = 2048.0
         f_min, f_max = 20.0, 1024.0
+        sampling_frequency = f_max * 2
         
         detector.frequency_bounds = (f_min, f_max)
         
         # Set up waveform model and parameters
         waveform = RippleIMRPhenomD(f_ref=20.0)
         
+        gps_time = 1126259462.0  # example GPS time
         # Simple parameter set
         params = {
             "M_c": 28.0,
-            "eta": 0.25,
+            "eta": 0.24,
             "s1_z": 0.0,
             "s2_z": 0.0,
             "d_L": 440.0,
@@ -146,9 +150,9 @@ class TestDataInterface:
             "ra": 1.5,
             "dec": 0.5,
             "psi": 0.3,
-            "trigger_time": 0.0,
+            "trigger_time": gps_time,
             "t_c": 0.0,
-            "gmst": 0.0,
+            "gmst": compute_gmst(gps_time),
         }
         
         # Test injection with zero noise
