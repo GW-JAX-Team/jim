@@ -294,9 +294,10 @@ class Data(ABC):
         assert (
             fd_strain.shape == frequencies.shape
         ), "Frequency and data arrays must have the same length"
-        delta_f = frequencies[1] - frequencies[0]
         f_nyq = frequencies[-1]
-        n_samples = int(jnp.round(2 * f_nyq / delta_f))
+        sampling_rate = 2 * f_nyq
+        duration = 1 / (frequencies[1] - frequencies[0])
+        n_samples = int(jnp.round(sampling_rate * duration))
 
         # Ensure time-domain samples will be even
         if (n_samples % 2) != 0:
@@ -307,14 +308,14 @@ class Data(ABC):
 
         # Construct the full frequency array
         n_frequencies = int(jnp.round(n_samples / 2) + 1)
-        freqs = jnp.arange(n_frequencies) * delta_f
+        freqs = jnp.arange(n_frequencies) / duration
         # Fill in the full data array
         start_idx = jnp.searchsorted(freqs, frequencies[0])
         data_fd_full = jax.lax.dynamic_update_slice(
             jnp.zeros_like(freqs, dtype=fd_strain.dtype), fd_strain, (start_idx,)
         )
         # IFFT into time domain
-        delta_t = 1 / (2 * f_nyq)
+        delta_t = 1 / sampling_rate
         data_td_full = jnp.fft.irfft(data_fd_full) / delta_t
         # Check frequencies
         assert jnp.array_equal(
