@@ -123,20 +123,20 @@ class TestDataInterface:
         """Test signal injection into detector."""
         # Set up detector
         detector = get_H1()
-        
+
         # Load default PSD (this is a known working setup)
         detector.load_and_set_psd()
-        
+
         # Set up observation parameters
-        duration = 6.0
+        duration = 4.0
         f_min, f_max = 20.0, 1024.0
         sampling_frequency = f_max * 2
-        
+
         detector.frequency_bounds = (f_min, f_max)
-        
+
         # Set up waveform model and parameters
         waveform = RippleIMRPhenomD(f_ref=20.0)
-        
+
         gps_time = 1126259462.0  # example GPS time
         # Simple parameter set
         params = {
@@ -154,7 +154,7 @@ class TestDataInterface:
             "t_c": 0.0,
             "gmst": compute_gmst(gps_time),
         }
-        
+
         # Test injection with zero noise
         detector.inject_signal(
             duration=duration,
@@ -165,24 +165,24 @@ class TestDataInterface:
             is_zero_noise=True,
             rng_key=jax.random.PRNGKey(0),
         )
-        
+
         # Check that data was created
         assert detector.data is not None
         assert len(detector.data.td) == int(duration * sampling_frequency)
         assert detector.data.epoch == 0.0
-        
+
         # Check that frequency domain data is non-zero in the frequency band
         assert jnp.any(jnp.abs(detector.sliced_fd_data) > 0)
-        
+
         # Check that sliced frequencies match bounds
         assert jnp.all(detector.sliced_frequencies >= f_min)
         assert jnp.all(detector.sliced_frequencies <= f_max)
-        
+
         # Test injection with noise
         detector_with_noise = get_H1()
         detector_with_noise.load_and_set_psd()
         detector_with_noise.frequency_bounds = (f_min, f_max)
-        
+
         detector_with_noise.inject_signal(
             duration=duration,
             sampling_frequency=sampling_frequency,
@@ -192,11 +192,12 @@ class TestDataInterface:
             is_zero_noise=False,
             rng_key=jax.random.PRNGKey(42),
         )
-        
+
         # Check that data with noise differs from zero-noise data
         # (they should differ due to the noise component)
         assert not jnp.allclose(
-            detector.sliced_fd_data, detector_with_noise.sliced_fd_data
+            detector.sliced_fd_data, detector_with_noise.sliced_fd_data,
+            rtol=1e-05, atol=1e-23
         )
 
     # def test_user_provide_data(self):
