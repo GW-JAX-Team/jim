@@ -597,7 +597,8 @@ class GroundBased2G(Detector):
             None
         """
         # 1. Set empty data to initialise the detector
-        n_times = int(duration * sampling_frequency)
+        # n_times = int(duration * sampling_frequency)
+        n_times = int(jnp.round(duration * sampling_frequency))
         self.set_data(
             Data(
                 name=f"{self.name}_empty",

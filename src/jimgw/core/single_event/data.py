@@ -296,7 +296,7 @@ class Data(ABC):
         ), "Frequency and data arrays must have the same length"
         delta_f = frequencies[1] - frequencies[0]
         f_nyq = frequencies[-1]
-        n_samples = int(np.round(2 * f_nyq / delta_f))
+        n_samples = int(jnp.round(2 * f_nyq / delta_f))
 
         # Ensure time-domain samples will be even
         if (n_samples % 2) != 0:
@@ -306,7 +306,7 @@ class Data(ABC):
             )
 
         # Construct the full frequency array
-        n_frequencies = int(np.round(n_samples / 2) + 1)
+        n_frequencies = int(jnp.round(n_samples / 2) + 1)
         freqs = jnp.arange(n_frequencies) * delta_f
         # Fill in the full data array
         start_idx = jnp.searchsorted(freqs, frequencies[0])
