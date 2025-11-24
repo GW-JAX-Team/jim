@@ -506,9 +506,14 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         self.freq_grid_low = self.freq_grid_low[mask_heterodyne_low]
         self.freq_grid_center = self.freq_grid_center[mask_heterodyne_center]
 
-        # Ensure frequency grids have same length
-        if len(self.freq_grid_low) > len(self.freq_grid_center):
-            self.freq_grid_low = self.freq_grid_low[: len(self.freq_grid_center)]
+        # Ensure frequency grids all reference the same number of bins
+        n_centers = len(self.freq_grid_center)
+        n_low_edges = len(self.freq_grid_low)
+        n_edges = len(freq_grid) - 1
+        n_bins = min(n_centers, n_low_edges, n_edges)
+        freq_grid = freq_grid[: n_bins + 1]
+        self.freq_grid_center = self.freq_grid_center[:n_bins]
+        self.freq_grid_low = self.freq_grid_low[:n_bins]
 
         h_sky_low = reference_waveform(self.freq_grid_low, self.ref_params)
         h_sky_center = reference_waveform(self.freq_grid_center, self.ref_params)
@@ -532,10 +537,10 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
                 freq_grid,
                 self.freq_grid_center,
             )
-            self.A0_array[detector.name] = A0[mask_heterodyne_center]
-            self.A1_array[detector.name] = A1[mask_heterodyne_center]
-            self.B0_array[detector.name] = B0[mask_heterodyne_center]
-            self.B1_array[detector.name] = B1[mask_heterodyne_center]
+            self.A0_array[detector.name] = A0[:n_bins]
+            self.A1_array[detector.name] = A1[:n_bins]
+            self.B0_array[detector.name] = B0[:n_bins]
+            self.B1_array[detector.name] = B1[:n_bins]
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params["trigger_time"] = self.trigger_time

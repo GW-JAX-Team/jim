@@ -29,22 +29,22 @@ default_corner_kwargs = dict(bins=40,
                         save=False,
                         truth_color="red")
 
-matplotlib_params = {"axes.grid": True,
-        "text.usetex" : True,
-        "font.family" : "serif",
-        "ytick.color" : "black",
-        "xtick.color" : "black",
-        "axes.labelcolor" : "black",
-        "axes.edgecolor" : "black",
-        "font.serif" : ["Computer Modern Serif"],
-        "xtick.labelsize": 16,
-        "ytick.labelsize": 16,
-        "axes.labelsize": 16,
-        "legend.fontsize": 16,
-        "legend.title_fontsize": 16,
-        "figure.titlesize": 16}
+# matplotlib_params = {"axes.grid": True,
+#         "text.usetex" : True,
+#         "font.family" : "serif",
+#         "ytick.color" : "black",
+#         "xtick.color" : "black",
+#         "axes.labelcolor" : "black",
+#         "axes.edgecolor" : "black",
+#         "font.serif" : ["Computer Modern Serif"],
+#         "xtick.labelsize": 16,
+#         "ytick.labelsize": 16,
+#         "axes.labelsize": 16,
+#         "legend.fontsize": 16,
+#         "legend.title_fontsize": 16,
+#         "figure.titlesize": 16}
 
-plt.rcParams.update(matplotlib_params)
+# plt.rcParams.update(matplotlib_params)
 
 labels = [r'$M_c/M_\odot$', r'$q$', r'$\chi_1$', r'$\chi_2$', r'$\Lambda$', r'$\delta\Lambda$', r'$d_{\rm{L}}/{\rm Mpc}$', r'$t_c$', r'$\phi_c$', r'$\iota$', r'$\psi$', r'$\alpha$', r'$\delta$']
 
@@ -248,7 +248,12 @@ def save_relative_binning_ref_params(likelihood: SingleEventLikelihood, outdir: 
     with open(f"{outdir}ref_params.json", 'w') as f:
         json.dump(new_ref_params, f)
         
-def save_prior_bounds(prior_low: jnp.array, prior_high: jnp.array, outdir: str) -> None:
+def save_prior_bounds(
+    prior_low: jnp.array,
+    prior_high: jnp.array,
+    outdir: str,
+    naming: "list[str] | None" = None,
+) -> None:
     """
     Save the prior bounds to a JSON file.
 
@@ -256,12 +261,14 @@ def save_prior_bounds(prior_low: jnp.array, prior_high: jnp.array, outdir: str) 
         prior_low (jnp.array): Lower bound of the priors
         prior_high (jnp.array): Upper bound of the priors
         outdir (str): The output directory
+        naming (list[str] | None): Optional list of parameter names. Defaults to utils.NAMING.
     """
     
     my_dict = {}
     prior_low = prior_low.tolist()
     prior_high = prior_high.tolist()
-    for (low, high), name in zip(zip(prior_low, prior_high), NAMING):
+    parameter_names = naming if naming is not None else NAMING
+    for (low, high), name in zip(zip(prior_low, prior_high), parameter_names):
         my_dict[name] = list([low, high])
         
     with open(f"{outdir}prior_bounds.json", 'w') as f:
@@ -311,7 +318,7 @@ def get_parser(**kwargs):
     parser.add_argument(
         "--waveform-approximant",
         type=str,
-        default="TaylorF2",
+        default="NRTidalv2",
         help="Which waveform approximant to use. Recommended to use TaylorF2 for now, NRTidalv2 might still be a bit unstable.",
     )
     parser.add_argument(
@@ -323,7 +330,7 @@ def get_parser(**kwargs):
     parser.add_argument(
         "--relative-binning-binsize",
         type=int,
-        default=500,
+        default=300,
         help="Number of bins for the relative binning.",
     )
     parser.add_argument(
@@ -529,7 +536,7 @@ def get_parser(**kwargs):
     parser.add_argument(
         "--seed",
         type=int,
-        default=None,
+        default=1,
         help="Random seed for parameter generation. If None, a random seed will be generated."
     )
     parser.add_argument(
