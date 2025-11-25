@@ -597,7 +597,8 @@ class GroundBased2G(Detector):
             None
         """
         # 1. Set empty data to initialise the detector
-        n_times = int(duration * sampling_frequency)
+        # n_times = int(duration * sampling_frequency)
+        n_times = int(jnp.round(duration * sampling_frequency))
         self.set_data(
             Data(
                 name=f"{self.name}_empty",
@@ -621,7 +622,7 @@ class GroundBased2G(Detector):
         self.set_data(
             Data.from_fd(
                 name=f"{self.name}_injected",
-                fd=strain_data,
+                fd_strain=strain_data,
                 frequencies=self.frequencies,
                 epoch=self.data.epoch,
             )
