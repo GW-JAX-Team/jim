@@ -128,7 +128,7 @@ class TestDataInterface:
         detector.load_and_set_psd()
 
         # Set up observation parameters
-        duration = 4.0
+        duration = 6.0
         f_min, f_max = 20.0, 1024.0
         sampling_frequency = f_max * 2
 
