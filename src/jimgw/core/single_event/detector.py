@@ -760,11 +760,7 @@ def get_ET() -> list[GroundBased2G]:
     earth_approx_radius = (
         a
         * b
-        / (
-            jnp.sqrt(
-                a ** (2) * jnp.sin(latitude) ** 2 + b ** (2) * jnp.cos(latitude) ** 2
-            )
-        )
+        / (jnp.sqrt(a**2 * jnp.sin(latitude) ** 2 + b**2 * jnp.cos(latitude) ** 2))
     )
     earth_approx_radius *= 1e3
 
