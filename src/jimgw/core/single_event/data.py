@@ -283,7 +283,7 @@ class Data(ABC):
         Fourier domain data.
 
         Args:
-            fd: Fourier domain data array.
+            fd_strain: Fourier domain data array.
             frequencies: Frequencies of the data in Hz.
             epoch: Epoch of the data in seconds (default: 0).
             name: Name of the data (default: '').
