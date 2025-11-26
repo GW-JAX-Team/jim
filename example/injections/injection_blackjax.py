@@ -5,6 +5,7 @@ Perform an injection recovery using nested sampling. Assumes aligned spin and BN
 import argparse
 import json
 import os
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION']='1.'
 import time
 
 import anesthetic
@@ -621,6 +622,7 @@ def body(args):
     f, a = anesthetic.make_2d_axes(plot_params, upper=False, figsize=(14, 12))
     posterior_df.plot_2d(a, kinds=dict(diagonal='kde_1d', lower='scatter_2d'))
 
+    reduced_corner_params = ["M_c", "q", "d_L", "iota", "lambda_1", "lambda_2", "ra", "dec"]
     # dataframe.plot_2d(["M_c", "d_L", "iota", "ra", "dec"])
     if true_param is not None:
         a.axlines(true_param, ls=':', c='k', alpha=0.5)
@@ -635,9 +637,12 @@ def body(args):
     print(f"Saved diagnostic corner plot to {figure_path}")
 
     prior_df = dataframe.set_beta(0.0).compress(1000)
-    f_prior, a_prior = anesthetic.make_2d_axes(plot_params, upper=False, figsize=(14, 12))
+    f_prior, a_prior = anesthetic.make_2d_axes(reduced_corner_params, upper=False, figsize=(8, 6))
     prior_df.plot_2d(a_prior, kinds=dict(diagonal="kde_1d", lower="scatter_2d"), label="prior")
     posterior_df.plot_2d(a_prior, kinds=dict(diagonal="kde_1d", lower="scatter_2d"), label="posterior")
+    if true_param is not None:
+        a_prior.axlines(true_param, ls=':', c='k', alpha=0.5)
+        a_prior.scatter(true_param, marker='*', c='k', label="truth")
     a_prior.iloc[-1, 0].legend(
         loc="lower center",
         bbox_to_anchor=(len(a_prior) / 2, len(a_prior)),
@@ -646,6 +651,7 @@ def body(args):
 
     prior_figure_path = os.path.join(outdir, "nested_corner_prior_posterior.png")
     f_prior.savefig(prior_figure_path)
+    f_prior.savefig(os.path.join(outdir, "nested_corner_prior_posterior.pdf"))
     print(f"Saved prior/posterior corner plot to {prior_figure_path}")
 
     ess_value = float(blackjax.ns.utils.ess(jax.random.PRNGKey(0), samples))

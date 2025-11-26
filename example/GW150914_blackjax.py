@@ -25,6 +25,7 @@ from jimgw.core.prior import (
 )
 from jimgw.core.single_event.data import Data
 from jimgw.core.single_event.detector import get_H1, get_L1
+from jimgw.core.transforms import BoundToUnbound
 from jimgw.core.single_event.likelihood import BaseTransientLikelihoodFD, HeterodynedPhaseMarginalizedLikelihoodFD
 from jimgw.core.single_event.transforms import (
     DistanceToSNRWeightedDistanceTransform,
@@ -60,6 +61,8 @@ PARAMETER_NAMES = [
     "dec",
 ]
 
+M_c_min, M_c_max = 10.0, 80.0
+q_min, q_max = 0.125, 1.0
 
 def build_prior() -> CombinePrior:
     """Prior matching the GW150914 setup."""
@@ -67,8 +70,8 @@ def build_prior() -> CombinePrior:
     prior = []
 
     # Mass prior
-    M_c_min, M_c_max = 10.0, 80.0
-    q_min, q_max = 0.125, 1.0
+    # M_c_min, M_c_max = 10.0, 80.0
+    # q_min, q_max = 0.125, 1.0
     Mc_prior = UniformPrior(M_c_min, M_c_max, parameter_names=["M_c"])
     q_prior = UniformPrior(q_min, q_max, parameter_names=["q"])
     prior.extend([Mc_prior, q_prior])
@@ -103,6 +106,71 @@ def build_transforms(gps_time, ifos):
         GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(gps_time=gps_time, ifo=ifos[0]),
         GeocentricArrivalTimeToDetectorArrivalTimeTransform(gps_time=gps_time, ifo=ifos[0]),
         SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps_time, ifos=ifos),
+        BoundToUnbound(
+            name_mapping=(["M_c"], ["M_c_unbounded"]),
+            original_lower_bound=M_c_min,
+            original_upper_bound=M_c_max,
+        ),
+        BoundToUnbound(
+            name_mapping=(["q"], ["q_unbounded"]),
+            original_lower_bound=q_min,
+            original_upper_bound=q_max,
+        ),
+        BoundToUnbound(
+            name_mapping=(["s1_phi"], ["s1_phi_unbounded"]),
+            original_lower_bound=0.0,
+            original_upper_bound=2 * jnp.pi,
+        ),
+        BoundToUnbound(
+            name_mapping=(["s2_phi"], ["s2_phi_unbounded"]),
+            original_lower_bound=0.0,
+            original_upper_bound=2 * jnp.pi,
+        ),
+        BoundToUnbound(
+            name_mapping=(["iota"], ["iota_unbounded"]),
+            original_lower_bound=0.0,
+            original_upper_bound=jnp.pi,
+        ),
+        BoundToUnbound(
+            name_mapping=(["s1_theta"], ["s1_theta_unbounded"]),
+            original_lower_bound=0.0,
+            original_upper_bound=jnp.pi,
+        ),
+        BoundToUnbound(
+            name_mapping=(["s2_theta"], ["s2_theta_unbounded"]),
+            original_lower_bound=0.0,
+            original_upper_bound=jnp.pi,
+        ),
+        BoundToUnbound(
+            name_mapping=(["s1_mag"], ["s1_mag_unbounded"]),
+            original_lower_bound=0.0,
+            original_upper_bound=1.0,
+        ),
+        BoundToUnbound(
+            name_mapping=(["s2_mag"], ["s2_mag_unbounded"]),
+            original_lower_bound=0.0,
+            original_upper_bound=1.0,
+        ),
+        BoundToUnbound(
+            name_mapping=(["phase_det"], ["phase_det_unbounded"]),
+            original_lower_bound=0.0,
+            original_upper_bound=2 * jnp.pi,
+        ),
+        BoundToUnbound(
+            name_mapping=(["psi"], ["psi_unbounded"]),
+            original_lower_bound=0.0,
+            original_upper_bound=jnp.pi,
+        ),
+        BoundToUnbound(
+            name_mapping=(["zenith"], ["zenith_unbounded"]),
+            original_lower_bound=0.0,
+            original_upper_bound=jnp.pi,
+        ),
+        BoundToUnbound(
+            name_mapping=(["azimuth"], ["azimuth_unbounded"]),
+            original_lower_bound=0.0,
+            original_upper_bound=2 * jnp.pi,
+        ),
     ]
     likelihood_transforms = [
         MassRatioToSymmetricMassRatioTransform,
