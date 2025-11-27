@@ -117,9 +117,9 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
             detector.set_frequency_bounds(f_min, f_max)
             _frequencies.append(detector.sliced_frequencies)
         _frequencies = jnp.array(_frequencies)
-        assert jnp.array_equal(
-            _frequencies[:-1], _frequencies[1:]
-        ), "The frequency arrays are not all the same."
+        assert jnp.array_equal(_frequencies[:-1], _frequencies[1:]), (
+            "The frequency arrays are not all the same."
+        )
         self.frequencies = _frequencies[0]
         self.trigger_time = trigger_time
         self.gmst = compute_gmst(self.trigger_time)
@@ -222,9 +222,9 @@ class TimeMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
         super().__init__(
             detectors, waveform, fixed_parameters, f_min, f_max, trigger_time
         )
-        assert (
-            "t_c" not in self.fixed_parameters
-        ), "Cannot have t_c fixed while marginalizing over t_c"
+        assert "t_c" not in self.fixed_parameters, (
+            "Cannot have t_c fixed while marginalizing over t_c"
+        )
         self.tc_range = tc_range
         fs = self.detectors[0].data.sampling_frequency
         duration = self.detectors[0].data.duration
@@ -427,7 +427,6 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         sample_transforms: list[BijectiveTransform] = [],
         likelihood_transforms: list[NtoMTransform] = [],
     ):
-
         super().__init__(
             detectors, waveform, fixed_parameters, f_min, f_max, trigger_time
         )
@@ -734,7 +733,6 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
 
 
 class HeterodynedPhaseMarginalizedLikelihoodFD(HeterodynedTransientLikelihoodFD):
-
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params.update(self.fixed_parameters)
         params["phase_c"] = 0.0
