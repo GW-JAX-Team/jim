@@ -4,21 +4,21 @@
 <img src="https://badgen.net/badge/Read/the doc/blue" alt="doc"/>
 </a>
 
-Jim comprises a set of tools for estimating parameters of gravitational-wave sources thorugh Bayesian inference.
+Jim comprises a set of tools for estimating parameters of gravitational-wave sources through Bayesian inference.
 At its core, Jim relies on the JAX-based sampler [flowMC](https://github.com/GW-JAX-Team/flowMC),
 which leverages normalizing flows to enhance the convergence of a gradient-based MCMC sampler.
 
-Since its based on JAX, Jim can also leverage hardware acceleration to achieve significant speedups on GPUs. Jim also takes advantage of likelihood-heterodyining, ([Cornish 2010](https://arxiv.org/abs/1007.4820), [Cornish 2021](https://arxiv.org/abs/2109.02728)) to compute the gravitational-wave likelihood more efficiently.
+Since it's based on JAX, Jim can also leverage hardware acceleration to achieve significant speedups on GPUs. Jim also takes advantage of likelihood-heterodyning, ([Cornish 2010](https://arxiv.org/abs/1007.4820), [Cornish 2021](https://arxiv.org/abs/2109.02728)) to compute the gravitational-wave likelihood more efficiently.
 
 See the accompanying paper, [Wong, Isi, Edwards (2023)](https://github.com/kazewong/TurboPE/) for details.
 
 
 > [!WARNING]  
 > Jim is under heavy development, so API is constantly changing. Use at your own risk!
-> One way to mitigate this inconvience is to make your own fork over a version for now.
+> One way to mitigate this inconvenience is to make your own fork over a version for now.
 > We expect to hit a stable version this year. Stay tuned.
 
-_[Documentatation and examples are a work in progress]_
+_[Documentation and examples are a work in progress]_
 
 ## Installation
 
@@ -44,10 +44,6 @@ The performance of Jim will vary depending on the hardware available. Under opti
 ```
 No GPU/TPU found, falling back to CPU.
 ```
-
-## Directory
-
-Parameter estimation examples are in `example/ParameterEstimation`.
 
 ## Attribution
 
