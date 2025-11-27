@@ -32,12 +32,10 @@ You may install the bleeding edge version by cloning this repo, or doing
 pip install git+https://github.com/GW-JAX-Team/jim
 ```
 
-If you would like to take advantage of CUDA, you will additionally need to install a specific version of JAX by doing
+If you would like to take advantage of CUDA, you can install the GPU version of Jax by running:
 ```
-pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install jimGW[cuda]
 ```
-
-_NOTE:_ Jim is only currently compatible with Python 3.10.
 
 ## Performance
 
