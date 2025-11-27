@@ -291,9 +291,9 @@ class Data(ABC):
         Returns:
             Data: Data object with the Fourier and time domain data.
         """
-        assert (
-            fd_strain.shape == frequencies.shape
-        ), "Frequency and data arrays must have the same length"
+        assert fd_strain.shape == frequencies.shape, (
+            "Frequency and data arrays must have the same length"
+        )
         f_nyq = frequencies[-1]
         sampling_rate = 2 * f_nyq
         duration = 1 / (frequencies[1] - frequencies[0])
@@ -318,9 +318,9 @@ class Data(ABC):
         delta_t = 1 / sampling_rate
         data_td_full = jnp.fft.irfft(data_fd_full) / delta_t
         # Check frequencies
-        assert jnp.array_equal(
-            freqs, jnp.fft.rfftfreq(len(data_td_full), delta_t)
-        ), "Generated frequencies do not match the input frequencies"
+        assert jnp.array_equal(freqs, jnp.fft.rfftfreq(len(data_td_full), delta_t)), (
+            "Generated frequencies do not match the input frequencies"
+        )
         # Create a Data object
         data = cls(data_td_full, delta_t, epoch=epoch, name=name)
         data.fd = data_fd_full
@@ -328,12 +328,12 @@ class Data(ABC):
         # Ensures the newly constructed Data in FD faithfully
         # represents the input FD data.
         d_new, f_new = data.frequency_slice(frequencies[0], frequencies[-1])
-        assert jnp.array_equal(
-            d_new, fd_strain
-        ), "Fourier domain data do not match after slicing"
-        assert jnp.array_equal(
-            f_new, frequencies
-        ), "Frequencies do not match after slicing"
+        assert jnp.array_equal(d_new, fd_strain), (
+            "Fourier domain data do not match after slicing"
+        )
+        assert jnp.array_equal(f_new, frequencies), (
+            "Frequencies do not match after slicing"
+        )
         return data
 
     @classmethod
@@ -453,9 +453,9 @@ class PowerSpectrum(ABC):
         # NOTE: Are we sure the values and frequencies start from 0?
         self.values = values
         self.frequencies = frequencies
-        assert self.n_freq == len(
-            self.frequencies
-        ), "Values and frequencies must have the same length"
+        assert self.n_freq == len(self.frequencies), (
+            "Values and frequencies must have the same length"
+        )
         self.name = name or ""
 
     def __repr__(self) -> str:

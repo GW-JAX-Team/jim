@@ -47,7 +47,9 @@ dev-dependencies = [
     "coverage>=7.7.0",
     "coveralls>=4.0.1",
     "pytest>=8.3.3",
-    "ruff>=0.11.12",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.12.2",
+    "pyright>=1.1.402",
 ]
 
 [tool.uv.sources]
@@ -74,12 +76,13 @@ exclude = ["docs","tests"]
 include = ["src"]
 exclude = ["test", "docs"]
 
+[tool.ruff.lint]
+ignore = ["F722"]
+
 [tool.coverage.report]
 exclude_also = [
     'def __repr__',
     "raise AssertionError",
     "raise NotImplementedError",
     "@(abc\\. )?abstractmethod",
-    "def tree_flatten",
-    "def tree_unflatten",
 ]
