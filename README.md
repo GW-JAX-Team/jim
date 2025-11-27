@@ -9,7 +9,7 @@
 <img src="https://badgen.net/badge/License/MIT/blue" alt="license"/>
 </a>
 <a href='https://coveralls.io/github/GW-JAX-Team/jim?branch=main'>
-<img src='https://badgen.net/coveralls/c/github/GW-JAX-Team/jim/main' alt='Coverage Status' />
+<img src='https://badgen.net/coveralls/c/github/GW-JAX-Team/jim/main' alt='coverage' />
 </a>
 
 Jim is a JAX-based toolkit for estimating parameters of gravitational-wave sources through Bayesian inference. At its core, Jim uses the normalizing-flow enhanced sampler [flowMC](https://github.com/GW-JAX-Team/flowMC) to improve the convergence of gradient-based MCMC sampling.
