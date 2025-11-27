@@ -5,7 +5,7 @@
 </a>
 
 Jim comprises a set of tools for estimating parameters of gravitational-wave sources thorugh Bayesian inference.
-At its core, Jim relies on the JAX-based sampler [flowMC](https://github.com/kazewong/flowMC),
+At its core, Jim relies on the JAX-based sampler [flowMC](https://github.com/GW-JAX-Team/flowMC),
 which leverages normalizing flows to enhance the convergence of a gradient-based MCMC sampler.
 
 Since its based on JAX, Jim can also leverage hardware acceleration to achieve significant speedups on GPUs. Jim also takes advantage of likelihood-heterodyining, ([Cornish 2010](https://arxiv.org/abs/1007.4820), [Cornish 2021](https://arxiv.org/abs/2109.02728)) to compute the gravitational-wave likelihood more efficiently.
