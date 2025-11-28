@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
       - name: Run tests
-        run: uv run pytest --cov=jimgw --cov-report=term-missing test/
+        run: uv run pytest --cov=jimgw --cov-report=term-missing tests/
       - name: Upload coverage to Coveralls
         if: matrix.python-version == '3.12'
         env:
