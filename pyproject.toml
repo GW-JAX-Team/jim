@@ -69,11 +69,9 @@ build-backend = "hatchling.build"
 
 [tool.pyright]
 include = ["src"]
-exclude = ["docs","tests"]
 
 [tool.ruff]
 include = ["src"]
-exclude = ["test", "docs"]
 
 [tool.ruff.lint]
 ignore = ["F722"]
