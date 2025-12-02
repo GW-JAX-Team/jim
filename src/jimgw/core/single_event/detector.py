@@ -232,6 +232,9 @@ class GroundBased2G(Detector):
     xarm_tilt: Float = 0
     yarm_tilt: Float = 0
     elevation: Float = 0
+    
+    optimal_snr: Float = 0
+    match_filtered_snr: Complex = 0 + 0j
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.name})"
@@ -610,13 +613,18 @@ class GroundBased2G(Detector):
 
         # 2. Compute the projected strain from parameters
         polarisations = waveform_model(self.frequencies, parameters)
+        # Waveforms may produce NaNs at invalid frequencies (like f=0)
+        # Replace NaNs with zeros since they'll be masked out by frequency_mask anyway
+        polarisations["p"] = jnp.nan_to_num(polarisations["p"], nan=0.0)
+        polarisations["c"] = jnp.nan_to_num(polarisations["c"], nan=0.0)
         projected_strain = self.fd_response(self.frequencies, polarisations, parameters)
 
         # 3. Set the new data
         strain_data = jnp.where(self.frequency_mask, projected_strain, 0.0 + 0.0j)
         if not is_zero_noise:
+            noise = self.psd.simulate_data(rng_key)
             strain_data += jnp.where(
-                self.frequency_mask, self.psd.simulate_data(rng_key), 0.0 + 0.0j
+                self.frequency_mask, noise, 0.0 + 0.0j
             )
 
         self.set_data(
@@ -641,6 +649,10 @@ class GroundBased2G(Detector):
             masked_signal, self.sliced_fd_data, self.sliced_psd, df
         )
         match_filtered_snr /= optimal_snr
+        
+        # Save as attributes
+        self.optimal_snr = optimal_snr
+        self.match_filtered_snr = match_filtered_snr
 
         # NOTE: Change this to logging later.
         print(f"For detector {self.name}, the injected signal has:")
