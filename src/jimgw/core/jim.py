@@ -211,15 +211,25 @@ class Jim(object):
         self.sampler.sample(initial_position, {})
 
     def get_samples(
-        self, training: bool = False
+        self,
+        training: bool = False,
+        rng_key: PRNGKeyArray = jax.random.PRNGKey(0),
+        n_samples: int = 0,
     ) -> dict[str, Float[Array, " n_chains n_dims"]]:
         """
-        Get the samples from the sampler
+        Get the samples from the sampler with rejection sampling.
 
         Parameters
         ----------
         training : bool, optional
             Whether to get the training samples or the production samples, by default False
+        rng_key : PRNGKeyArray, optional
+            Random key for rejection sampling and downsampling, by default jax.random.PRNGKey(0).
+        n_samples : int, optional
+            Number of samples to return after rejection sampling and downsampling.
+            If 0 (default), returns all samples that pass rejection sampling.
+            If the requested number exceeds available samples, a warning is logged
+            and all available samples are returned.
 
         Returns
         -------
@@ -232,13 +242,47 @@ class Jim(object):
                 chains := self.sampler.resources["positions_training"], Buffer
             )
             chains = chains.data
+            assert isinstance(
+                log_prob := self.sampler.resources["log_prob_training"], Buffer
+            )
+            log_prob = log_prob.data
         else:
             assert isinstance(
                 chains := self.sampler.resources["positions_production"], Buffer
             )
             chains = chains.data
+            assert isinstance(
+                log_prob := self.sampler.resources["log_prob_production"], Buffer
+            )
+            log_prob = log_prob.data
 
         chains = chains.reshape(-1, self.prior.n_dims)
+        log_prob = log_prob.flatten()
+
+        # Rejection sampling
+        log_prob_max = jnp.max(log_prob)
+        acceptance_prob = jnp.exp(log_prob - log_prob_max)
+        _rng_key, subkey = jax.random.split(rng_key)
+        uniform_samples = jax.random.uniform(subkey, shape=log_prob.shape)
+        accept_mask = uniform_samples < acceptance_prob
+        chains = chains[accept_mask]
+
+        # Downsample to requested number of samples
+        n_available = chains.shape[0]
+        if n_samples > 0:
+            if n_samples > n_available:
+                logging.warning(
+                    f"Requested {n_samples} samples but only {n_available} available "
+                    f"after rejection sampling. Returning all available samples."
+                )
+            else:
+                # Randomly select n_samples from the accepted chains
+                _rng_key, subkey = jax.random.split(_rng_key)
+                indices = jax.random.choice(
+                    subkey, n_available, shape=(n_samples,), replace=False
+                )
+                chains = chains[indices]
+
         chains = jax.vmap(self.add_name)(chains)
         for sample_transform in reversed(self.sample_transforms):
             chains = jax.vmap(sample_transform.backward)(chains)
