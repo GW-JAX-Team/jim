@@ -211,7 +211,10 @@ class Jim(object):
         self.sampler.sample(initial_position, {})
 
     def get_samples(
-        self, training: bool = False
+        self,
+        training: bool = False,
+        rng_key: PRNGKeyArray = jax.random.PRNGKey(0),
+        n_samples: int = 0,
     ) -> dict[str, Float[Array, " n_chains n_dims"]]:
         """
         Get the samples from the sampler.
