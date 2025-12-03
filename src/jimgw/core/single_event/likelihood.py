@@ -149,9 +149,9 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
 
         # Validate frequency grids are consistent across detectors
         _frequencies = jnp.array(_frequencies)
-        assert jnp.array_equal(
-            _frequencies[:-1], _frequencies[1:]
-        ), "Detectors must have the same frequency grid"
+        assert jnp.array_equal(_frequencies[:-1], _frequencies[1:]), (
+            "Detectors must have the same frequency grid"
+        )
 
         self.frequencies = _frequencies[0]
         self.df = self.frequencies[1] - self.frequencies[0]
