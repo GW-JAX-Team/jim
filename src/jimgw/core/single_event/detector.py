@@ -142,9 +142,9 @@ class Detector(ABC):
         data, freqs_1 = self.data.frequency_slice(*self.frequency_bounds)
         psd, freqs_2 = self.psd.frequency_slice(*self.frequency_bounds)
 
-        assert jnp.array_equal(
-            freqs_1, freqs_2
-        ), f"The {self.name} data and PSD must have same frequencies"
+        assert jnp.array_equal(freqs_1, freqs_2), (
+            f"The {self.name} data and PSD must have same frequencies"
+        )
 
         self._sliced_frequencies = freqs_1
         self._sliced_fd_data = data
@@ -760,11 +760,7 @@ def get_ET() -> list[GroundBased2G]:
     earth_approx_radius = (
         a
         * b
-        / (
-            jnp.sqrt(
-                a ** (2) * jnp.sin(latitude) ** 2 + b ** (2) * jnp.cos(latitude) ** 2
-            )
-        )
+        / (jnp.sqrt(a**2 * jnp.sin(latitude) ** 2 + b**2 * jnp.cos(latitude) ** 2))
     )
     earth_approx_radius *= 1e3
 
@@ -772,7 +768,7 @@ def get_ET() -> list[GroundBased2G]:
     for i in range(3):
         ifos.append(
             GroundBased2G(
-                f"{name}{i+1}",
+                f"{name}{i + 1}",
                 latitude=float(latitude),
                 longitude=float(longitude),
                 xarm_azimuth=xarm_azimuth,

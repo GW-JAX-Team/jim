@@ -1,56 +1,82 @@
-# Jim <img src="https://user-images.githubusercontent.com/4642979/218163532-1c8a58e5-6f36-42de-96d3-f245eee93cf8.png" alt="jim" width="35"/> - A JAX-based gravitational-wave inference toolkit
+# Jim <img src="https://user-images.githubusercontent.com/4642979/218163532-1c8a58e5-6f36-42de-96d3-f245eee93cf8.png" alt="jim" width="35"/>
+
+**A JAX-based gravitational-wave inference toolkit**
 
 <a href="https://jim.readthedocs.io/en/main/">
 <img src="https://badgen.net/badge/Read/the doc/blue" alt="doc"/>
 </a>
+<a href="https://github.com/GW-JAX-Team/jim/blob/main/LICENSE">
+<img src="https://badgen.net/badge/License/MIT/blue" alt="license"/>
+</a>
+<a href='https://coveralls.io/github/GW-JAX-Team/jim?branch=main'>
+<img src='https://badgen.net/coveralls/c/github/GW-JAX-Team/jim/main' alt='coverage' />
+</a>
 
-Jim comprises a set of tools for estimating parameters of gravitational-wave sources thorugh Bayesian inference.
-At its core, Jim relies on the JAX-based sampler [flowMC](https://github.com/kazewong/flowMC),
-which leverages normalizing flows to enhance the convergence of a gradient-based MCMC sampler.
+Jim is a JAX-based toolkit for estimating parameters of gravitational-wave sources through Bayesian inference. At its core, Jim uses the normalizing-flow enhanced sampler [flowMC](https://github.com/GW-JAX-Team/flowMC) to improve the convergence of gradient-based MCMC sampling.
 
-Since its based on JAX, Jim can also leverage hardware acceleration to achieve significant speedups on GPUs. Jim also takes advantage of likelihood-heterodyining, ([Cornish 2010](https://arxiv.org/abs/1007.4820), [Cornish 2021](https://arxiv.org/abs/2109.02728)) to compute the gravitational-wave likelihood more efficiently.
+Built on JAX, Jim leverages hardware acceleration to achieve significant speedups on GPUs. The toolkit also implements likelihood-heterodyning ([Cornish et al. 2010](https://arxiv.org/abs/1007.4820), [Cornish & Littenberg 2021](https://arxiv.org/abs/2109.02728)) for efficient gravitational-wave likelihood computation.
 
-See the accompanying paper, [Wong, Isi, Edwards (2023)](https://github.com/kazewong/TurboPE/) for details.
+See the accompanying paper, [Wong, Isi, Edwards (2023)](https://github.com/kazewong/TurboPE/), for more details.
 
 
 > [!WARNING]  
-> Jim is under heavy development, so API is constantly changing. Use at your own risk!
-> One way to mitigate this inconvience is to make your own fork over a version for now.
-> We expect to hit a stable version this year. Stay tuned.
+> Jim is under active development and the API may change. Use at your own risk!
+> Consider forking a specific version if you need API stability.
+> We aim to release a stable v1.0.0 version in 2026.
 
-_[Documentatation and examples are a work in progress]_
+_[Documentation and examples are a work in progress]_
 
-## Installation
+# Installation
 
-You may install the latest released version of Jim through pip by doing
+The simplest way to install Jim is through pip:
+
 ```
 pip install jimGW
 ```
 
-You may install the bleeding edge version by cloning this repo, or doing
+This will install the latest stable release and its dependencies.
+Jim is built on [JAX](https://github.com/google/jax) and [flowMC](https://github.com/GW-JAX-Team/flowMC).
+By default, this installs the CPU version of JAX from [PyPI](https://pypi.org).
+If you have a GPU and want to leverage hardware acceleration, install the CUDA-enabled version:
+
 ```
-pip install git+https://github.com/GW-JAX-Team/jim
+pip install jimGW[cuda]
 ```
 
-If you would like to take advantage of CUDA, you will additionally need to install a specific version of JAX by doing
+If you want to install the latest version of Jim, you can clone this repo and install it locally:
+
 ```
-pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+git clone https://github.com/GW-JAX-Team/jim.git
+cd jim
+pip install -e .
 ```
 
-_NOTE:_ Jim is only currently compatible with Python 3.10.
+# Performance
 
-## Performance
+Jim's performance varies with available hardware. Under optimal conditions with CUDA, parameter estimation for a binary neutron star can complete in ~1 minute on an NVIDIA A100 GPU (see [paper](https://github.com/kazewong/TurboPE/) for details).
 
-The performance of Jim will vary depending on the hardware available. Under optimal conditions, the CUDA installation can achieve parameter estimation in ~1 min on an Nvidia A100 GPU for a binary neutron star (see [paper](https://github.com/kazewong/TurboPE/) for details). If a GPU is not available, JAX will fall back on CPUs, and you will see a message like this on execution:
+If no GPU is available, JAX will automatically fall back to CPU execution, displaying:
 
 ```
 No GPU/TPU found, falling back to CPU.
 ```
 
-## Directory
+# Attribution
 
-Parameter estimation examples are in `example/ParameterEstimation`.
+If you use Jim in your research, please cite the accompanying paper:
 
-## Attribution
-
-Please cite the accompanying paper, [Wong, Isi, Edwards (2023)](https://github.com/kazewong/TurboPE/).
+```
+@article{Wong:2023lgb,
+    author = "Wong, Kaze W. K. and Isi, Maximiliano and Edwards, Thomas D. P.",
+    title = "{Fast Gravitational-wave Parameter Estimation without Compromises}",
+    eprint = "2302.05333",
+    archivePrefix = "arXiv",
+    primaryClass = "astro-ph.IM",
+    doi = "10.3847/1538-4357/acf5cd",
+    journal = "Astrophys. J.",
+    volume = "958",
+    number = "2",
+    pages = "129",
+    year = "2023"
+}
+```

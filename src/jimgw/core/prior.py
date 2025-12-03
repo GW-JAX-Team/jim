@@ -161,9 +161,9 @@ class StandardNormalDistribution(Prior):
 
     def __init__(self, parameter_names: list[str], **kwargs):
         super().__init__(parameter_names)
-        assert (
-            self.n_dims == 1
-        ), "StandardNormalDistribution needs to be 1D distributions"
+        assert self.n_dims == 1, (
+            "StandardNormalDistribution needs to be 1D distributions"
+        )
 
     def sample(
         self, rng_key: PRNGKeyArray, n_samples: int
@@ -212,9 +212,9 @@ class SequentialTransformPrior(CompositePrior):
         base_prior: list[Prior],
         transforms: list[BijectiveTransform],
     ):
-        assert (
-            len(base_prior) == 1
-        ), "SequentialTransformPrior only takes one base prior"
+        assert len(base_prior) == 1, (
+            "SequentialTransformPrior only takes one base prior"
+        )
         super().__init__(base_prior)
         self.transforms = transforms
         for transform in self.transforms:
