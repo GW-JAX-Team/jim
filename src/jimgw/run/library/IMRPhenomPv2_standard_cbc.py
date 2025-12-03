@@ -146,7 +146,9 @@ class IMRPhenomPv2StandardCBCRunDefinition(SingleEventRunDefinition):
         s2_prior = UniformSpherePrior(parameter_names=["s2"], max_mag=self.max_s1)
         iota_prior = SinePrior(parameter_names=["iota"])
         # Extrinsic prior
-        dL_prior = PowerLawPrior(self.dL_range[0],self.dL_range[1], 2.0, parameter_names=["d_L"])
+        dL_prior = PowerLawPrior(
+            self.dL_range[0], self.dL_range[1], 2.0, parameter_names=["d_L"]
+        )
         t_c_prior = UniformPrior(
             self.t_c_range[0], self.t_c_range[1], parameter_names=["t_c"]
         )
