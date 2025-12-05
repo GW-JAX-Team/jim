@@ -1,5 +1,5 @@
 jimgw
-mkdocs==1.4.3               # Main documentation generator.
+mkdocs==1.6.1               # Main documentation generator.
 mkdocs-material==9.1.18     # Theme
 pymdown-extensions==10.1    # Markdown extensions e.g. to handle LaTeX.
 mkdocstrings[python]==0.22.0        # Autogenerate documentation from docstrings.
