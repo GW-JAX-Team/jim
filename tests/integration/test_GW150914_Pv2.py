@@ -13,7 +13,6 @@ from jimgw.core.prior import (
     SinePrior,
     PowerLawPrior,
     UniformSpherePrior,
-    SimpleConstrainedPrior,
 )
 from jimgw.core.single_event.data import Data
 from jimgw.core.single_event.detector import get_detector_preset
@@ -77,8 +76,8 @@ prior = prior + [
 ]
 
 # Extrinsic prior
-dL_prior = SimpleConstrainedPrior([PowerLawPrior(1.0, 2000.0, 2.0, parameter_names=["d_L"])])
-t_c_prior = SimpleConstrainedPrior([UniformPrior(-0.05, 0.05, parameter_names=["t_c"])])
+dL_prior = PowerLawPrior(1.0, 2000.0, 2.0, parameter_names=["d_L"])
+t_c_prior = UniformPrior(-0.05, 0.05, parameter_names=["t_c"])
 phase_c_prior = UniformPrior(0.0, 2 * jnp.pi, parameter_names=["phase_c"])
 psi_prior = UniformPrior(0.0, jnp.pi, parameter_names=["psi"])
 ra_prior = UniformPrior(0.0, 2 * jnp.pi, parameter_names=["ra"])

@@ -10,7 +10,6 @@ import equinox as eqx
 
 from jimgw.core.transforms import (
     BijectiveTransform,
-    LogitTransform,
     ScaleTransform,
     OffsetTransform,
     SineTransform,
@@ -190,6 +189,54 @@ class StandardNormalDistribution(Prior):
     def log_prob(self, z: dict[str, Float]) -> Float:
         variable = z[self.parameter_names[0]]
         return -0.5 * (variable**2 + jnp.log(2 * jnp.pi))
+
+
+@jaxtyped(typechecker=typechecker)
+class UniformDistribution(Prior):
+    """
+    One-dimensional uniform distribution prior over [0, 1].
+
+    Attributes:
+        parameter_names (list[str]): Name of the parameter.
+    """
+
+    xmin: float = 0.0
+    xmax: float = 1.0
+
+    def __repr__(self):
+        return f"UniformDistribution(parameter_names={self.parameter_names})"
+
+    def __init__(self, parameter_names: list[str], **kwargs):
+        super().__init__(parameter_names)
+        assert self.n_dims == 1, "UniformDistribution needs to be 1D distributions"
+
+    def sample(
+        self, rng_key: PRNGKeyArray, n_samples: int
+    ) -> dict[str, Float[Array, " n_samples"]]:
+        """
+        Sample from a uniform distribution.
+
+        Parameters
+        ----------
+        rng_key : PRNGKeyArray
+            A random key to use for sampling.
+        n_samples : int
+            The number of samples to draw.
+
+        Returns
+        -------
+        samples : dict
+            Samples from the distribution. The keys are the names of the parameters.
+
+        """
+        samples = jax.random.uniform(rng_key, (n_samples,), minval=0.0, maxval=1.0)
+        return self.add_name(samples[None])
+
+    def log_prob(self, z: dict[str, Float]) -> Float:
+        variable = z[self.parameter_names[0]]
+        return jnp.where(
+            jnp.logical_and(variable >= 0.0, variable <= 1.0), 0.0, -jnp.inf
+        )
 
 
 class SequentialTransformPrior(CompositePrior):
@@ -418,17 +465,11 @@ class UniformPrior(SequentialTransformPrior):
         self.xmax = xmax
         self.xmin = xmin
         super().__init__(
-            [LogisticDistribution([f"{self.parameter_names[0]}_base"])],
+            [UniformDistribution([f"{self.parameter_names[0]}_base"])],
             [
-                LogitTransform(
-                    (
-                        [f"{self.parameter_names[0]}_base"],
-                        [f"({self.parameter_names[0]}-({xmin}))/{(xmax - xmin)}"],
-                    )
-                ),
                 ScaleTransform(
                     (
-                        [f"({self.parameter_names[0]}-({xmin}))/{(xmax - xmin)}"],
+                        [f"{self.parameter_names[0]}_base"],
                         [f"{self.parameter_names[0]}-({xmin})"],
                     ),
                     xmax - xmin,
@@ -658,17 +699,11 @@ class PowerLawPrior(SequentialTransformPrior):
         assert self.xmin < self.xmax, "xmin must be less than xmax"
         assert self.xmin > 0.0, "x must be positive"
         super().__init__(
-            [LogisticDistribution([f"{self.parameter_names[0]}_base"])],
+            [UniformDistribution([f"{self.parameter_names[0]}_base"])],
             [
-                LogitTransform(
-                    (
-                        [f"{self.parameter_names[0]}_base"],
-                        [f"{self.parameter_names[0]}_before_transform"],
-                    )
-                ),
                 PowerLawTransform(
                     (
-                        [f"{self.parameter_names[0]}_before_transform"],
+                        [f"{self.parameter_names[0]}_base"],
                         self.parameter_names,
                     ),
                     xmin,

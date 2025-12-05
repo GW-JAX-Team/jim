@@ -14,7 +14,6 @@ from jimgw.core.prior import (
     PowerLawPrior,
     UniformSpherePrior,
     RayleighPrior,
-    SimpleConstrainedPrior,
 )
 from jimgw.core.single_event.detector import get_H1, get_L1
 from jimgw.core.single_event.likelihood import TransientLikelihoodFD
@@ -125,8 +124,8 @@ prior = [
     UniformSpherePrior(parameter_names=["s1"]),
     UniformSpherePrior(parameter_names=["s2"]),
     SinePrior(parameter_names=["iota"]),
-    SimpleConstrainedPrior([PowerLawPrior(dL_min, dL_max, 2.0, parameter_names=["d_L"])]),
-    SimpleConstrainedPrior([UniformPrior(-0.1, 0.1, parameter_names=["t_c"])]),
+    PowerLawPrior(dL_min, dL_max, 2.0, parameter_names=["d_L"]),
+    UniformPrior(-0.1, 0.1, parameter_names=["t_c"]),
     UniformPrior(0.0, 2 * jnp.pi, parameter_names=["phase_c"]),
     UniformPrior(0.0, jnp.pi, parameter_names=["psi"]),
     UniformPrior(0.0, 2 * jnp.pi, parameter_names=["ra"]),
