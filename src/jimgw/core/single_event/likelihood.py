@@ -505,9 +505,8 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         # Keep edges from first valid center to last valid center + 1
         if len(mask_heterodyne_center) > 0:
             start_idx = mask_heterodyne_center[0]
-            end_idx = (
-                mask_heterodyne_center[-1] + 2
-            )  # +1 for inclusive, +1 for the extra edge
+            end_idx = mask_heterodyne_center[-1] + 2
+            # +1 for inclusive, +1 for the extra edge
             freq_grid = freq_grid[start_idx:end_idx]
         else:
             raise ValueError(
