@@ -33,22 +33,22 @@ class Jim(object):
         sample_transforms: Sequence[BijectiveTransform] = [],
         likelihood_transforms: Sequence[NtoMTransform] = [],
         rng_key: PRNGKeyArray = jax.random.PRNGKey(0),
-        n_chains: int = 50,
-        n_local_steps: int = 10,
-        n_global_steps: int = 10,
+        n_chains: int = 1000,
+        n_local_steps: int = 100,
+        n_global_steps: int = 1000,
         n_training_loops: int = 20,
-        n_production_loops: int = 20,
+        n_production_loops: int = 10,
         n_epochs: int = 20,
-        mala_step_size: float = 0.01,
+        mala_step_size: Float | Float[Array, " n_dims"] = 2e-3,
         chain_batch_size: int = 0,
         rq_spline_hidden_units: list[int] = [128, 128],
         rq_spline_n_bins: int = 10,
-        rq_spline_n_layers: int = 2,
+        rq_spline_n_layers: int = 8,
         learning_rate: float = 1e-3,
         batch_size: int = 10000,
-        n_max_examples: int = 10000,
+        n_max_examples: int = 30000,
         local_thinning: int = 1,
-        global_thinning: int = 1,
+        global_thinning: int = 100,
         n_NFproposal_batch_size: int = 1000,
         history_window: int = 100,
         n_temperatures: int = 5,
@@ -92,7 +92,7 @@ class Jim(object):
             n_training_loops=n_training_loops,
             n_production_loops=n_production_loops,
             n_epochs=n_epochs,
-            mala_step_size=mala_step_size,
+            mala_step_size=mala_step_size,  # type: ignore # Type ignored should be removed once the FlowMC fix is published
             chain_batch_size=chain_batch_size,
             rq_spline_hidden_units=rq_spline_hidden_units,
             rq_spline_n_bins=rq_spline_n_bins,
@@ -161,40 +161,23 @@ class Jim(object):
         return self.likelihood.evaluate(named_params, data) + prior
 
     def sample_initial_condition(self) -> Float[Array, " n_chains n_dims"]:
-        initial_position = (
-            jnp.zeros((self.sampler.n_chains, self.prior.n_dims)) + jnp.nan
-        )
-
         rng_key, subkey = jax.random.split(self.sampler.rng_key)
 
-        while not jax.tree.reduce(
-            jnp.logical_and,
-            jax.tree.map(lambda x: jnp.isfinite(x), initial_position),
-        ).all():
-            non_finite_index = jnp.where(
-                jnp.any(
-                    ~jax.tree.reduce(
-                        jnp.logical_and,
-                        jax.tree.map(lambda x: jnp.isfinite(x), initial_position),
-                    ),
-                    axis=1,
-                )
-            )[0]
+        initial_position = self.prior.sample(subkey, self.sampler.n_chains)
+        for transform in self.sample_transforms:
+            initial_position = jax.vmap(transform.forward)(initial_position)
+        initial_position = jnp.array(
+            [initial_position[key] for key in self.parameter_names]
+        ).T
 
-            rng_key, subkey = jax.random.split(rng_key)
-            guess = self.prior.sample(subkey, self.sampler.n_chains)
-            for transform in self.sample_transforms:
-                guess = jax.vmap(transform.forward)(guess)
-            guess = jnp.array([guess[key] for key in self.parameter_names]).T
+        if not jnp.all(jnp.isfinite(initial_position)):
+            raise ValueError(
+                "Initial positions contain non-finite values (NaN or inf). "
+                "Check your priors and transforms for validity."
+            )
 
-            finite_guess = jnp.where(
-                jnp.all(jax.tree.map(lambda x: jnp.isfinite(x), guess), axis=1)
-            )[0]
-            common_length = min(len(finite_guess), len(non_finite_index))
-            initial_position = initial_position.at[
-                non_finite_index[:common_length]
-            ].set(guess[:common_length])
         self.sampler.rng_key = rng_key
+
         return initial_position
 
     def sample(
@@ -228,15 +211,24 @@ class Jim(object):
         self.sampler.sample(initial_position, {})
 
     def get_samples(
-        self, training: bool = False
+        self,
+        training: bool = False,
+        rng_key: PRNGKeyArray = jax.random.PRNGKey(0),
+        n_samples: int = 0,
     ) -> dict[str, Float[Array, " n_chains n_dims"]]:
         """
-        Get the samples from the sampler
+        Get the samples from the sampler.
 
         Parameters
         ----------
         training : bool, optional
             Whether to get the training samples or the production samples, by default False
+        rng_key : PRNGKeyArray, optional
+            Random key for downsampling, by default jax.random.PRNGKey(0).
+        n_samples : int, optional
+            Number of samples to return after downsampling. If 0 (default), returns all samples.
+            If the requested number exceeds available samples, a warning is logged and all
+            available samples are returned.
 
         Returns
         -------
@@ -256,6 +248,23 @@ class Jim(object):
             chains = chains.data
 
         chains = chains.reshape(-1, self.prior.n_dims)
+
+        # Downsample to requested number of samples
+        n_available = chains.shape[0]
+        if n_samples > 0:
+            if n_samples > n_available:
+                logging.warning(
+                    f"Requested {n_samples} samples but only {n_available} available "
+                    f"after rejection sampling. Returning all available samples."
+                )
+            else:
+                # Randomly select n_samples from the accepted chains
+                rng_key, subkey = jax.random.split(rng_key)
+                indices = jax.random.choice(
+                    subkey, n_available, shape=(n_samples,), replace=False
+                )
+                chains = chains[indices]
+
         chains = jax.vmap(self.add_name)(chains)
         for sample_transform in reversed(self.sample_transforms):
             chains = jax.vmap(sample_transform.backward)(chains)

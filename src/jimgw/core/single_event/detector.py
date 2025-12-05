@@ -142,9 +142,9 @@ class Detector(ABC):
         data, freqs_1 = self.data.frequency_slice(*self.frequency_bounds)
         psd, freqs_2 = self.psd.frequency_slice(*self.frequency_bounds)
 
-        assert all(
-            freqs_1 == freqs_2
-        ), f"The {self.name} data and PSD must have same frequencies"
+        assert jnp.array_equal(freqs_1, freqs_2), (
+            f"The {self.name} data and PSD must have same frequencies"
+        )
 
         self._sliced_frequencies = freqs_1
         self._sliced_fd_data = data
@@ -540,7 +540,7 @@ class GroundBased2G(Detector):
         """Add data to the detector.
 
         Args:
-            data (Union[Data, Array]): Data to be added to the detector, either as a `Data` object
+            data (Data | Array): Data to be added to the detector, either as a `Data` object
                 or as a timeseries array.
             **kws (dict): Additional keyword arguments to pass to `Data` constructor.
 
@@ -559,7 +559,7 @@ class GroundBased2G(Detector):
         """Add PSD to the detector.
 
         Args:
-            psd (Union[PowerSpectrum, Array]): PSD to be added to the detector, either as a `PowerSpectrum`
+            psd (PowerSpectrum | Array): PSD to be added to the detector, either as a `PowerSpectrum`
                 object or as a timeseries array.
             **kws (dict): Additional keyword arguments to pass to `PowerSpectrum` constructor.
 
@@ -597,7 +597,8 @@ class GroundBased2G(Detector):
             None
         """
         # 1. Set empty data to initialise the detector
-        n_times = int(duration * sampling_frequency)
+        # n_times = int(duration * sampling_frequency)
+        n_times = int(jnp.round(duration * sampling_frequency))
         self.set_data(
             Data(
                 name=f"{self.name}_empty",
@@ -621,7 +622,7 @@ class GroundBased2G(Detector):
         self.set_data(
             Data.from_fd(
                 name=f"{self.name}_injected",
-                fd=strain_data,
+                fd_strain=strain_data,
                 frequencies=self.frequencies,
                 epoch=self.data.epoch,
             )
@@ -743,9 +744,72 @@ def get_V1():
     )
 
 
+def get_ET() -> list[GroundBased2G]:
+    name = "ET"
+    latitude = (43 + 37.0 / 60 + 53.0921 / 3600) * DEG_TO_RAD
+    longitude = (10 + 30.0 / 60 + 16.1887 / 3600) * DEG_TO_RAD
+    xarm_azimuth = 70.5674 * DEG_TO_RAD
+    yarm_azimuth = 130.5674 * DEG_TO_RAD
+    xarm_tilt = 0
+    yarm_tilt = 0
+    elevation = 51.884
+    length = 1e4
+
+    a = EARTH_SEMI_MAJOR_AXIS / 1e3  # Numerical instability avoidance
+    b = EARTH_SEMI_MINOR_AXIS / 1e3
+    earth_approx_radius = (
+        a
+        * b
+        / (jnp.sqrt(a**2 * jnp.sin(latitude) ** 2 + b**2 * jnp.cos(latitude) ** 2))
+    )
+    earth_approx_radius *= 1e3
+
+    ifos = []
+    for i in range(3):
+        ifos.append(
+            GroundBased2G(
+                f"{name}{i + 1}",
+                latitude=float(latitude),
+                longitude=float(longitude),
+                xarm_azimuth=xarm_azimuth,
+                yarm_azimuth=yarm_azimuth,
+                elevation=elevation,
+                xarm_tilt=xarm_tilt,
+                yarm_tilt=yarm_tilt,
+            )
+        )
+        # Rotate arms
+        xarm_azimuth += (4 / 3) * jnp.pi
+        yarm_azimuth += (4 / 3) * jnp.pi
+        # The detector is taken as a chord that cuts across the earth
+        latitude += 2 * jnp.arcsin(
+            0.5 * length * jnp.sin(xarm_azimuth) / earth_approx_radius
+        )
+        longitude += 2 * jnp.arcsin(
+            0.5 * length * jnp.cos(xarm_azimuth) / earth_approx_radius
+        )
+    return ifos
+
+
+def get_CE():
+    return GroundBased2G(
+        "CE",
+        latitude=(46 + 27.0 / 60 + 18.528 / 3600) * DEG_TO_RAD,
+        longitude=-(119 + 24.0 / 60 + 27.5657 / 3600) * DEG_TO_RAD,
+        xarm_azimuth=125.9994 * DEG_TO_RAD,
+        yarm_azimuth=215.994 * DEG_TO_RAD,
+        xarm_tilt=-6.195e-4,
+        yarm_tilt=1.25e-5,
+        elevation=142.554,
+        modes="pc",
+    )
+
+
 def get_detector_preset():
     return {
         "H1": get_H1(),
         "L1": get_L1(),
         "V1": get_V1(),
+        "ET": get_ET(),
+        "CE": get_CE(),
     }

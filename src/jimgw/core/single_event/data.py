@@ -167,10 +167,6 @@ class Data(ABC):
             f"{self.__class__.__name__}(name='{self.name}', "
             + f"delta_t={self.delta_t}, epoch={self.epoch})"
         )
-        return (
-            f"{self.__class__.__name__}(name='{self.name}', "
-            + f"delta_t={self.delta_t}, epoch={self.epoch})"
-        )
 
     def __bool__(self) -> bool:
         """Check if the data is empty."""
@@ -278,7 +274,7 @@ class Data(ABC):
     @classmethod
     def from_fd(
         cls,
-        fd: Complex[Array, " n_freq"],
+        fd_strain: Complex[Array, " n_freq"],
         frequencies: Float[Array, " n_freq"],
         epoch: float = 0.0,
         name: str = "",
@@ -287,7 +283,7 @@ class Data(ABC):
         Fourier domain data.
 
         Args:
-            fd: Fourier domain data array.
+            fd_strain: Fourier domain data array.
             frequencies: Frequencies of the data in Hz.
             epoch: Epoch of the data in seconds (default: 0).
             name: Name of the data (default: '').
@@ -295,40 +291,49 @@ class Data(ABC):
         Returns:
             Data: Data object with the Fourier and time domain data.
         """
-        assert len(fd) == len(
-            frequencies
-        ), "Frequency and data arrays must have the same length"
-        # form full frequency array
-        delta_f = frequencies[1] - frequencies[0]
-        fnyq = frequencies[-1]
-        # complete frequencies to adjacent multiple of 2
-        # (sometimes this is needed because frequency arrays do not include
-        # the Nyquist frequency)
-        if (fnyq + delta_f) % 2 == 0:
-            fnyq = fnyq + delta_f
-        f = jnp.arange(0, fnyq + delta_f, delta_f)
-        # Form full data array
-        data_fd_full = jnp.where(
-            (frequencies[0] <= f) & (f <= frequencies[-1]), fd, 0.0 + 0.0j
+        assert fd_strain.shape == frequencies.shape, (
+            "Frequency and data arrays must have the same length"
+        )
+        f_nyq = frequencies[-1]
+        sampling_rate = 2 * f_nyq
+        duration = 1 / (frequencies[1] - frequencies[0])
+        n_samples = int(jnp.round(sampling_rate * duration))
+
+        # Ensure time-domain samples will be even
+        if (n_samples % 2) != 0:
+            raise ValueError(
+                "The number of time-domain samples will not be even. "
+                + "Please check your frequency array."
+            )
+
+        # Construct the full frequency array
+        n_frequencies = int(jnp.round(n_samples / 2) + 1)
+        freqs = jnp.arange(n_frequencies) / duration
+        # Fill in the full data array
+        start_idx = jnp.searchsorted(freqs, frequencies[0])
+        data_fd_full = jax.lax.dynamic_update_slice(
+            jnp.zeros_like(freqs, dtype=fd_strain.dtype), fd_strain, (start_idx,)
         )
         # IFFT into time domain
-        delta_t = 1 / (2 * fnyq)
+        delta_t = 1 / sampling_rate
         data_td_full = jnp.fft.irfft(data_fd_full) / delta_t
-        # check frequencies
-        assert jnp.allclose(
-            f, jnp.fft.rfftfreq(len(data_td_full), delta_t)
-        ), "Generated frequencies do not match the input frequencies"
-        # create a Data object
+        # Check frequencies
+        assert jnp.array_equal(freqs, jnp.fft.rfftfreq(len(data_td_full), delta_t)), (
+            "Generated frequencies do not match the input frequencies"
+        )
+        # Create a Data object
         data = cls(data_td_full, delta_t, epoch=epoch, name=name)
         data.fd = data_fd_full
 
-        # This ensures the newly constructed Data in FD fully
+        # Ensures the newly constructed Data in FD faithfully
         # represents the input FD data.
         d_new, f_new = data.frequency_slice(frequencies[0], frequencies[-1])
-        assert all(jnp.equal(d_new, fd)), "Data do not match after slicing"
-        assert all(
-            jnp.equal(f_new, frequencies)
-        ), "Frequencies do not match after slicing"
+        assert jnp.array_equal(d_new, fd_strain), (
+            "Fourier domain data do not match after slicing"
+        )
+        assert jnp.array_equal(f_new, frequencies), (
+            "Frequencies do not match after slicing"
+        )
         return data
 
     @classmethod
@@ -448,9 +453,9 @@ class PowerSpectrum(ABC):
         # NOTE: Are we sure the values and frequencies start from 0?
         self.values = values
         self.frequencies = frequencies
-        assert self.n_freq == len(
-            self.frequencies
-        ), "Values and frequencies must have the same length"
+        assert self.n_freq == len(self.frequencies), (
+            "Values and frequencies must have the same length"
+        )
         self.name = name or ""
 
     def __repr__(self) -> str:

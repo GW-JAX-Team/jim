@@ -29,6 +29,12 @@ from jimgw.core.single_event.detector import get_detector_preset
 
 jax.config.update("jax_enable_x64", True)
 
+# Get detector instances
+detector_preset = get_detector_preset()
+H1 = detector_preset["H1"]
+L1 = detector_preset["L1"]
+V1 = detector_preset["V1"]
+
 
 def common_keys_allclose(
     dict_1: dict, dict_2: dict, atol: float = 1e-8, rtol: float = 1e-5
@@ -353,8 +359,6 @@ class TestDistanceTransform:
         output, jacobian = DistanceToSNRWeightedDistanceTransform(
             gps_time=1126259462.4,
             ifos=[H1, L1],
-            dL_min=1.0,
-            dL_max=2000.0,
         ).transform(
             {
                 "d_L": 200.0,
@@ -366,29 +370,8 @@ class TestDistanceTransform:
             }
         )
 
-        assert np.isfinite(output["d_hat_unbounded"])
+        assert np.isfinite(output["d_hat"])
         assert not jnp.isnan(jacobian).any()
-
-    def test_forward_distance_transform_at_boundaries(self):
-        """
-        Test transformation from distance to SNR-weighted distance at boundaries (dL_min, dL_max)
-        """
-        output, jacobian = DistanceToSNRWeightedDistanceTransform(
-            gps_time=1126259462.4,
-            ifos=[H1, L1],
-            dL_min=1.0,
-            dL_max=2000.0,
-        ).transform(
-            {
-                "d_L": 1.0,
-                "M_c": 30.0,
-                "ra": 1.0,
-                "dec": 0.0,
-                "psi": 0.5,
-                "iota": 0.6,
-            }
-        )
-        assert jnp.allclose(output["d_hat_unbounded"], -jnp.inf)
 
     def test_backward_distance_transform(self):
         """
@@ -397,11 +380,9 @@ class TestDistanceTransform:
         output, jacobian = DistanceToSNRWeightedDistanceTransform(
             gps_time=1126259462.4,
             ifos=[H1, L1],
-            dL_min=1.0,
-            dL_max=2000.0,
         ).inverse(
             {
-                "d_hat_unbounded": 100.0,
+                "d_hat": 100.0,
                 "M_c": 30.0,
                 "ra": 1.0,
                 "dec": 0.0,
@@ -411,27 +392,6 @@ class TestDistanceTransform:
         )
         assert np.isfinite(output["d_L"])
         assert not jnp.isnan(jacobian).any()
-
-    def test_backward_distance_transform_at_boundaries(self):
-        """
-        Test transformation from SNR-weighted distance to distance at boundaries (dL_min, dL_max)
-        """
-        output, jacobian = DistanceToSNRWeightedDistanceTransform(
-            gps_time=1126259462.4,
-            ifos=[H1, L1],
-            dL_min=1.0,
-            dL_max=2000.0,
-        ).inverse(
-            {
-                "d_hat_unbounded": -jnp.inf,
-                "M_c": 30.0,
-                "ra": 1.0,
-                "dec": 0.0,
-                "psi": 0.5,
-                "iota": 0.6,
-            }
-        )
-        assert jnp.allclose(output["d_L"], 1.0)
 
     def test_forward_backward_consistency(self):
         """
@@ -455,8 +415,6 @@ class TestDistanceTransform:
         distance_transform = DistanceToSNRWeightedDistanceTransform(
             gps_time=1126259462.4,
             ifos=[H1, L1],
-            dL_min=1.0,
-            dL_max=2000.0,
         )
         forward_transform_output, _ = jax.vmap(distance_transform.transform)(inputs)
         output, _ = jax.vmap(distance_transform.inverse)(forward_transform_output)
@@ -491,19 +449,15 @@ class TestDistanceTransform:
 
         # Create a JIT compiled version of the transform.
         jit_transform = jax.jit(
-            lambda data: DistanceToSNRWeightedDistanceTransform(
+            DistanceToSNRWeightedDistanceTransform(
                 gps_time=1126259462.4,
                 ifos=[H1, L1],
-                dL_min=1.0,
-                dL_max=2000.0,
-            ).transform(data)
+            ).transform
         )
         jitted_output, jitted_jacobian = jit_transform(sample_dict)
         non_jitted_output, _ = DistanceToSNRWeightedDistanceTransform(
             gps_time=1126259462.4,
             ifos=[H1, L1],
-            dL_min=1.0,
-            dL_max=2000.0,
         ).transform(sample_dict)
 
         # Assert that the jitted and non-jitted results agree
@@ -519,7 +473,7 @@ class TestDistanceTransform:
 
         # Generate random sample
         subkeys = jax.random.split(jax.random.PRNGKey(123), 6)
-        d_hat_unbounded = jax.random.uniform(subkeys[0], (1,), minval=1, maxval=100000)
+        d_hat = jax.random.uniform(subkeys[0], (1,), minval=1, maxval=100000)
         M_c = jax.random.uniform(subkeys[1], (1,), minval=1, maxval=100)
         ra = jax.random.uniform(subkeys[2], (1,), minval=0, maxval=2 * jnp.pi)
         dec = jax.random.uniform(
@@ -529,7 +483,7 @@ class TestDistanceTransform:
         iota = jax.random.uniform(subkeys[5], (1,), minval=0, maxval=jnp.pi)
 
         sample = [
-            d_hat_unbounded[0],
+            d_hat[0],
             M_c[0],
             ra[0],
             dec[0],
@@ -537,24 +491,20 @@ class TestDistanceTransform:
             iota[0],
         ]
         sample_dict = dict(
-            zip(["d_hat_unbounded", "M_c", "ra", "dec", "psi", "iota"], sample)
+            zip(["d_hat", "M_c", "ra", "dec", "psi", "iota"], sample)
         )
 
         # Create a JIT compiled version of the transform.
         jit_inverse_transform = jax.jit(
-            lambda data: DistanceToSNRWeightedDistanceTransform(
+            DistanceToSNRWeightedDistanceTransform(
                 gps_time=1126259462.4,
                 ifos=[H1, L1],
-                dL_min=1.0,
-                dL_max=2000.0,
-            ).inverse(data)
+            ).inverse
         )
         jitted_output, jitted_jacobian = jit_inverse_transform(sample_dict)
         non_jitted_output, _ = DistanceToSNRWeightedDistanceTransform(
             gps_time=1126259462.4,
             ifos=[H1, L1],
-            dL_min=1.0,
-            dL_max=2000.0,
         ).inverse(sample_dict)
 
         assert common_keys_allclose(jitted_output, non_jitted_output)

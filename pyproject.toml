@@ -8,6 +8,15 @@ authors = [
 	{name = "Kaze W. K. Wong", email = "kazewong.physics@gmail.com"},
 ]
 license = {file = "LICENSE"}
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+]
+
 dependencies = [
     "astropy>=6.1.4",
     "beartype>=0.19.0",
@@ -39,14 +48,16 @@ dagster = [
     "dagster-webserver>=1.11.1",
 ]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "jimgw",
     "pre-commit>=4.2.0",
     "coverage>=7.7.0",
     "coveralls>=4.0.1",
     "pytest>=8.3.3",
-    "ruff>=0.11.12",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.12.2",
+    "pyright>=1.1.402",
 ]
 
 [tool.uv.sources]
@@ -58,20 +69,15 @@ modules = [
 { type="module", name="jim_dagster.RealDataCatalog.definitions" },
 ]
 
-
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-
 [tool.pyright]
 include = ["src"]
-exclude = ["docs","tests"]
 
-[tool.ruff]
-include = ["src"]
-exclude = ["test", "docs"]
+[tool.ruff.lint]
+ignore = ["F722"]
 
 [tool.coverage.report]
 exclude_also = [
@@ -79,6 +85,4 @@ exclude_also = [
     "raise AssertionError",
     "raise NotImplementedError",
     "@(abc\\. )?abstractmethod",
-    "def tree_flatten",
-    "def tree_unflatten",
 ]
