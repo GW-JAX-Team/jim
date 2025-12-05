@@ -503,18 +503,10 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
 
         # For freq_grid (bin edges), we need n_center + 1 edges
         # Keep edges from first valid center to last valid center + 1
-        if len(mask_heterodyne_center) > 0:
-            start_idx = mask_heterodyne_center[0]
-            end_idx = mask_heterodyne_center[-1] + 2
-            # +1 for inclusive, +1 for the extra edge
-            freq_grid = freq_grid[start_idx:end_idx]
-        else:
-            raise ValueError(
-                "No valid frequency bins found after masking. "
-                "The reference waveform has no valid frequency content in the range "
-                f"[{self.frequencies[0]:.2f}, {self.frequencies[-1]:.2f}] Hz. "
-                "Check your reference parameters and frequency bounds."
-            )
+        start_idx = mask_heterodyne_center[0]
+        end_idx = mask_heterodyne_center[-1] + 2
+        # +1 for inclusive, +1 for the extra edge
+        freq_grid = freq_grid[start_idx:end_idx]
 
         h_sky_low = reference_waveform(self.freq_grid_low, self.ref_params)
         h_sky_center = reference_waveform(self.freq_grid_center, self.ref_params)
