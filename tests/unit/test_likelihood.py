@@ -7,7 +7,7 @@ from jimgw.core.single_event.likelihood import (
     # TimeMarginalizedLikelihoodFD,
     # PhaseMarginalizedLikelihoodFD,
     # PhaseTimeMarginalizedLikelihoodFD,
-    # HeterodynedTransientLikelihoodFD,
+    HeterodynedTransientLikelihoodFD,
     # HeterodynedPhaseMarginalizedLikelihoodFD,
 )
 from jimgw.core.single_event.detector import get_H1, get_L1
@@ -126,16 +126,31 @@ class TestBaseTransientLikelihoodFD:
 #         assert np.isfinite(result)
 
 
-# class TestHeterodynedTransientLikelihoodFD:
-#     def test_initialization_and_evaluation(self, detectors_and_waveform):
-#         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
-#         likelihood = HeterodynedTransientLikelihoodFD(
-#             detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps, ref_params=example_params(gps)
-#         )
-#         assert isinstance(likelihood, HeterodynedTransientLikelihoodFD)
-#         params = example_params(likelihood.gmst)
-#         result = likelihood.evaluate(params, {})
-#         assert np.isfinite(result)
+class TestHeterodynedTransientLikelihoodFD:
+    def test_initialization_and_evaluation(self, detectors_and_waveform):
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        # First create base likelihood for comparison
+        base_likelihood = BaseTransientLikelihoodFD(
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
+        )
+
+        # Create heterodyned likelihood with reference parameters
+        ref_params = example_params(base_likelihood.gmst)
+        likelihood = HeterodynedTransientLikelihoodFD(
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
+            trigger_time=gps, ref_params=ref_params
+        )
+        assert isinstance(likelihood, HeterodynedTransientLikelihoodFD)
+
+        # Test evaluation at reference parameters
+        params = example_params(likelihood.gmst)
+        result = likelihood.evaluate(params, {})
+        assert np.isfinite(result), "Heterodyned likelihood should be finite"
+
+        # Test that heterodyned likelihood matches base likelihood at reference parameters
+        base_result = base_likelihood.evaluate(params, {})
+        assert np.isclose(result, base_result), f"Heterodyned likelihood ({result}) should match base likelihood ({base_result}) at reference parameters"
+
 
 
 # class TestHeterodynedPhaseMarginalizedLikelihoodFD:
@@ -148,5 +163,3 @@ class TestBaseTransientLikelihoodFD:
 #         params = example_params(likelihood.gmst)
 #         result = likelihood.evaluate(params, {})
 #         assert np.isfinite(result)
-        
-# Need to add tests for running the heterodyned likelihood with different parameters
