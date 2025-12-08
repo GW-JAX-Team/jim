@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from jax.scipy.special import logit
 from beartype import beartype as typechecker
-from jaxtyping import Float, jaxtyped
+from jaxtyping import Float, Array, jaxtyped
 
 
 class Transform(ABC):
@@ -390,10 +390,10 @@ class BoundToBound(BijectiveTransform):
     Bound to bound transformation
     """
 
-    original_lower_bound: Float
-    original_upper_bound: Float
-    target_lower_bound: Float
-    target_upper_bound: Float
+    original_lower_bound: Float[Array, " n_dim"]
+    original_upper_bound: Float[Array, " n_dim"]
+    target_lower_bound: Float[Array, " n_dim"]
+    target_upper_bound: Float[Array, " n_dim"]
 
     def __repr__(self):
         return f"BoundToBound(name_mapping={self.name_mapping}, original_lower_bound={self.original_lower_bound}, original_upper_bound={self.original_upper_bound}, target_lower_bound={self.target_lower_bound}, target_upper_bound={self.target_upper_bound})"
@@ -401,10 +401,10 @@ class BoundToBound(BijectiveTransform):
     def __init__(
         self,
         name_mapping: tuple[list[str], list[str]],
-        original_lower_bound: Float,
-        original_upper_bound: Float,
-        target_lower_bound: Float,
-        target_upper_bound: Float,
+        original_lower_bound: Float | Float[Array, " n_dim"],
+        original_upper_bound: Float | Float[Array, " n_dim"],
+        target_lower_bound: Float | Float[Array, " n_dim"],
+        target_upper_bound: Float | Float[Array, " n_dim"],
     ):
         super().__init__(name_mapping)
         self.original_lower_bound = jnp.atleast_1d(original_lower_bound)
@@ -434,8 +434,8 @@ class BoundToUnbound(BijectiveTransform):
     Bound to unbound transformation
     """
 
-    original_lower_bound: Float
-    original_upper_bound: Float
+    original_lower_bound: Float[Array, " n_dim"]
+    original_upper_bound: Float[Array, " n_dim"]
 
     def __repr__(self):
         return f"BoundToUnbound(name_mapping={self.name_mapping}, original_lower_bound={self.original_lower_bound}, original_upper_bound={self.original_upper_bound})"
@@ -443,8 +443,8 @@ class BoundToUnbound(BijectiveTransform):
     def __init__(
         self,
         name_mapping: tuple[list[str], list[str]],
-        original_lower_bound: Float,
-        original_upper_bound: Float,
+        original_lower_bound: Float | Float[Array, " n_dim"],
+        original_upper_bound: Float | Float[Array, " n_dim"],
     ):
         super().__init__(name_mapping)
         self.original_lower_bound = jnp.atleast_1d(original_lower_bound)
@@ -479,7 +479,7 @@ class SingleSidedUnboundTransform(BijectiveTransform):
 
     """
 
-    original_lower_bound: Float
+    original_lower_bound: Float[Array, " n_dim"]
 
     def __repr__(self):
         return f"SingleSidedUnboundTransform(name_mapping={self.name_mapping}, original_lower_bound={self.original_lower_bound})"
@@ -487,7 +487,7 @@ class SingleSidedUnboundTransform(BijectiveTransform):
     def __init__(
         self,
         name_mapping: tuple[list[str], list[str]],
-        original_lower_bound: Float,
+        original_lower_bound: Float | Float[Array, " n_dim"],
     ):
         super().__init__(name_mapping)
         self.original_lower_bound = jnp.atleast_1d(original_lower_bound)
@@ -505,6 +505,7 @@ class SingleSidedUnboundTransform(BijectiveTransform):
         }
 
 
+@jaxtyped(typechecker=typechecker)
 class PowerLawTransform(BijectiveTransform):
     """
     PowerLaw transformation
