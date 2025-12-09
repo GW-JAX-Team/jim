@@ -24,11 +24,13 @@ dependencies = [
     "gwpy>=3.0.12",
     "jaxtyping>=0.3.3",
     "ripplegw>=0.0.9",
-    "corner>=2.2.3",
-    "matplotlib>=3.10.7",
 ]
 
 [project.optional-dependencies]
+visualize = [
+    "corner>=2.2.3",
+    "matplotlib>=3.10.7",
+]
 docs = [
     "mkdocs-gen-files==0.6.0",
     "mkdocs-jupyter==0.25.1",

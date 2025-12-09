@@ -1690,11 +1690,9 @@ source = { editable = "." }
 dependencies = [
     { name = "astropy" },
     { name = "beartype" },
-    { name = "corner" },
     { name = "flowmc" },
     { name = "gwpy" },
     { name = "jaxtyping" },
-    { name = "matplotlib" },
     { name = "ripplegw" },
 ]
 
@@ -1717,6 +1715,10 @@ docs = [
     { name = "mkdocstrings", extra = ["python"] },
     { name = "pymdown-extensions" },
 ]
+visualize = [
+    { name = "corner" },
+    { name = "matplotlib" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1734,7 +1736,7 @@ dev = [
 requires-dist = [
     { name = "astropy", specifier = ">=7.0.1" },
     { name = "beartype", specifier = ">=0.19.0" },
-    { name = "corner", specifier = ">=2.2.3" },
+    { name = "corner", marker = "extra == 'visualize'", specifier = ">=2.2.3" },
     { name = "dagster", marker = "extra == 'dagster'", specifier = ">=1.11.1" },
     { name = "dagster-dg-cli", marker = "extra == 'dagster'", specifier = ">=1.11.1" },
     { name = "dagster-pipes", marker = "extra == 'dagster'", specifier = ">=1.11.1" },
@@ -1743,7 +1745,7 @@ requires-dist = [
     { name = "gwpy", specifier = ">=3.0.12" },
     { name = "jax", extras = ["cuda"], marker = "extra == 'cuda'", specifier = ">=0.8.1" },
     { name = "jaxtyping", specifier = ">=0.3.3" },
-    { name = "matplotlib", specifier = ">=3.10.7" },
+    { name = "matplotlib", marker = "extra == 'visualize'", specifier = ">=3.10.7" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = "==1.6.1" },
     { name = "mkdocs-gen-files", marker = "extra == 'docs'", specifier = "==0.6.0" },
     { name = "mkdocs-jupyter", marker = "extra == 'docs'", specifier = "==0.25.1" },
@@ -1753,7 +1755,7 @@ requires-dist = [
     { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = "==10.18" },
     { name = "ripplegw", specifier = ">=0.0.9" },
 ]
-provides-extras = ["docs", "cuda", "dagster"]
+provides-extras = ["visualize", "docs", "cuda", "dagster"]
 
 [package.metadata.requires-dev]
 dev = [
