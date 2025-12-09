@@ -40,12 +40,18 @@ class SingleEventLikelihood(LikelihoodBase):
         waveform: Waveform,
         fixed_parameters: Optional[dict[str, Float]] = None,
     ) -> None:
-        # Check that all detectors have initialized data
+        # Check that all detectors have initialized data and PSD
         for detector in detectors:
             if detector.data.is_empty:
                 raise ValueError(
                     f"Detector '{detector.name}' does not have initialized data. "
                     f"Please set data using detector.set_data() or detector.inject_signal() "
+                    f"before initializing the likelihood."
+                )
+            if detector.psd.is_empty:
+                raise ValueError(
+                    f"Detector '{detector.name}' does not have initialized PSD. "
+                    f"Please set PSD using detector.set_psd() or detector.load_and_set_psd() "
                     f"before initializing the likelihood."
                 )
 

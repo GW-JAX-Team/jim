@@ -76,8 +76,17 @@ class TestBaseTransientLikelihoodFD:
 
     def test_uninitialized_data_raises_error(self):
         """Test that initializing likelihood with detectors that have no data raises an error."""
-        # Create detectors without setting data
+        gps = 1126259462.4
+        psd_start = gps - 2048
+        psd_end = gps + 2048
+        
+        # Create detectors with PSD but without data
         ifos = [get_H1(), get_L1()]
+        for ifo in ifos:
+            psd_data = Data.from_gwosc(ifo.name, psd_start, psd_end)
+            ifo.set_psd(psd_data.to_psd(nperseg=4 * 4096))
+            # Intentionally not setting data
+        
         waveform = RippleIMRPhenomD(f_ref=20.0)
         
         # Should raise ValueError when trying to initialize likelihood
@@ -87,18 +96,74 @@ class TestBaseTransientLikelihoodFD:
                 waveform=waveform, 
                 f_min=20.0, 
                 f_max=1024.0, 
-                trigger_time=1126259462.4
+                trigger_time=gps
             )
     
     def test_partially_initialized_data_raises_error(self, detectors_and_waveform):
         """Test that having only some detectors with data raises an error."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         
-        # Add an uninitialized detector to the list
-        ifos_mixed = ifos + [get_H1()]  # This H1 has no data set
+        # Add a detector with PSD but no data
+        new_detector = get_H1()
+        psd_start = gps - 2048
+        psd_end = gps + 2048
+        psd_data = Data.from_gwosc(new_detector.name, psd_start, psd_end)
+        new_detector.set_psd(psd_data.to_psd(nperseg=4 * 4096))
+        # Intentionally not setting data for this detector
+        
+        ifos_mixed = ifos + [new_detector]
         
         # Should raise ValueError mentioning the detector name
         with pytest.raises(ValueError, match="H1.*does not have initialized data"):
+            BaseTransientLikelihoodFD(
+                detectors=ifos_mixed, 
+                waveform=waveform, 
+                f_min=fmin, 
+                f_max=fmax, 
+                trigger_time=gps
+            )
+
+    def test_uninitialized_psd_raises_error(self):
+        """Test that initializing likelihood with detectors that have no PSD raises an error."""
+        gps = 1126259462.4
+        start = gps - 2
+        end = gps + 2
+        
+        # Create detectors with data but no PSD
+        ifos = [get_H1(), get_L1()]
+        for ifo in ifos:
+            data = Data.from_gwosc(ifo.name, start, end)
+            ifo.set_data(data)
+            # Intentionally not setting PSD
+        
+        waveform = RippleIMRPhenomD(f_ref=20.0)
+        
+        # Should raise ValueError when trying to initialize likelihood
+        with pytest.raises(ValueError, match="does not have initialized PSD"):
+            BaseTransientLikelihoodFD(
+                detectors=ifos, 
+                waveform=waveform, 
+                f_min=20.0, 
+                f_max=1024.0, 
+                trigger_time=gps
+            )
+    
+    def test_partially_initialized_psd_raises_error(self, detectors_and_waveform):
+        """Test that having only some detectors with PSD raises an error."""
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        
+        # Add a detector with data but no PSD
+        new_detector = get_H1()
+        start = gps - 2
+        end = gps + 2
+        data = Data.from_gwosc(new_detector.name, start, end)
+        new_detector.set_data(data)
+        # Intentionally not setting PSD for this detector
+        
+        ifos_mixed = ifos + [new_detector]
+        
+        # Should raise ValueError mentioning the detector name and PSD
+        with pytest.raises(ValueError, match="H1.*does not have initialized PSD"):
             BaseTransientLikelihoodFD(
                 detectors=ifos_mixed, 
                 waveform=waveform, 
