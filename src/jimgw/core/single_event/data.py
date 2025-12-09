@@ -1,6 +1,5 @@
 from abc import ABC
 import logging
-
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -11,6 +10,8 @@ from typing import Optional, Self
 from scipy.signal import welch
 from scipy.signal.windows import tukey
 from scipy.interpolate import interp1d
+
+logger = logging.getLogger(__name__)
 
 # TODO: Need to expand this list. Currently it is only O3.
 asd_file_dict = {
@@ -180,7 +181,7 @@ class Data(ABC):
             alpha: Shape parameter of the Tukey window (default: 0.2); this is
                 the fraction of the segment that is tapered on each side.
         """
-        logging.info(f"Setting Tukey window to {self.name} data")
+        logger.info(f"Setting Tukey window to {self.name} data")
         self.window = jnp.array(tukey(self.n_time, alpha))
 
     def fft(
@@ -196,12 +197,12 @@ class Data(ABC):
             assert self.delta_t > 0, "Delta t must be positive"
         if self.has_fd and (window is None or window == self.window):
             # Perhaps one needs to also check self.td and self.delta_t are the same.
-            logging.debug(f"{self.name} has FD data, skipping FFT.")
+            logger.debug(f"{self.name} has FD data, skipping FFT.")
             return self.fd
         if window is None:
             window = self.window
 
-        logging.info(f"Computing FFT of {self.name} data")
+        logger.info(f"Computing FFT of {self.name} data")
         self.fd = jnp.fft.rfft(self.td * window) * self.delta_t
         self.window = window
         return self.fd
@@ -261,7 +262,7 @@ class Data(ABC):
             Data: Data object with the fetched time domain data.
         """
         duration = gps_end_time - gps_start_time
-        logging.info(
+        logger.info(
             f"Fetching {duration} s of {ifo} data from GWOSC "
             f"[{gps_start_time}, {gps_end_time}]"
         )

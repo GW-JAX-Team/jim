@@ -19,6 +19,8 @@ import logging
 from typing import Sequence
 from abc import abstractmethod
 
+logger = logging.getLogger(__name__)
+
 
 class SingleEventLikelihood(LikelihoodBase):
     detectors: Sequence[Detector]
@@ -431,7 +433,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
             detectors, waveform, fixed_parameters, f_min, f_max, trigger_time
         )
 
-        logging.info("Initializing heterodyned likelihood..")
+        logger.info("Initializing heterodyned likelihood..")
 
         # Can use another waveform to use as reference waveform, but if not provided, use the same waveform
         if reference_waveform is None:
@@ -439,9 +441,9 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
 
         if ref_params:
             self.ref_params = ref_params.copy()
-            logging.info(f"Reference parameters provided, which are {self.ref_params}")
+            logger.info(f"Reference parameters provided, which are {self.ref_params}")
         elif prior:
-            logging.info("No reference parameters are provided, finding it...")
+            logger.info("No reference parameters are provided, finding it...")
             ref_params = self.maximize_likelihood(
                 prior=prior,
                 sample_transforms=sample_transforms,
@@ -450,7 +452,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
                 n_steps=n_steps,
             )
             self.ref_params = {key: float(value) for key, value in ref_params.items()}
-            logging.info(f"The reference parameters are {self.ref_params}")
+            logger.info(f"The reference parameters are {self.ref_params}")
         else:
             raise ValueError(
                 "Either reference parameters or parameter names must be provided"
@@ -459,10 +461,10 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         # since ripple cannot handle eta=0.25
         if jnp.isclose(self.ref_params["eta"], 0.25):
             self.ref_params["eta"] = 0.249995
-            logging.info("The eta of the reference parameter is close to 0.25")
-            logging.info(f"The eta is adjusted to {self.ref_params['eta']}")
+            logger.warning("The eta of the reference parameter is close to 0.25")
+            logger.warning(f"The eta is adjusted to {self.ref_params['eta']}")
 
-        logging.info("Constructing reference waveforms..")
+        logger.info("Constructing reference waveforms..")
 
         self.ref_params["trigger_time"] = self.trigger_time
         self.ref_params["gmst"] = self.gmst
@@ -701,7 +703,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
                 named_params, data
             )
 
-        print("Starting the optimizer")
+        logger.info("Starting the optimizer")
 
         optimizer = AdamOptimization(
             logpdf=y, n_steps=n_steps, learning_rate=0.001, noise_level=1

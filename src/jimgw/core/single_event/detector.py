@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import Optional
+import logging
 
 import jax
 import jax.numpy as jnp
@@ -6,7 +8,6 @@ from jaxtyping import Array, Float, Complex, PRNGKeyArray, jaxtyped, Bool
 from numpy import loadtxt
 import requests
 from beartype import beartype as typechecker
-from typing import Optional
 
 from jimgw.core.constants import (
     C_SI,
@@ -17,6 +18,8 @@ from jimgw.core.constants import (
 from jimgw.core.single_event.wave import Polarization
 from jimgw.core.single_event.data import Data, PowerSpectrum
 from jimgw.core.single_event.utils import inner_product, complex_inner_product
+
+logger = logging.getLogger(__name__)
 
 # TODO: Need to expand this list. Currently it is only O3.
 asd_file_dict = {
@@ -505,7 +508,7 @@ class GroundBased2G(Detector):
             f, asd_vals = loadtxt(asd_file, unpack=True)
             psd_vals = asd_vals**2
         else:
-            print("Grabbing GWTC-2 PSD for " + self.name)
+            logger.info("Grabbing GWTC-2 PSD for " + self.name)
             url = asd_file_dict[self.name]
             data = requests.get(url)
             tmp_file_name = f"fetched_default_asd_{self.name}.txt"
@@ -642,10 +645,9 @@ class GroundBased2G(Detector):
         )
         match_filtered_snr /= optimal_snr
 
-        # NOTE: Change this to logging later.
-        print(f"For detector {self.name}, the injected signal has:")
-        print(f"  - Optimal SNR: {optimal_snr:.4f}")
-        print(f"  - Match filtered SNR: {match_filtered_snr:.4f}")
+        logger.info(f"For detector {self.name}, the injected signal has:")
+        logger.info(f"  - Optimal SNR: {optimal_snr:.4f}")
+        logger.info(f"  - Match filtered SNR: {match_filtered_snr:.4f}")
 
     def get_whitened_frequency_domain_strain(
         self, frequency_series: Complex[Array, " n_freq"]

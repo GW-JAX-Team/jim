@@ -11,6 +11,8 @@ from flowMC.resource.nf_model.base import NFModel
 import logging
 import os
 
+logger = logging.getLogger(__name__)
+
 
 class RunManager:
     run: RunDefinition
@@ -22,7 +24,7 @@ class RunManager:
         elif isinstance(run, str):
             self.run = RunDefinition.from_file(run)
         else:
-            logging.ERROR("Run object or path not given.")
+            logger.error("Run object or path not given.")
 
         assert isinstance(run, RunDefinition), (
             "Run object or path not given. Please provide a Run object or a path to a serialized Run object."
@@ -44,7 +46,7 @@ class RunManager:
         self.working_dir = run.working_dir
 
     def sample(self):
-        logging.info("Starting sampling...")
+        logger.info("Starting sampling...")
         self.jim.sample(self.jim.sample_initial_condition())
 
     ### Data-fetching functions ###
