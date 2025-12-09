@@ -218,7 +218,9 @@ class SequentialTransformPrior(CompositePrior):
         super().__init__(base_prior)
         self.transforms = tuple(transforms)
         for transform in self.transforms:
-            self.parameter_names = tuple(transform.propagate_name(list(self.parameter_names)))
+            self.parameter_names = tuple(
+                transform.propagate_name(list(self.parameter_names))
+            )
 
     def sample(
         self, rng_key: PRNGKeyArray, n_samples: int
@@ -434,7 +436,10 @@ class UniformPrior(SequentialTransformPrior):
                     xmax - xmin,
                 ),
                 OffsetTransform(
-                    ([f"{self.parameter_names[0]}-({xmin})"], list(self.parameter_names)),
+                    (
+                        [f"{self.parameter_names[0]}-({xmin})"],
+                        list(self.parameter_names),
+                    ),
                     xmin,
                 ),
             ],
@@ -577,9 +582,12 @@ class UniformSpherePrior(CombinePrior):
     def __init__(self, parameter_names: list[str], max_mag: float = 1.0):
         self.parameter_names = tuple(parameter_names)
         assert self.n_dims == 1, "UniformSpherePrior only takes the name of the vector"
-        self.parameter_names = tuple([
-            f"{self.parameter_names[0]}_{suffix}" for suffix in ("mag", "theta", "phi")
-        ])
+        self.parameter_names = tuple(
+            [
+                f"{self.parameter_names[0]}_{suffix}"
+                for suffix in ("mag", "theta", "phi")
+            ]
+        )
         super().__init__(
             [
                 UniformPrior(0.0, max_mag, [self.parameter_names[0]]),
