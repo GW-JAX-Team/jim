@@ -1,4 +1,5 @@
 from dataclasses import field
+from typing import Optional
 
 import jax
 import jax.numpy as jnp
@@ -94,7 +95,9 @@ class CompositePrior(Prior):
         self.base_prior = tuple(priors)
         self.parameter_names = tuple(parameter_names)
 
-    def trace_prior_parent(self, output: list[Prior] = []) -> list[Prior]:
+    def trace_prior_parent(self, output: Optional[list[Prior]] = None) -> list[Prior]:
+        if output is None:
+            output = []
         for subprior in self.base_prior:
             if isinstance(subprior, CompositePrior):
                 output = subprior.trace_prior_parent(output)
