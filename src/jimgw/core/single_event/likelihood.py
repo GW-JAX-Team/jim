@@ -520,20 +520,19 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         f_max = jnp.max(f_valid)
         f_min = jnp.min(f_valid)
 
-        mask_heterodyne_grid = jnp.where((freq_grid <= f_max) & (freq_grid >= f_min))[0]
-        mask_heterodyne_low = jnp.where(
-            (self.freq_grid_low <= f_max) & (self.freq_grid_low >= f_min)
-        )[0]
+        # Mask based on center frequencies to keep complete bins
         mask_heterodyne_center = jnp.where(
             (self.freq_grid_center <= f_max) & (self.freq_grid_center >= f_min)
         )[0]
-        freq_grid = freq_grid[mask_heterodyne_grid]
-        self.freq_grid_low = self.freq_grid_low[mask_heterodyne_low]
         self.freq_grid_center = self.freq_grid_center[mask_heterodyne_center]
+        self.freq_grid_low = self.freq_grid_low[mask_heterodyne_center]
 
-        # Ensure frequency grids have same length
-        if len(self.freq_grid_low) > len(self.freq_grid_center):
-            self.freq_grid_low = self.freq_grid_low[: len(self.freq_grid_center)]
+        # For freq_grid (bin edges), we need n_center + 1 edges
+        # Keep edges from first valid center to last valid center + 1
+        start_idx = mask_heterodyne_center[0]
+        end_idx = mask_heterodyne_center[-1] + 2
+        # +1 for inclusive, +1 for the extra edge
+        freq_grid = freq_grid[start_idx:end_idx]
 
         h_sky_low = reference_waveform(self.freq_grid_low, self.ref_params)
         h_sky_center = reference_waveform(self.freq_grid_center, self.ref_params)
