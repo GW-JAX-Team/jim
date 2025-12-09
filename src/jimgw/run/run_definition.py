@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Self
+from typing import Self, Optional
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.prior import Prior
 from jimgw.core.transforms import BijectiveTransform, NtoMTransform
@@ -29,10 +29,10 @@ class RunDefinition(ABC):
         self,
         working_dir: str = "./",
         seed: int = 0,
-        likelihood: LikelihoodBase | None = None,
-        prior: Prior | None = None,
-        sample_transforms: Sequence[BijectiveTransform] | None = None,
-        likelihood_transforms: Sequence[NtoMTransform] | None = None,
+        likelihood: Optional[LikelihoodBase] = None,
+        prior: Optional[Prior] = None,
+        sample_transforms: Optional[Sequence[BijectiveTransform]] = None,
+        likelihood_transforms: Optional[Sequence[NtoMTransform]] = None,
         rng_key: jax.Array = jax.random.PRNGKey(0),
         n_chains: int = 50,
         n_local_steps: int = 10,
