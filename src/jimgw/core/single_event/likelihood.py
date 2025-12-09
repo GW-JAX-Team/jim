@@ -40,6 +40,15 @@ class SingleEventLikelihood(LikelihoodBase):
         waveform: Waveform,
         fixed_parameters: Optional[dict[str, Float]] = None,
     ) -> None:
+        # Check that all detectors have initialized data
+        for detector in detectors:
+            if detector.data.is_empty:
+                raise ValueError(
+                    f"Detector '{detector.name}' does not have initialized data. "
+                    f"Please set data using detector.set_data() or detector.inject_signal() "
+                    f"before initializing the likelihood."
+                )
+        
         self.detectors = detectors
         self.waveform = waveform
         self.fixed_parameters = fixed_parameters if fixed_parameters is not None else {}

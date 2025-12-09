@@ -74,6 +74,39 @@ class TestBaseTransientLikelihoodFD:
         assert likelihood.trigger_time == 1126259462.4
         assert hasattr(likelihood, "gmst")
 
+    def test_uninitialized_data_raises_error(self):
+        """Test that initializing likelihood with detectors that have no data raises an error."""
+        # Create detectors without setting data
+        ifos = [get_H1(), get_L1()]
+        waveform = RippleIMRPhenomD(f_ref=20.0)
+        
+        # Should raise ValueError when trying to initialize likelihood
+        with pytest.raises(ValueError, match="does not have initialized data"):
+            BaseTransientLikelihoodFD(
+                detectors=ifos, 
+                waveform=waveform, 
+                f_min=20.0, 
+                f_max=1024.0, 
+                trigger_time=1126259462.4
+            )
+    
+    def test_partially_initialized_data_raises_error(self, detectors_and_waveform):
+        """Test that having only some detectors with data raises an error."""
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        
+        # Add an uninitialized detector to the list
+        ifos_mixed = ifos + [get_H1()]  # This H1 has no data set
+        
+        # Should raise ValueError mentioning the detector name
+        with pytest.raises(ValueError, match="H1.*does not have initialized data"):
+            BaseTransientLikelihoodFD(
+                detectors=ifos_mixed, 
+                waveform=waveform, 
+                f_min=fmin, 
+                f_max=fmax, 
+                trigger_time=gps
+            )
+
     def test_evaluation(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = BaseTransientLikelihoodFD(
