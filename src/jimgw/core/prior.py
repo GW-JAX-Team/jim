@@ -27,7 +27,7 @@ class Prior(eqx.Module):
     This class should not be used directly. It provides a common interface and bookkeeping for parameter names and transforms.
     """
 
-    parameter_names: list[str]
+    parameter_names: tuple[str, ...]
 
     @property
     def n_dims(self) -> int:
@@ -40,7 +40,7 @@ class Prior(eqx.Module):
         parameter_names : list[str]
             A list of names for the parameters of the prior.
         """
-        self.parameter_names = parameter_names
+        self.parameter_names = tuple(parameter_names)
 
     def add_name(self, x: Float[Array, " n_dims"]) -> dict[str, Float]:
         """
@@ -75,11 +75,11 @@ class CompositePrior(Prior):
     This class is used to create complex prior distributions from simpler ones.
 
     Attributes:
-        base_prior (list[Prior]): List of prior objects.
-        parameter_names (list[str]): Names of all parameters in the composite prior.
+        base_prior (tuple[Prior, ...]): Tuple of prior objects.
+        parameter_names (tuple[str, ...]): Names of all parameters in the composite prior.
     """
 
-    base_prior: list[Prior]
+    base_prior: tuple[Prior, ...]
 
     def __repr__(self):
         return f"Composite(priors={self.base_prior}, parameter_names={self.parameter_names})"
@@ -90,9 +90,9 @@ class CompositePrior(Prior):
     ):
         parameter_names = []
         for prior in priors:
-            parameter_names += prior.parameter_names
-        self.base_prior = priors
-        self.parameter_names = parameter_names
+            parameter_names += list(prior.parameter_names)
+        self.base_prior = tuple(priors)
+        self.parameter_names = tuple(parameter_names)
 
     def trace_prior_parent(self, output: list[Prior] = []) -> list[Prior]:
         for subprior in self.base_prior:
@@ -197,12 +197,12 @@ class SequentialTransformPrior(CompositePrior):
     Prior distribution transformed by a sequence of bijective transforms.
 
     Attributes:
-        base_prior (list[Prior]): The base prior to transform.
-        transforms (list[BijectiveTransform]): List of transforms to apply sequentially.
-        parameter_names (list[str]): Names of the parameters after all transforms.
+        base_prior (tuple[Prior, ...]): The base prior to transform.
+        transforms (tuple[BijectiveTransform, ...]): Tuple of transforms to apply sequentially.
+        parameter_names (tuple[str, ...]): Names of the parameters after all transforms.
     """
 
-    transforms: list[BijectiveTransform]
+    transforms: tuple[BijectiveTransform, ...]
 
     def __repr__(self):
         return f"Sequential(priors={self.base_prior}, parameter_names={self.parameter_names})"
@@ -216,9 +216,9 @@ class SequentialTransformPrior(CompositePrior):
             "SequentialTransformPrior only takes one base prior"
         )
         super().__init__(base_prior)
-        self.transforms = transforms
+        self.transforms = tuple(transforms)
         for transform in self.transforms:
-            self.parameter_names = transform.propagate_name(self.parameter_names)
+            self.parameter_names = tuple(transform.propagate_name(list(self.parameter_names)))
 
     def sample(
         self, rng_key: PRNGKeyArray, n_samples: int
@@ -357,11 +357,11 @@ class CombinePrior(CompositePrior):
     Multivariate prior constructed by joining multiple independent priors.
 
     Attributes:
-        base_prior (list[Prior]): List of independent priors.
-        parameter_names (list[str]): Names of all parameters in the combined prior.
+        base_prior (tuple[Prior, ...]): Tuple of independent priors.
+        parameter_names (tuple[str, ...]): Names of all parameters in the combined prior.
     """
 
-    base_prior: list[Prior] = field(default_factory=list)
+    base_prior: tuple[Prior, ...] = field(default_factory=tuple)
 
     def __repr__(self):
         return (
@@ -413,7 +413,7 @@ class UniformPrior(SequentialTransformPrior):
         xmax: float,
         parameter_names: list[str],
     ):
-        self.parameter_names = parameter_names
+        self.parameter_names = tuple(parameter_names)
         assert self.n_dims == 1, "UniformPrior needs to be 1D distributions"
         self.xmax = xmax
         self.xmin = xmin
@@ -434,7 +434,7 @@ class UniformPrior(SequentialTransformPrior):
                     xmax - xmin,
                 ),
                 OffsetTransform(
-                    ([f"{self.parameter_names[0]}-({xmin})"], self.parameter_names),
+                    ([f"{self.parameter_names[0]}-({xmin})"], list(self.parameter_names)),
                     xmin,
                 ),
             ],
@@ -473,7 +473,7 @@ class GaussianPrior(SequentialTransformPrior):
             sigma: The standard deviation of the distribution.
             parameter_names: A list of names for the parameters of the prior.
         """
-        self.parameter_names = parameter_names
+        self.parameter_names = tuple(parameter_names)
         assert self.n_dims == 1, "GaussianPrior needs to be 1D distributions"
         self.mu = mu
         self.sigma = sigma
@@ -488,7 +488,7 @@ class GaussianPrior(SequentialTransformPrior):
                     sigma,
                 ),
                 OffsetTransform(
-                    ([f"{self.parameter_names[0]}-({mu})"], self.parameter_names),
+                    ([f"{self.parameter_names[0]}-({mu})"], list(self.parameter_names)),
                     mu,
                 ),
             ],
@@ -511,7 +511,7 @@ class SinePrior(SequentialTransformPrior):
         return f"SinePrior(parameter_names={self.parameter_names})"
 
     def __init__(self, parameter_names: list[str]):
-        self.parameter_names = parameter_names
+        self.parameter_names = tuple(parameter_names)
         assert self.n_dims == 1, "SinePrior needs to be 1D distributions"
         super().__init__(
             [CosinePrior([f"{self.parameter_names[0]}-pi/2"])],
@@ -545,7 +545,7 @@ class CosinePrior(SequentialTransformPrior):
         return f"CosinePrior(parameter_names={self.parameter_names})"
 
     def __init__(self, parameter_names: list[str]):
-        self.parameter_names = parameter_names
+        self.parameter_names = tuple(parameter_names)
         assert self.n_dims == 1, "CosinePrior needs to be 1D distributions"
         super().__init__(
             [UniformPrior(-1.0, 1.0, [f"sin({self.parameter_names[0]})"])],
@@ -575,11 +575,11 @@ class UniformSpherePrior(CombinePrior):
         return f"UniformSpherePrior(parameter_names={self.parameter_names})"
 
     def __init__(self, parameter_names: list[str], max_mag: float = 1.0):
-        self.parameter_names = parameter_names
+        self.parameter_names = tuple(parameter_names)
         assert self.n_dims == 1, "UniformSpherePrior only takes the name of the vector"
-        self.parameter_names = [
+        self.parameter_names = tuple([
             f"{self.parameter_names[0]}_{suffix}" for suffix in ("mag", "theta", "phi")
-        ]
+        ])
         super().__init__(
             [
                 UniformPrior(0.0, max_mag, [self.parameter_names[0]]),
@@ -610,14 +610,14 @@ class RayleighPrior(SequentialTransformPrior):
         sigma: float,
         parameter_names: list[str],
     ):
-        self.parameter_names = parameter_names
+        self.parameter_names = tuple(parameter_names)
         assert self.n_dims == 1, "RayleighPrior needs to be 1D distributions"
         self.sigma = sigma
         super().__init__(
             [UniformPrior(0.0, 1.0, [f"{self.parameter_names[0]}_base"])],
             [
                 RayleighTransform(
-                    ([f"{self.parameter_names[0]}_base"], self.parameter_names),
+                    ([f"{self.parameter_names[0]}_base"], list(self.parameter_names)),
                     sigma=sigma,
                 )
             ],
@@ -650,7 +650,7 @@ class PowerLawPrior(SequentialTransformPrior):
         alpha: float,
         parameter_names: list[str],
     ):
-        self.parameter_names = parameter_names
+        self.parameter_names = tuple(parameter_names)
         assert self.n_dims == 1, "Power law needs to be 1D distributions"
         self.xmax = xmax
         self.xmin = xmin
@@ -669,7 +669,7 @@ class PowerLawPrior(SequentialTransformPrior):
                 PowerLawTransform(
                     (
                         [f"{self.parameter_names[0]}_before_transform"],
-                        self.parameter_names,
+                        list(self.parameter_names),
                     ),
                     xmin,
                     xmax,
