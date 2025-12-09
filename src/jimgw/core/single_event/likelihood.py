@@ -48,7 +48,7 @@ class SingleEventLikelihood(LikelihoodBase):
                     f"Please set data using detector.set_data() or detector.inject_signal() "
                     f"before initializing the likelihood."
                 )
-        
+
         self.detectors = detectors
         self.waveform = waveform
         self.fixed_parameters = fixed_parameters if fixed_parameters is not None else {}
