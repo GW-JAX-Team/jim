@@ -9,7 +9,6 @@ from jimgw.core.prior import (
     SinePrior,
     PowerLawPrior,
     UniformSpherePrior,
-    SimpleConstrainedPrior,
 )
 
 from jimgw.core.single_event.data import Data, PowerSpectrum
@@ -149,22 +148,11 @@ class IMRPhenomPv2StandardCBCRunDefinition(SingleEventRunDefinition):
         s2_prior = UniformSpherePrior(parameter_names=["s2"], max_mag=self.max_s1)
         iota_prior = SinePrior(parameter_names=["iota"])
         # Extrinsic prior
-        dL_prior = SimpleConstrainedPrior(
-            [
-                PowerLawPrior(
-                    self.dL_range[0],
-                    self.dL_range[1],
-                    2.0,
-                    parameter_names=["d_L"],
-                )
-            ]
+        dL_prior = PowerLawPrior(
+            self.dL_range[0], self.dL_range[1], 2.0, parameter_names=["d_L"]
         )
-        t_c_prior = SimpleConstrainedPrior(
-            [
-                UniformPrior(
-                    self.t_c_range[0], self.t_c_range[1], parameter_names=["t_c"]
-                )
-            ]
+        t_c_prior = UniformPrior(
+            self.t_c_range[0], self.t_c_range[1], parameter_names=["t_c"]
         )
         phase_c_prior = UniformPrior(
             self.phase_c_range[0], self.phase_c_range[1], parameter_names=["phase_c"]
