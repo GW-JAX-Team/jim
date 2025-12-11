@@ -268,9 +268,7 @@ class SequentialTransformPrior(CompositePrior):
         super().__init__(base_prior)
         self.transforms = tuple(transforms)
         for transform in self.transforms:
-            self.parameter_names = tuple(
-                transform.propagate_name(list(self.parameter_names))
-            )
+            self.parameter_names = tuple(transform.propagate_name(self.parameter_names))
 
     def sample(
         self, rng_key: PRNGKeyArray, n_samples: int

@@ -730,7 +730,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         popsize: int = 100,
         n_steps: int = 2000,
     ):
-        parameter_names = list(prior.parameter_names)
+        parameter_names = prior.parameter_names
         for transform in sample_transforms:
             parameter_names = transform.propagate_name(parameter_names)
 

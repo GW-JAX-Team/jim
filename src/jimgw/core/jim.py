@@ -25,7 +25,7 @@ class Jim(object):
     # Name of parameters to sample from
     sample_transforms: Sequence[BijectiveTransform]
     likelihood_transforms: Sequence[NtoMTransform]
-    parameter_names: list[str]
+    parameter_names: tuple[str, ...]
     sampler: Sampler
 
     def __init__(
@@ -63,7 +63,7 @@ class Jim(object):
 
         self.sample_transforms = sample_transforms
         self.likelihood_transforms = likelihood_transforms
-        self.parameter_names = list(prior.parameter_names)
+        self.parameter_names = prior.parameter_names
 
         if len(sample_transforms) == 0:
             logger.info(
