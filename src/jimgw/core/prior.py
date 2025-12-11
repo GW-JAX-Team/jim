@@ -1,4 +1,5 @@
 from dataclasses import field
+from typing import Optional
 
 import jax
 import jax.numpy as jnp
@@ -26,7 +27,7 @@ class Prior(eqx.Module):
     This class should not be used directly. It provides a common interface and bookkeeping for parameter names and transforms.
     """
 
-    parameter_names: list[str]
+    parameter_names: tuple[str, ...]
 
     @property
     def n_dims(self) -> int:
@@ -39,7 +40,7 @@ class Prior(eqx.Module):
         parameter_names : list[str]
             A list of names for the parameters of the prior.
         """
-        self.parameter_names = parameter_names
+        self.parameter_names = tuple(parameter_names)
 
     def add_name(self, x: Float[Array, " n_dims"]) -> dict[str, Float]:
         """
@@ -74,11 +75,11 @@ class CompositePrior(Prior):
     This class is used to create complex prior distributions from simpler ones.
 
     Attributes:
-        base_prior (list[Prior]): List of prior objects.
-        parameter_names (list[str]): Names of all parameters in the composite prior.
+        base_prior (tuple[Prior, ...]): Tuple of prior objects.
+        parameter_names (tuple[str, ...]): Names of all parameters in the composite prior.
     """
 
-    base_prior: list[Prior]
+    base_prior: tuple[Prior, ...]
 
     def __repr__(self):
         return f"Composite(priors={self.base_prior}, parameter_names={self.parameter_names})"
@@ -89,11 +90,13 @@ class CompositePrior(Prior):
     ):
         parameter_names = []
         for prior in priors:
-            parameter_names += prior.parameter_names
-        self.base_prior = priors
-        self.parameter_names = parameter_names
+            parameter_names += list(prior.parameter_names)
+        self.base_prior = tuple(priors)
+        self.parameter_names = tuple(parameter_names)
 
-    def trace_prior_parent(self, output: list[Prior] = []) -> list[Prior]:
+    def trace_prior_parent(self, output: Optional[list[Prior]] = None) -> list[Prior]:
+        if output is None:
+            output = []
         for subprior in self.base_prior:
             if isinstance(subprior, CompositePrior):
                 output = subprior.trace_prior_parent(output)
@@ -244,12 +247,12 @@ class SequentialTransformPrior(CompositePrior):
     Prior distribution transformed by a sequence of bijective transforms.
 
     Attributes:
-        base_prior (list[Prior]): The base prior to transform.
-        transforms (list[BijectiveTransform]): List of transforms to apply sequentially.
-        parameter_names (list[str]): Names of the parameters after all transforms.
+        base_prior (tuple[Prior, ...]): The base prior to transform.
+        transforms (tuple[BijectiveTransform, ...]): Tuple of transforms to apply sequentially.
+        parameter_names (tuple[str, ...]): Names of the parameters after all transforms.
     """
 
-    transforms: list[BijectiveTransform]
+    transforms: tuple[BijectiveTransform, ...]
 
     def __repr__(self):
         return f"Sequential(priors={self.base_prior}, parameter_names={self.parameter_names})"
@@ -263,9 +266,11 @@ class SequentialTransformPrior(CompositePrior):
             "SequentialTransformPrior only takes one base prior"
         )
         super().__init__(base_prior)
-        self.transforms = transforms
+        self.transforms = tuple(transforms)
         for transform in self.transforms:
-            self.parameter_names = transform.propagate_name(self.parameter_names)
+            self.parameter_names = tuple(
+                transform.propagate_name(list(self.parameter_names))
+            )
 
     def sample(
         self, rng_key: PRNGKeyArray, n_samples: int
@@ -404,11 +409,11 @@ class CombinePrior(CompositePrior):
     Multivariate prior constructed by joining multiple independent priors.
 
     Attributes:
-        base_prior (list[Prior]): List of independent priors.
-        parameter_names (list[str]): Names of all parameters in the combined prior.
+        base_prior (tuple[Prior, ...]): Tuple of independent priors.
+        parameter_names (tuple[str, ...]): Names of all parameters in the combined prior.
     """
 
-    base_prior: list[Prior] = field(default_factory=list)
+    base_prior: tuple[Prior, ...] = field(default_factory=tuple)
 
     def __repr__(self):
         return (

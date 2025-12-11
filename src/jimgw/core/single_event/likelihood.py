@@ -19,6 +19,8 @@ import logging
 from typing import Sequence
 from abc import abstractmethod
 
+logger = logging.getLogger(__name__)
+
 
 class SingleEventLikelihood(LikelihoodBase):
     detectors: Sequence[Detector]
@@ -40,6 +42,21 @@ class SingleEventLikelihood(LikelihoodBase):
         waveform: Waveform,
         fixed_parameters: Optional[dict[str, Float]] = None,
     ) -> None:
+        # Check that all detectors have initialized data and PSD
+        for detector in detectors:
+            if detector.data.is_empty:
+                raise ValueError(
+                    f"Detector '{detector.name}' does not have initialized data. "
+                    f"Please set data using detector.set_data() or detector.inject_signal() "
+                    f"before initializing the likelihood."
+                )
+            if detector.psd.is_empty:
+                raise ValueError(
+                    f"Detector '{detector.name}' does not have initialized PSD. "
+                    f"Please set PSD using detector.set_psd() or detector.load_and_set_psd() "
+                    f"before initializing the likelihood."
+                )
+
         self.detectors = detectors
         self.waveform = waveform
         self.fixed_parameters = fixed_parameters if fixed_parameters is not None else {}
@@ -81,12 +98,16 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
     Args:
         detectors (Sequence[Detector]): List of detector objects containing data and metadata.
         waveform (Waveform): Waveform model to evaluate.
-        f_min (Float, optional): Minimum frequency for likelihood evaluation. Defaults to 0.
-        f_max (Float, optional): Maximum frequency for likelihood evaluation. Defaults to infinity.
+        f_min (float | dict[str, float], optional): Minimum frequency for likelihood evaluation.
+            Can be a single float (applied to all detectors) or a dictionary mapping detector names
+            to their respective minimum frequencies. Defaults to 0.
+        f_max (float | dict[str, float], optional): Maximum frequency for likelihood evaluation.
+            Can be a single float (applied to all detectors) or a dictionary mapping detector names
+            to their respective maximum frequencies. Defaults to infinity.
         trigger_time (Float, optional): GPS time of the event trigger. Defaults to 0.
 
     Example:
-        >>> likelihood = BaseTransientLikelihoodFD(detectors, waveform, f_min=20, f_max=1024, trigger_time=1234567890)
+        >>> likelihood = BaseTransientLikelihoodFD(detectors, waveform, f_min={'H1': 20, 'L1': 50}, f_max=1024, trigger_time=1234567890)
         >>> logL = likelihood.evaluate(params, data)
     """
 
@@ -95,8 +116,8 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         detectors: Sequence[Detector],
         waveform: Waveform,
         fixed_parameters: Optional[dict[str, Float]] = None,
-        f_min: Float = 0,
-        f_max: Float = float("inf"),
+        f_min: float | dict[str, float] = 0.0,
+        f_max: float | dict[str, float] = float("inf"),
         trigger_time: Float = 0,
     ) -> None:
         """Initializes the BaseTransientLikelihoodFD class.
@@ -106,21 +127,51 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         Args:
             detectors (Sequence[Detector]): List of detector objects.
             waveform (Waveform): Waveform model.
-            f_min (Float, optional): Minimum frequency. Defaults to 0.
-            f_max (Float, optional): Maximum frequency. Defaults to infinity.
+            f_min (float | dict[str, float], optional): Minimum frequency. Can be a single float
+                (applied to all detectors) or a dictionary mapping detector names to their respective
+                minimum frequencies. Defaults to 0.
+            f_max (float | dict[str, float], optional): Maximum frequency. Can be a single float
+                (applied to all detectors) or a dictionary mapping detector names to their respective
+                maximum frequencies. Defaults to infinity.
             trigger_time (Float, optional): Event trigger time. Defaults to 0.
         """
         super().__init__(detectors, waveform, fixed_parameters)
-        # Set the frequency bounds for the detectors
+
+        # Determine global frequency bounds
+        f_min_min = min(f_min.values()) if isinstance(f_min, dict) else f_min
+        f_max_max = max(f_max.values()) if isinstance(f_max, dict) else f_max
+
+        # Set frequency bounds and masks for each detector
         _frequencies = []
         for detector in detectors:
-            detector.set_frequency_bounds(f_min, f_max)
+            detector.set_frequency_bounds(f_min_min, f_max_max)
             _frequencies.append(detector.sliced_frequencies)
+
+            # Determine detector-specific frequency mask
+            f_min_ifo = f_min[detector.name] if isinstance(f_min, dict) else None
+            f_max_ifo = f_max[detector.name] if isinstance(f_max, dict) else None
+
+            cond_1 = f_min_ifo is not None and f_min_ifo > f_min_min
+            cond_2 = f_max_ifo is not None and f_max_ifo < f_max_max
+            if cond_1 or cond_2:
+                if cond_1:
+                    logging.warning(
+                        f"{detector.name} has f_min={f_min_ifo}, which is higher than the global minimum frequency {f_min_min}. Truncating data accordingly."
+                    )
+                if cond_2:
+                    logging.warning(
+                        f"{detector.name} has f_max={f_max_ifo}, which is lower than the global maximum frequency {f_max_max}. Truncating data accordingly."
+                    )
+                detector.data.set_frequency_mask(f_min_ifo, f_max_ifo)
+
+        # Validate frequency grids are consistent across detectors
         _frequencies = jnp.array(_frequencies)
         assert jnp.array_equal(_frequencies[:-1], _frequencies[1:]), (
-            "The frequency arrays are not all the same."
+            "Detectors must have the same frequency grid"
         )
+
         self.frequencies = _frequencies[0]
+        self.df = self.frequencies[1] - self.frequencies[0]
         self.trigger_time = trigger_time
         self.gmst = compute_gmst(self.trigger_time)
 
@@ -147,19 +198,11 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         """Core likelihood evaluation method for frequency-domain transient events."""
         waveform_sky = self.waveform(self.frequencies, params)
         log_likelihood = 0.0
-        df = (
-            self.detectors[0].sliced_frequencies[1]
-            - self.detectors[0].sliced_frequencies[0]
-        )
         for ifo in self.detectors:
-            freqs, ifo_data, psd = (
-                ifo.sliced_frequencies,
-                ifo.sliced_fd_data,
-                ifo.sliced_psd,
-            )
-            h_dec = ifo.fd_response(freqs, waveform_sky, params)
-            match_filter_SNR = inner_product(h_dec, ifo_data, psd, df)
-            optimal_SNR = inner_product(h_dec, h_dec, psd, df)
+            psd = ifo.sliced_psd
+            h_dec = ifo.fd_response(self.frequencies, waveform_sky, params)
+            match_filter_SNR = inner_product(h_dec, ifo.sliced_fd_data, psd, self.df)
+            optimal_SNR = inner_product(h_dec, h_dec, psd, self.df)
             log_likelihood += match_filter_SNR - optimal_SNR / 2
         return log_likelihood
 
@@ -431,7 +474,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
             detectors, waveform, fixed_parameters, f_min, f_max, trigger_time
         )
 
-        logging.info("Initializing heterodyned likelihood..")
+        logger.info("Initializing heterodyned likelihood..")
 
         # Can use another waveform to use as reference waveform, but if not provided, use the same waveform
         if reference_waveform is None:
@@ -439,9 +482,9 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
 
         if ref_params:
             self.ref_params = ref_params.copy()
-            logging.info(f"Reference parameters provided, which are {self.ref_params}")
+            logger.info(f"Reference parameters provided, which are {self.ref_params}")
         elif prior:
-            logging.info("No reference parameters are provided, finding it...")
+            logger.info("No reference parameters are provided, finding it...")
             ref_params = self.maximize_likelihood(
                 prior=prior,
                 sample_transforms=sample_transforms,
@@ -450,7 +493,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
                 n_steps=n_steps,
             )
             self.ref_params = {key: float(value) for key, value in ref_params.items()}
-            logging.info(f"The reference parameters are {self.ref_params}")
+            logger.info(f"The reference parameters are {self.ref_params}")
         else:
             raise ValueError(
                 "Either reference parameters or parameter names must be provided"
@@ -459,10 +502,10 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         # since ripple cannot handle eta=0.25
         if jnp.isclose(self.ref_params["eta"], 0.25):
             self.ref_params["eta"] = 0.249995
-            logging.info("The eta of the reference parameter is close to 0.25")
-            logging.info(f"The eta is adjusted to {self.ref_params['eta']}")
+            logger.warning("The eta of the reference parameter is close to 0.25")
+            logger.warning(f"The eta is adjusted to {self.ref_params['eta']}")
 
-        logging.info("Constructing reference waveforms..")
+        logger.info("Constructing reference waveforms..")
 
         self.ref_params["trigger_time"] = self.trigger_time
         self.ref_params["gmst"] = self.gmst
@@ -494,20 +537,19 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         f_max = jnp.max(f_valid)
         f_min = jnp.min(f_valid)
 
-        mask_heterodyne_grid = jnp.where((freq_grid <= f_max) & (freq_grid >= f_min))[0]
-        mask_heterodyne_low = jnp.where(
-            (self.freq_grid_low <= f_max) & (self.freq_grid_low >= f_min)
-        )[0]
+        # Mask based on center frequencies to keep complete bins
         mask_heterodyne_center = jnp.where(
             (self.freq_grid_center <= f_max) & (self.freq_grid_center >= f_min)
         )[0]
-        freq_grid = freq_grid[mask_heterodyne_grid]
-        self.freq_grid_low = self.freq_grid_low[mask_heterodyne_low]
         self.freq_grid_center = self.freq_grid_center[mask_heterodyne_center]
+        self.freq_grid_low = self.freq_grid_low[mask_heterodyne_center]
 
-        # Ensure frequency grids have same length
-        if len(self.freq_grid_low) > len(self.freq_grid_center):
-            self.freq_grid_low = self.freq_grid_low[: len(self.freq_grid_center)]
+        # For freq_grid (bin edges), we need n_center + 1 edges
+        # Keep edges from first valid center to last valid center + 1
+        start_idx = mask_heterodyne_center[0]
+        end_idx = mask_heterodyne_center[-1] + 2
+        # +1 for inclusive, +1 for the extra edge
+        freq_grid = freq_grid[start_idx:end_idx]
 
         h_sky_low = reference_waveform(self.freq_grid_low, self.ref_params)
         h_sky_center = reference_waveform(self.freq_grid_center, self.ref_params)
@@ -688,7 +730,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         popsize: int = 100,
         n_steps: int = 2000,
     ):
-        parameter_names = prior.parameter_names
+        parameter_names = list(prior.parameter_names)
         for transform in sample_transforms:
             parameter_names = transform.propagate_name(parameter_names)
 
@@ -702,7 +744,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
                 named_params, data
             )
 
-        print("Starting the optimizer")
+        logger.info("Starting the optimizer")
 
         optimizer = AdamOptimization(
             logpdf=y, n_steps=n_steps, learning_rate=0.001, noise_level=1

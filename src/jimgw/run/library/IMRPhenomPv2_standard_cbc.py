@@ -29,6 +29,8 @@ from typing import Optional, Sequence, Self
 import yaml
 import logging
 
+logger = logging.getLogger(__name__)
+
 
 class IMRPhenomPv2StandardCBCRunDefinition(SingleEventRunDefinition):
     M_c_range: tuple[float, float]
@@ -87,14 +89,14 @@ class IMRPhenomPv2StandardCBCRunDefinition(SingleEventRunDefinition):
     def initialize_likelihood(
         self, local_data_prefix: Optional[str] = None
     ) -> BaseTransientLikelihoodFD:
-        logging.info("Initializing likelihood...")
+        logger.info("Initializing likelihood...")
 
         gps = self.gps
         start = gps - (self.segment_length - self.post_trigger_length)
         end = gps + self.post_trigger_length
 
         if self.local_data_prefix is None:
-            logging.info("No local data provided, using GWOSC data.")
+            logger.info("No local data provided, using GWOSC data.")
             psd_start = gps - 2048
             psd_end = gps + 2048
             for ifo in self.ifos:
@@ -108,7 +110,7 @@ class IMRPhenomPv2StandardCBCRunDefinition(SingleEventRunDefinition):
                 psd_fftlength = ifo_data.duration * ifo_data.sampling_frequency
                 ifo.set_psd(ifo_psd.to_psd(nperseg=psd_fftlength))
         else:
-            logging.info(f"Using local data from {local_data_prefix}.")
+            logger.info(f"Using local data from {local_data_prefix}.")
             # TODO: Load local data from a file, and the PSD correspondingly.
             for ifo in self.ifos:
                 if ifo.name not in [
@@ -135,7 +137,7 @@ class IMRPhenomPv2StandardCBCRunDefinition(SingleEventRunDefinition):
         return likelihood
 
     def initialize_prior(self) -> CombinePrior:
-        logging.info("Initializing prior...")
+        logger.info("Initializing prior...")
         # Mass prior
         Mc_prior = UniformPrior(
             self.M_c_range[0], self.M_c_range[1], parameter_names=["M_c"]
@@ -180,7 +182,7 @@ class IMRPhenomPv2StandardCBCRunDefinition(SingleEventRunDefinition):
         return CombinePrior(prior)
 
     def initialize_likelihood_transforms(self) -> Sequence[NtoMTransform]:
-        logging.info("Initializing likelihood transforms...")
+        logger.info("Initializing likelihood transforms...")
         return [
             MassRatioToSymmetricMassRatioTransform,
             SphereSpinToCartesianSpinTransform("s1"),
@@ -188,7 +190,7 @@ class IMRPhenomPv2StandardCBCRunDefinition(SingleEventRunDefinition):
         ]
 
     def initialize_sample_transforms(self) -> Sequence[BijectiveTransform]:
-        logging.info("Initializing sample transforms...")
+        logger.info("Initializing sample transforms...")
         return [
             DistanceToSNRWeightedDistanceTransform(
                 gps_time=self.gps,
@@ -291,13 +293,13 @@ class IMRPhenomPv2StandardCBCRunDefinition(SingleEventRunDefinition):
         )
         with open(path, "w") as f:
             yaml.dump(run_dict, f, default_flow_style=False, sort_keys=False)
-        print(f"Run serialized to {path}")
+        logger.info(f"Run serialized to {path}")
 
         return run_dict
 
     @classmethod
     def deserialize(cls, path: str) -> Self:
-        print(f"Deserializing run from {path}")
+        logger.info(f"Deserializing run from {path}")
         with open(path, "r") as f:
             run_dict = yaml.safe_load(f)
         run = cls(

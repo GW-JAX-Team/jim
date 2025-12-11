@@ -1,6 +1,5 @@
 from abc import ABC
 import logging
-
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -11,6 +10,8 @@ from typing import Optional, Self
 from scipy.signal import welch
 from scipy.signal.windows import tukey
 from scipy.interpolate import interp1d
+
+logger = logging.getLogger(__name__)
 
 # TODO: Need to expand this list. Currently it is only O3.
 asd_file_dict = {
@@ -127,6 +128,22 @@ class Data(ABC):
         return jnp.fft.rfftfreq(self.n_time, self.delta_t)
 
     @property
+    def frequency_mask(self) -> Float[Array, " n_time // 2 + 1"]:
+        """Masks data in Fourier domain.
+
+        Different from frequency slicing, which alters the shape of the output
+        array. The primary use case of this is to mask out data quality issues.
+
+        This mask also allows for more adaptive changes such as data notching.
+
+        Returns:
+            Array: Array of frequency mask, usually of 0 and 1, but not necessary.
+        """
+        # Developer note: Unless there are good reasons not to, any updates
+        # to self.fd should be immediately followed by applying this mask.
+        return self._frequency_mask
+
+    @property
     def has_fd(self) -> bool:
         """Checks if Fourier domain data exists.
 
@@ -161,6 +178,7 @@ class Data(ABC):
             self.set_tukey_window()
         else:
             self.window = window
+        self._frequency_mask = jnp.ones_like(self.frequencies)
 
     def __repr__(self):
         return (
@@ -180,8 +198,28 @@ class Data(ABC):
             alpha: Shape parameter of the Tukey window (default: 0.2); this is
                 the fraction of the segment that is tapered on each side.
         """
-        logging.info(f"Setting Tukey window to {self.name} data")
+        logger.info(f"Setting Tukey window to {self.name} data")
         self.window = jnp.array(tukey(self.n_time, alpha))
+
+    @frequency_mask.setter
+    def frequency_mask(self, frequency_mask: Float[Array, " n_time // 2 + 1"]) -> None:
+        if not frequency_mask.shape == self.frequencies.shape:
+            raise ValueError(
+                "Shape of frequency mask should match with that of frequency array"
+            )
+        self._frequency_mask = frequency_mask
+        # Always update the data whenever the mask is updated.
+        self.fd *= self.frequency_mask
+
+    def set_frequency_mask(
+        self,
+        f_min: Optional[Float] = None,
+        f_max: Optional[Float] = None,
+    ) -> None:
+        if f_min is not None:
+            self.frequency_mask *= self.frequencies >= f_min
+        elif f_max is not None:
+            self.frequency_mask *= self.frequencies <= f_max
 
     def fft(
         self, window: Optional[Float[Array, " n_time"]] = None
@@ -196,13 +234,15 @@ class Data(ABC):
             assert self.delta_t > 0, "Delta t must be positive"
         if self.has_fd and (window is None or window == self.window):
             # Perhaps one needs to also check self.td and self.delta_t are the same.
-            logging.debug(f"{self.name} has FD data, skipping FFT.")
+            logger.debug(f"{self.name} has FD data, skipping FFT.")
             return self.fd
         if window is None:
             window = self.window
 
-        logging.info(f"Computing FFT of {self.name} data")
+        logger.info(f"Computing FFT of {self.name} data")
         self.fd = jnp.fft.rfft(self.td * window) * self.delta_t
+        # TODO: Consider adding a setter function for fd that always applies the mask
+        self.fd *= self.frequency_mask
         self.window = window
         return self.fd
 
@@ -261,7 +301,7 @@ class Data(ABC):
             Data: Data object with the fetched time domain data.
         """
         duration = gps_end_time - gps_start_time
-        logging.info(
+        logger.info(
             f"Fetching {duration} s of {ifo} data from GWOSC "
             f"[{gps_start_time}, {gps_end_time}]"
         )
@@ -334,6 +374,9 @@ class Data(ABC):
         assert jnp.array_equal(f_new, frequencies), (
             "Frequencies do not match after slicing"
         )
+
+        # Only apply the destructive mask after assertion (if set)
+        data.fd *= data.frequency_mask
         return data
 
     @classmethod

@@ -11,6 +11,8 @@ from jimgw.core.base import LikelihoodBase
 from jimgw.core.prior import Prior
 from jimgw.core.transforms import BijectiveTransform, NtoMTransform
 
+logger = logging.getLogger(__name__)
+
 
 class Jim(object):
     """
@@ -61,24 +63,24 @@ class Jim(object):
 
         self.sample_transforms = sample_transforms
         self.likelihood_transforms = likelihood_transforms
-        self.parameter_names = prior.parameter_names
+        self.parameter_names = list(prior.parameter_names)
 
         if len(sample_transforms) == 0:
-            print(
+            logger.info(
                 "No sample transforms provided. Using prior parameters as sampling parameters"
             )
         else:
-            print("Using sample transforms")
+            logger.info("Using sample transforms")
             for transform in sample_transforms:
                 self.parameter_names = transform.propagate_name(self.parameter_names)
 
         if len(likelihood_transforms) == 0:
-            print(
+            logger.info(
                 "No likelihood transforms provided. Using prior parameters as likelihood parameters"
             )
 
         if rng_key is jax.random.PRNGKey(0):
-            print("No rng_key provided. Using default key with seed=0.")
+            logger.info("No rng_key provided. Using default key with seed=0.")
 
         rng_key, subkey = jax.random.split(rng_key)
 
@@ -112,7 +114,7 @@ class Jim(object):
         )
 
         if n_temperatures == 0:
-            logging.info(
+            logger.info(
                 "The number of temperatures is set to 0. No tempering will be applied."
             )
             resource_strategy_bundle.strategy_order = [
@@ -185,7 +187,7 @@ class Jim(object):
         initial_position: Optional[Float[Array, " n_chains n_dims"]] = None,
     ):
         if initial_position is None:
-            print("No initial_position provided. Sampling from prior.")
+            logger.info("No initial_position provided. Sampling from prior.")
             initial_position = self.sample_initial_condition()
         else:
             initial_position = jnp.asarray(initial_position)
@@ -194,7 +196,9 @@ class Jim(object):
                     raise ValueError(
                         f"initial_position must have shape (n_dims,) or (n_chains, n_dims). Got shape {initial_position.shape}."
                     )
-                print("1D initial_position provided. Broadcasting it to all chains.")
+                logger.info(
+                    "1D initial_position provided. Broadcasting it to all chains."
+                )
                 initial_position = jnp.broadcast_to(
                     initial_position, (self.sampler.n_chains, self.prior.n_dims)
                 )
@@ -203,7 +207,7 @@ class Jim(object):
                     raise ValueError(
                         f"initial_position must have shape (n_dims,) or (n_chains, n_dims). Got shape {initial_position.shape}."
                     )
-                print("Using the provided initial positions for sampling.")
+                logger.info("Using the provided initial positions for sampling.")
             else:
                 raise ValueError(
                     f"initial_position must have shape (n_dims,) or (n_chains, n_dims). Got shape {initial_position.shape}."
@@ -253,7 +257,7 @@ class Jim(object):
         n_available = chains.shape[0]
         if n_samples > 0:
             if n_samples > n_available:
-                logging.warning(
+                logger.warning(
                     f"Requested {n_samples} samples but only {n_available} available "
                     f"after rejection sampling. Returning all available samples."
                 )

@@ -7,7 +7,7 @@ from jimgw.core.single_event.likelihood import (
     # TimeMarginalizedLikelihoodFD,
     # PhaseMarginalizedLikelihoodFD,
     # PhaseTimeMarginalizedLikelihoodFD,
-    # HeterodynedTransientLikelihoodFD,
+    HeterodynedTransientLikelihoodFD,
     # HeterodynedPhaseMarginalizedLikelihoodFD,
 )
 from jimgw.core.single_event.detector import get_H1, get_L1
@@ -74,6 +74,104 @@ class TestBaseTransientLikelihoodFD:
         assert likelihood.trigger_time == 1126259462.4
         assert hasattr(likelihood, "gmst")
 
+    def test_uninitialized_data_raises_error(self):
+        """Test that initializing likelihood with detectors that have no data raises an error."""
+        gps = 1126259462.4
+        psd_start = gps - 2048
+        psd_end = gps + 2048
+        
+        # Create detectors with PSD but without data
+        ifos = [get_H1(), get_L1()]
+        for ifo in ifos:
+            psd_data = Data.from_gwosc(ifo.name, psd_start, psd_end)
+            ifo.set_psd(psd_data.to_psd(nperseg=4 * 4096))
+            # Intentionally not setting data
+        
+        waveform = RippleIMRPhenomD(f_ref=20.0)
+        
+        # Should raise ValueError when trying to initialize likelihood
+        with pytest.raises(ValueError, match="does not have initialized data"):
+            BaseTransientLikelihoodFD(
+                detectors=ifos, 
+                waveform=waveform, 
+                f_min=20.0, 
+                f_max=1024.0, 
+                trigger_time=gps
+            )
+    
+    def test_partially_initialized_data_raises_error(self, detectors_and_waveform):
+        """Test that having only some detectors with data raises an error."""
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        
+        # Add a detector with PSD but no data
+        new_detector = get_H1()
+        psd_start = gps - 2048
+        psd_end = gps + 2048
+        psd_data = Data.from_gwosc(new_detector.name, psd_start, psd_end)
+        new_detector.set_psd(psd_data.to_psd(nperseg=4 * 4096))
+        # Intentionally not setting data for this detector
+        
+        ifos_mixed = ifos + [new_detector]
+        
+        # Should raise ValueError mentioning the detector name
+        with pytest.raises(ValueError, match="H1.*does not have initialized data"):
+            BaseTransientLikelihoodFD(
+                detectors=ifos_mixed, 
+                waveform=waveform, 
+                f_min=fmin, 
+                f_max=fmax, 
+                trigger_time=gps
+            )
+
+    def test_uninitialized_psd_raises_error(self):
+        """Test that initializing likelihood with detectors that have no PSD raises an error."""
+        gps = 1126259462.4
+        start = gps - 2
+        end = gps + 2
+        
+        # Create detectors with data but no PSD
+        ifos = [get_H1(), get_L1()]
+        for ifo in ifos:
+            data = Data.from_gwosc(ifo.name, start, end)
+            ifo.set_data(data)
+            # Intentionally not setting PSD
+        
+        waveform = RippleIMRPhenomD(f_ref=20.0)
+        
+        # Should raise ValueError when trying to initialize likelihood
+        with pytest.raises(ValueError, match="does not have initialized PSD"):
+            BaseTransientLikelihoodFD(
+                detectors=ifos, 
+                waveform=waveform, 
+                f_min=20.0, 
+                f_max=1024.0, 
+                trigger_time=gps
+            )
+    
+    def test_partially_initialized_psd_raises_error(self, detectors_and_waveform):
+        """Test that having only some detectors with PSD raises an error."""
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        
+        # Add a detector with data but no PSD
+        new_detector = get_H1()
+        start = gps - 2
+        end = gps + 2
+        data = Data.from_gwosc(new_detector.name, start, end)
+        new_detector.set_data(data)
+        # Intentionally not setting PSD for this detector
+        
+        ifos_mixed = ifos + [new_detector]
+        
+        # Should raise ValueError mentioning the detector name and PSD
+        with pytest.raises(ValueError, match="H1.*does not have initialized PSD"):
+            BaseTransientLikelihoodFD(
+                detectors=ifos_mixed, 
+                waveform=waveform, 
+                f_min=fmin, 
+                f_max=fmax, 
+                trigger_time=gps
+            )
+
     def test_evaluation(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = BaseTransientLikelihoodFD(
@@ -87,7 +185,25 @@ class TestBaseTransientLikelihoodFD:
         log_likelihood_jit = jax.jit(likelihood.evaluate)(params, {})
         assert np.isfinite(log_likelihood_jit), "Log likelihood should be finite"
 
-        assert np.isclose(log_likelihood, log_likelihood_jit), "JIT and non-JIT results should match"
+        assert np.isclose(
+            log_likelihood, log_likelihood_jit
+        ), "JIT and non-JIT results should match"
+
+        likelihood = BaseTransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min={"H1": fmin, "L1": fmin + 1.0},
+            f_max=fmax,
+            trigger_time=gps,
+        )
+        log_likelihood_diff_fmin = likelihood.evaluate(params, {})
+        assert np.isfinite(
+            log_likelihood_diff_fmin
+        ), "Log likelihood with different f_min should be finite"
+
+        assert np.isclose(
+            log_likelihood, log_likelihood_diff_fmin, atol=1e-2
+        ), "Log likelihoods should be close with small differences"
 
 
 # class TestTimeMarginalizedLikelihoodFD:
@@ -126,16 +242,31 @@ class TestBaseTransientLikelihoodFD:
 #         assert np.isfinite(result)
 
 
-# class TestHeterodynedTransientLikelihoodFD:
-#     def test_initialization_and_evaluation(self, detectors_and_waveform):
-#         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
-#         likelihood = HeterodynedTransientLikelihoodFD(
-#             detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps, ref_params=example_params(gps)
-#         )
-#         assert isinstance(likelihood, HeterodynedTransientLikelihoodFD)
-#         params = example_params(likelihood.gmst)
-#         result = likelihood.evaluate(params, {})
-#         assert np.isfinite(result)
+class TestHeterodynedTransientLikelihoodFD:
+    def test_initialization_and_evaluation(self, detectors_and_waveform):
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        # First create base likelihood for comparison
+        base_likelihood = BaseTransientLikelihoodFD(
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
+        )
+
+        # Create heterodyned likelihood with reference parameters
+        ref_params = example_params(base_likelihood.gmst)
+        likelihood = HeterodynedTransientLikelihoodFD(
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
+            trigger_time=gps, ref_params=ref_params
+        )
+        assert isinstance(likelihood, HeterodynedTransientLikelihoodFD)
+
+        # Test evaluation at reference parameters
+        params = example_params(likelihood.gmst)
+        result = likelihood.evaluate(params, {})
+        assert np.isfinite(result), "Heterodyned likelihood should be finite"
+
+        # Test that heterodyned likelihood matches base likelihood at reference parameters
+        base_result = base_likelihood.evaluate(params, {})
+        assert np.isclose(result, base_result), f"Heterodyned likelihood ({result}) should match base likelihood ({base_result}) at reference parameters"
+
 
 
 # class TestHeterodynedPhaseMarginalizedLikelihoodFD:
@@ -148,5 +279,3 @@ class TestBaseTransientLikelihoodFD:
 #         params = example_params(likelihood.gmst)
 #         result = likelihood.evaluate(params, {})
 #         assert np.isfinite(result)
-        
-# Need to add tests for running the heterodyned likelihood with different parameters
