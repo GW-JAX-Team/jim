@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from flowMC.strategy.optimization import AdamOptimization
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, Float
-from typing import Optional, Union
+from typing import Optional
 from scipy.interpolate import interp1d
 from jimgw.core.utils import log_i0
 from jimgw.core.prior import Prior
@@ -81,10 +81,10 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
     Args:
         detectors (Sequence[Detector]): List of detector objects containing data and metadata.
         waveform (Waveform): Waveform model to evaluate.
-        f_min (Union[float, dict[str, float]], optional): Minimum frequency for likelihood evaluation.
+        f_min (float | dict[str, float], optional): Minimum frequency for likelihood evaluation.
             Can be a single float (applied to all detectors) or a dictionary mapping detector names
             to their respective minimum frequencies. Defaults to 0.
-        f_max (Union[float, dict[str, float]], optional): Maximum frequency for likelihood evaluation.
+        f_max (float | dict[str, float], optional): Maximum frequency for likelihood evaluation.
             Can be a single float (applied to all detectors) or a dictionary mapping detector names
             to their respective maximum frequencies. Defaults to infinity.
         trigger_time (Float, optional): GPS time of the event trigger. Defaults to 0.
@@ -99,8 +99,8 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         detectors: Sequence[Detector],
         waveform: Waveform,
         fixed_parameters: Optional[dict[str, Float]] = None,
-        f_min: Union[float, dict[str, float]] = 0.0,
-        f_max: Union[float, dict[str, float]] = float("inf"),
+        f_min: float | dict[str, float] = 0.0,
+        f_max: float | dict[str, float] = float("inf"),
         trigger_time: Float = 0,
     ) -> None:
         """Initializes the BaseTransientLikelihoodFD class.
@@ -110,10 +110,10 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         Args:
             detectors (Sequence[Detector]): List of detector objects.
             waveform (Waveform): Waveform model.
-            f_min (Union[float, dict[str, float]], optional): Minimum frequency. Can be a single float
+            f_min (float | dict[str, float], optional): Minimum frequency. Can be a single float
                 (applied to all detectors) or a dictionary mapping detector names to their respective
                 minimum frequencies. Defaults to 0.
-            f_max (Union[float, dict[str, float]], optional): Maximum frequency. Can be a single float
+            f_max (float | dict[str, float], optional): Maximum frequency. Can be a single float
                 (applied to all detectors) or a dictionary mapping detector names to their respective
                 maximum frequencies. Defaults to infinity.
             trigger_time (Float, optional): Event trigger time. Defaults to 0.
