@@ -137,41 +137,40 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         """
         super().__init__(detectors, waveform, fixed_parameters)
 
-        # Determine global frequency bounds
-        f_min_min = min(f_min.values()) if isinstance(f_min, dict) else f_min
-        f_max_max = max(f_max.values()) if isinstance(f_max, dict) else f_max
-
-        # Set frequency bounds and masks for each detector
         _frequencies = []
         for detector in detectors:
-            detector.set_frequency_bounds(f_min_min, f_max_max)
+            # Determine detector-specific frequency bounds
+            f_min_ifo = f_min[detector.name] if isinstance(f_min, dict) else f_min
+            f_max_ifo = f_max[detector.name] if isinstance(f_max, dict) else f_max
+
+            detector.set_frequency_bounds(f_min_ifo, f_max_ifo)
             _frequencies.append(detector.sliced_frequencies)
 
-            # Determine detector-specific frequency mask
-            f_min_ifo = f_min[detector.name] if isinstance(f_min, dict) else None
-            f_max_ifo = f_max[detector.name] if isinstance(f_max, dict) else None
+        # Ensure consistent frequency spacing across detectors
+        assert all(
+            jnp.isclose(
+                _frequencies[0][1] - _frequencies[0][0],
+                freq[1] - freq[0],
+            )
+            for freq in _frequencies
+        ), "All detectors must have the same frequency spacing."
 
-            cond_1 = f_min_ifo is not None and f_min_ifo > f_min_min
-            cond_2 = f_max_ifo is not None and f_max_ifo < f_max_max
-            if cond_1 or cond_2:
-                if cond_1:
-                    logging.warning(
-                        f"{detector.name} has f_min={f_min_ifo}, which is higher than the global minimum frequency {f_min_min}. Truncating data accordingly."
-                    )
-                if cond_2:
-                    logging.warning(
-                        f"{detector.name} has f_max={f_max_ifo}, which is lower than the global maximum frequency {f_max_max}. Truncating data accordingly."
-                    )
-                detector.data.set_frequency_mask(f_min_ifo, f_max_ifo)
+        self.df = _frequencies[0][1] - _frequencies[0][0]
+        self.frequencies = jnp.unique(jnp.concatenate(_frequencies))
 
-        # Validate frequency grids are consistent across detectors
-        _frequencies = jnp.array(_frequencies)
-        assert jnp.array_equal(_frequencies[:-1], _frequencies[1:]), (
-            "Detectors must have the same frequency grid"
-        )
+        # Check that all frequency arrays are the same for child classes
+        if type(self) is not BaseTransientLikelihoodFD:
+            assert all(
+                jnp.array_equal(_frequencies[0], freq) for freq in _frequencies
+            ), (
+                f"All detectors must have the same frequency array for {type(self).__name__}."
+            )
+        else:
+            self.frequency_masks = [
+                jnp.isin(self.frequencies, detector.sliced_frequencies)
+                for detector in detectors
+            ]
 
-        self.frequencies = _frequencies[0]
-        self.df = self.frequencies[1] - self.frequencies[0]
         self.trigger_time = trigger_time
         self.gmst = compute_gmst(self.trigger_time)
 
@@ -198,9 +197,12 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         """Core likelihood evaluation method for frequency-domain transient events."""
         waveform_sky = self.waveform(self.frequencies, params)
         log_likelihood = 0.0
-        for ifo in self.detectors:
+        for i, ifo in enumerate(self.detectors):
             psd = ifo.sliced_psd
-            h_dec = ifo.fd_response(self.frequencies, waveform_sky, params)
+            waveform_sky_ifo = {
+                key: waveform_sky[key][self.frequency_masks[i]] for key in waveform_sky
+            }
+            h_dec = ifo.fd_response(ifo.sliced_frequencies, waveform_sky_ifo, params)
             match_filter_SNR = inner_product(h_dec, ifo.sliced_fd_data, psd, self.df)
             optimal_SNR = inner_product(h_dec, h_dec, psd, self.df)
             log_likelihood += match_filter_SNR - optimal_SNR / 2
