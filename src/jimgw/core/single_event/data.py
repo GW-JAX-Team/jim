@@ -128,22 +128,6 @@ class Data(ABC):
         return jnp.fft.rfftfreq(self.n_time, self.delta_t)
 
     @property
-    def frequency_mask(self) -> Float[Array, " n_time // 2 + 1"]:
-        """Masks data in Fourier domain.
-
-        Different from frequency slicing, which alters the shape of the output
-        array. The primary use case of this is to mask out data quality issues.
-
-        This mask also allows for more adaptive changes such as data notching.
-
-        Returns:
-            Array: Array of frequency mask, usually of 0 and 1, but not necessary.
-        """
-        # Developer note: Unless there are good reasons not to, any updates
-        # to self.fd should be immediately followed by applying this mask.
-        return self._frequency_mask
-
-    @property
     def has_fd(self) -> bool:
         """Checks if Fourier domain data exists.
 
