@@ -8,7 +8,6 @@ from jimgw.core.prior import (
     CosinePrior,
     SinePrior,
     PowerLawPrior,
-    SimpleConstrainedPrior,
 )
 from jimgw.core.single_event.detector import get_detector_preset
 from jimgw.core.single_event.likelihood import ZeroLikelihood
@@ -33,8 +32,8 @@ detector_preset = get_detector_preset()
 ifos = [detector_preset["H1"], detector_preset["L1"], detector_preset["V1"]]
 
 M_c_prior = UniformPrior(10.0, 80.0, parameter_names=["M_c"])
-dL_prior = SimpleConstrainedPrior([PowerLawPrior(10.0, 2000.0, 2.0, parameter_names=["d_L"])])
-t_c_prior = SimpleConstrainedPrior([UniformPrior(-0.05, 0.05, parameter_names=["t_c"])])
+dL_prior = PowerLawPrior(10.0, 2000.0, 2.0, parameter_names=["d_L"])
+t_c_prior = UniformPrior(-0.05, 0.05, parameter_names=["t_c"])
 phase_c_prior = UniformPrior(0.0, 2 * jnp.pi, parameter_names=["phase_c"])
 iota_prior = SinePrior(parameter_names=["iota"])
 psi_prior = UniformPrior(0.0, jnp.pi, parameter_names=["psi"])
