@@ -89,7 +89,9 @@ class CompositePrior(Prior):
         priors: list[Prior],
     ):
         self.base_prior = tuple(priors)
-        self.parameter_names = tuple([name for prior in priors for name in prior.parameter_names])
+        self.parameter_names = tuple(
+            [name for prior in priors for name in prior.parameter_names]
+        )
 
     def trace_prior_parent(self, output: Optional[list[Prior]] = None) -> list[Prior]:
         if output is None:
