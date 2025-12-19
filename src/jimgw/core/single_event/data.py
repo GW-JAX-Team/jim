@@ -201,26 +201,6 @@ class Data(ABC):
         logger.info(f"Setting Tukey window to {self.name} data")
         self.window = jnp.array(tukey(self.n_time, alpha))
 
-    @frequency_mask.setter
-    def frequency_mask(self, frequency_mask: Float[Array, " n_time // 2 + 1"]) -> None:
-        if not frequency_mask.shape == self.frequencies.shape:
-            raise ValueError(
-                "Shape of frequency mask should match with that of frequency array"
-            )
-        self._frequency_mask = frequency_mask
-        # Always update the data whenever the mask is updated.
-        self.fd *= self.frequency_mask
-
-    def set_frequency_mask(
-        self,
-        f_min: Optional[Float] = None,
-        f_max: Optional[Float] = None,
-    ) -> None:
-        if f_min is not None:
-            self.frequency_mask *= self.frequencies >= f_min
-        elif f_max is not None:
-            self.frequency_mask *= self.frequencies <= f_max
-
     def fft(
         self, window: Optional[Float[Array, " n_time"]] = None
     ) -> Complex[Array, " n_freq"]:
@@ -241,8 +221,6 @@ class Data(ABC):
 
         logger.info(f"Computing FFT of {self.name} data")
         self.fd = jnp.fft.rfft(self.td * window) * self.delta_t
-        # TODO: Consider adding a setter function for fd that always applies the mask
-        self.fd *= self.frequency_mask
         self.window = window
         return self.fd
 
@@ -374,9 +352,6 @@ class Data(ABC):
         assert jnp.array_equal(f_new, frequencies), (
             "Frequencies do not match after slicing"
         )
-
-        # Only apply the destructive mask after assertion (if set)
-        data.fd *= data.frequency_mask
         return data
 
     @classmethod
