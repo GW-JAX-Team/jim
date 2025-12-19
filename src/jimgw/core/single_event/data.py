@@ -162,7 +162,6 @@ class Data(ABC):
             self.set_tukey_window()
         else:
             self.window = window
-        self._frequency_mask = jnp.ones_like(self.frequencies)
 
     def __repr__(self):
         return (
