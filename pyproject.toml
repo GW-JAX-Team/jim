@@ -17,6 +17,10 @@ dependencies = [
     "ripplegw>=0.0.9",
     "corner>=2.2.2",
     "matplotlib>=3.10.1",
+    "anesthetic>=2.11.0",
+    "blackjax",
+    "tqdm>=4.67.1",
+    "tueplots>=0.2.1",
 ]
 
 [project.optional-dependencies]
@@ -51,6 +55,7 @@ dev-dependencies = [
 
 [tool.uv.sources]
 jimgw = { workspace = true }
+blackjax = { git = "https://github.com/handley-lab/blackjax", rev = "nested_sampling" }
 
 [tool.dagster]
 modules = [

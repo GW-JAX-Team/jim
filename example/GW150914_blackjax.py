@@ -1,13 +1,14 @@
-"""Nested-sampling analysis of GW150914 with BlackJAX."""
+"""Nested-sampling and SMC analysis of GW150914 with BlackJAX."""
 
 import argparse
 import json
 import os
-import time
 
 import anesthetic
-from anesthetic import NestedSamples
+from anesthetic import NestedSamples, MCMCSamples
 import blackjax
+from blackjax.smc.ess import ess as smc_ess
+from blackjax.smc.resampling import systematic
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -41,6 +42,100 @@ from jimgw.core.single_event.waveform import RippleIMRPhenomPv2
 
 jax.config.update("jax_enable_x64", True)
 plt.rcParams.update(bundles.tmlr2023())
+
+
+def run_rw_sequential_mc(
+    rng_key,
+    loglikelihood_fn,
+    prior_logprob,
+    num_mcmc_steps,
+    initial_samples,
+    target_ess=0.9,
+):
+    """Run SMC with random-walk Metropolis-Hastings kernel."""
+    kernel = blackjax.mcmc.random_walk.build_additive_step()
+
+    def step(key, state, logdensity, cov):
+        def proposal_distribution(key, position):
+            x, ravel_fn = jax.flatten_util.ravel_pytree(position)
+            return ravel_fn(jax.random.multivariate_normal(key, jnp.zeros_like(x), cov))
+
+        return kernel(
+            key,
+            state,
+            logdensity,
+            proposal_distribution,
+        )
+
+    cov = blackjax.smc.tuning.from_particles.particles_covariance_matrix(
+        initial_samples
+    )
+    init_params = {"cov": cov}
+
+    def update_fn(key, state, info):
+        cov = blackjax.smc.tuning.from_particles.particles_covariance_matrix(
+            state.particles
+        )
+        return blackjax.smc.extend_params({"cov": cov})
+
+    smc_alg = blackjax.inner_kernel_tuning(
+        smc_algorithm=blackjax.adaptive_tempered_smc,
+        logprior_fn=prior_logprob,
+        loglikelihood_fn=loglikelihood_fn,
+        mcmc_step_fn=step,
+        mcmc_init_fn=blackjax.rmh.init,
+        resampling_fn=systematic,
+        mcmc_parameter_update_fn=update_fn,
+        initial_parameter_value=blackjax.smc.extend_params(init_params),
+        target_ess=target_ess,
+        num_mcmc_steps=num_mcmc_steps,
+    )
+
+    state = smc_alg.init(initial_samples)
+
+    @jax.jit
+    def one_step(carry, xs):
+        state, k = carry
+        k, subk = jax.random.split(k, 2)
+        state, info = smc_alg.step(subk, state)
+        return (state, k), info
+
+    rng_key, sample_key = jax.random.split(rng_key)
+    steps = 0
+    log_zs = []
+    ess_path = 0.0
+    lambda_mass = 0.0
+    prev_lambda = 0.0
+    with tqdm(desc="SMC-RW Annealing steps", unit=" step") as pbar:
+        while state[0].lmbda < 1:
+            (state, rng_key), smc_info = one_step((state, rng_key), None)
+            steps += 1
+            log_zs.append(smc_info[1])
+            delta_lambda = state[0].lmbda - prev_lambda
+            log_w = jnp.log(state.sampler_state.weights + 1e-16)
+            ess_path += smc_ess(log_w) * delta_lambda
+            lambda_mass += delta_lambda
+            prev_lambda = state[0].lmbda
+            pbar.update(1)
+    ess = ess_path / jnp.maximum(lambda_mass, 1e-12)
+    logzs = jnp.array(log_zs).sum()
+    return state, {
+        "name": "SMC RW",
+        "ess": float(ess),
+        "logZ": float(logzs),
+    }
+
+
+def sample_smc(rng_key, smc_state, n=1000):
+    """Resample from SMC particles according to weights."""
+    indices = jax.random.choice(
+        rng_key,
+        smc_state.weights.shape[0],
+        p=smc_state.weights,
+        shape=(n,),
+        replace=True,
+    )
+    return jax.tree_util.tree_map(lambda leaf: leaf[indices], smc_state.particles)
 
 
 PARAMETER_NAMES = [
@@ -304,7 +399,7 @@ def main(argv=None, overrides=None):
     with open(os.path.join(outdir, "run_configuration.json"), "w") as fh:
         json.dump(run_config, fh, indent=2)
 
-    print("Initializing transforms and nested sampler")
+    print("Initializing transforms and samplers")
 
     def loglikelihood(x):
         for transform in reversed(sample_transforms):
@@ -331,59 +426,22 @@ def main(argv=None, overrides=None):
             x, _ = t.inverse(x)
         return x
 
+    def process_samples_to_physical(unbounded_samples):
+        """Convert unbounded samples to physical parameter space."""
+        sample_dict = {key: np.array(value) for key, value in unbounded_samples.items()}
+        physical_samples = sample_dict.copy()
+        for transform in reversed(likelihood_transforms):
+            inputs = {name: physical_samples[name] for name in transform.name_mapping[0]}
+            outputs = transform.transform_func(inputs)
+            physical_samples.update({k: np.array(v) for k, v in outputs.items()})
+        physical_samples.setdefault("q", sample_dict.get("q"))
+        return physical_samples
+
     n_dims = len(prior.parameter_names)
     n_live = 2000
     n_delete = n_live // 2
     num_mcmc_steps = args.num_repeats * n_dims
 
-    nested_sampler = blackjax.nss(
-        logprior_fn=log_prior,
-        loglikelihood_fn=loglikelihood,
-        num_delete=n_delete,
-        num_inner_steps=num_mcmc_steps,
-    )
-
-    @jax.jit
-    def one_step(carry, xs):
-        state, k = carry
-        k, subk = jax.random.split(k, 2)
-        state, dead_point = nested_sampler.step(subk, state)
-        return (state, k), dead_point
-
-    rng_key = jax.random.PRNGKey(0)
-    rng_key, init_key = jax.random.split(rng_key, 2)
-    initial_particles = prior.sample(init_key, n_live)
-    initial_particles = sample_to_unbound(initial_particles)
-
-    first_key = next(iter(initial_particles.keys()))
-    print(f"using device {initial_particles[first_key].device}")
-
-    state = nested_sampler.init(initial_particles)
-    (state_dummy, rng_key), _ = one_step((state, rng_key), None)
-    jax.block_until_ready(state_dummy.logZ)
-
-    sampling_start = time.time()
-
-    dead = []
-    with tqdm(desc="Dead points", unit=" dead points") as pbar:
-        while not state.logZ_live - state.logZ < -3:
-            (state, rng_key), dead_info = one_step((state, rng_key), None)
-            dead.append(dead_info)
-            pbar.update(n_delete)
-
-    sampling_elapsed = time.time() - sampling_start
-
-    samples = blackjax.ns.utils.finalise(state, dead)
-
-    unbounded_samples = jax.vmap(unbound_to_sample)(samples.particles)
-    sample_dict = {key: np.array(value) for key, value in unbounded_samples.items()}
-    physical_samples = sample_dict.copy()
-    for transform in reversed(likelihood_transforms):
-        inputs = {name: physical_samples[name] for name in transform.name_mapping[0]}
-        outputs = transform.transform_func(inputs)
-        physical_samples.update({k: np.array(v) for k, v in outputs.items()})
-    # Keep q explicitly for plotting alongside derived eta
-    physical_samples.setdefault("q", sample_dict.get("q"))
     labels = {
         "M_c": r"$M_c$",
         "q": r"$q$",
@@ -402,13 +460,6 @@ def main(argv=None, overrides=None):
         "dec": r"$\delta$",
     }
 
-    dataframe = NestedSamples(
-        data=physical_samples,
-        logL=samples.loglikelihood,
-        logL_birth=samples.loglikelihood_birth,
-        labels=labels,
-    )
-
     plot_params = [
         "M_c",
         "q",
@@ -426,18 +477,143 @@ def main(argv=None, overrides=None):
         "ra",
         "dec",
     ]
+
+    rng_key = jax.random.PRNGKey(0)
+    rng_key, init_key = jax.random.split(rng_key, 2)
+    initial_particles = prior.sample(init_key, n_live)
+    initial_particles = sample_to_unbound(initial_particles)
+
+    first_key = next(iter(initial_particles.keys()))
+    print(f"using device {initial_particles[first_key].device}")
+
+    # ========== Run SMC-RW ==========
+    print("\n" + "=" * 50)
+    print("Running SMC-RW sampler")
+    print("=" * 50)
+
+    rng_key, smc_key = jax.random.split(rng_key)
+    smc_state, smc_results = run_rw_sequential_mc(
+        rng_key=smc_key,
+        loglikelihood_fn=loglikelihood,
+        prior_logprob=log_prior,
+        num_mcmc_steps=num_mcmc_steps * 10,
+        initial_samples=initial_particles,
+        target_ess=0.9,
+    )
+
+    print(f"SMC-RW log(Z) = {smc_results['logZ']:.2f}")
+    print(f"SMC-RW ESS = {smc_results['ess']:.1f}")
+
+    # Extract SMC samples
+    rng_key, resample_key = jax.random.split(rng_key)
+    smc_resampled = sample_smc(resample_key, smc_state.sampler_state, n=n_live)
+    smc_unbounded = jax.vmap(unbound_to_sample)(smc_resampled)
+    smc_physical = process_samples_to_physical(smc_unbounded)
+
+    smc_dataframe = MCMCSamples(
+        data=smc_physical,
+        labels=labels,
+    )
+
+    # ========== Run NSS ==========
+    print("\n" + "=" * 50)
+    print("Running Nested Sampling (NSS)")
+    print("=" * 50)
+
+    nested_sampler = blackjax.nss(
+        logprior_fn=log_prior,
+        loglikelihood_fn=loglikelihood,
+        num_delete=n_delete,
+        num_inner_steps=num_mcmc_steps,
+    )
+
+    @jax.jit
+    def one_step(carry, xs):
+        state, k = carry
+        k, subk = jax.random.split(k, 2)
+        state, dead_point = nested_sampler.step(subk, state)
+        return (state, k), dead_point
+
+    # Re-initialize particles for NSS
+    rng_key, init_key2 = jax.random.split(rng_key, 2)
+    initial_particles_nss = prior.sample(init_key2, n_live)
+    initial_particles_nss = sample_to_unbound(initial_particles_nss)
+
+    state = nested_sampler.init(initial_particles_nss)
+    (state_dummy, rng_key), _ = one_step((state, rng_key), None)
+    jax.block_until_ready(state_dummy.logZ)
+
+    dead = []
+    with tqdm(desc="NSS Dead points", unit=" dead points") as pbar:
+        while not state.logZ_live - state.logZ < -3:
+            (state, rng_key), dead_info = one_step((state, rng_key), None)
+            dead.append(dead_info)
+            pbar.update(n_delete)
+
+    samples = blackjax.ns.utils.finalise(state, dead)
+    nss_unbounded = jax.vmap(unbound_to_sample)(samples.particles)
+    nss_physical = process_samples_to_physical(nss_unbounded)
+
+    nss_dataframe = NestedSamples(
+        data=nss_physical,
+        logL=samples.loglikelihood,
+        logL_birth=samples.loglikelihood_birth,
+        labels=labels,
+    )
+
+    nss_ess = float(blackjax.ns.utils.ess(jax.random.PRNGKey(0), samples))
+    print(f"NSS log(Z) = {float(nss_dataframe.logZ()):.2f}")
+    print(f"NSS ESS = {nss_ess:.1f}")
+
+    # ========== Combined Corner Plot ==========
+    print("\n" + "=" * 50)
+    print("Creating combined corner plot")
+    print("=" * 50)
+
     fig, ax = anesthetic.make_2d_axes(plot_params, upper=False, figsize=(11, 9))
-    dataframe.plot_2d(ax, kinds=dict(diagonal="kde_1d", lower="scatter_2d"))
+
+    # Plot SMC-RW in blue
+    smc_dataframe.plot_2d(
+        ax,
+        kinds=dict(diagonal="kde_1d", lower="kde_2d"),
+        label="SMC-RW",
+        color="C0",
+    )
+
+    # Plot NSS in orange
+    nss_dataframe.plot_2d(
+        ax,
+        kinds=dict(diagonal="kde_1d", lower="kde_2d"),
+        label="NSS",
+        color="C1",
+    )
+
+    # Add legend
+    ax.iloc[-1, 0].legend(loc="upper right", labels=["SMC-RW", "NSS"])
+
     fig.tight_layout()
 
-    figure_path = os.path.join(outdir, "nested_corner.png")
+    figure_path = os.path.join(outdir, "combined_corner.png")
     fig.savefig(figure_path)
-    print(f"Saved diagnostic corner plot to {figure_path}")
+    print(f"Saved combined corner plot to {figure_path}")
 
-    ess_value = float(blackjax.ns.utils.ess(jax.random.PRNGKey(0), samples))
-    print(f"Nested sampling ESS (mean over stochastic weights): {ess_value:.1f}")
+    # Save individual corner plots too
+    fig_smc, ax_smc = anesthetic.make_2d_axes(plot_params, upper=False, figsize=(11, 9))
+    smc_dataframe.plot_2d(ax_smc, kinds=dict(diagonal="kde_1d", lower="scatter_2d"))
+    fig_smc.tight_layout()
+    fig_smc.savefig(os.path.join(outdir, "smc_corner.png"))
 
-    print(f"Finished GW150914 nested-sampling run in {sampling_elapsed:.1f} seconds (sampling only; JIT compile excluded)")
+    fig_nss, ax_nss = anesthetic.make_2d_axes(plot_params, upper=False, figsize=(11, 9))
+    nss_dataframe.plot_2d(ax_nss, kinds=dict(diagonal="kde_1d", lower="scatter_2d"))
+    fig_nss.tight_layout()
+    fig_nss.savefig(os.path.join(outdir, "nss_corner.png"))
+
+    # ========== Summary ==========
+    print("\n" + "=" * 50)
+    print("Summary")
+    print("=" * 50)
+    print(f"SMC-RW: log(Z)={smc_results['logZ']:.2f}, ESS={smc_results['ess']:.1f}")
+    print(f"NSS:    log(Z)={float(nss_dataframe.logZ()):.2f}, ESS={nss_ess:.1f}")
 
 
 if __name__ == "__main__":
