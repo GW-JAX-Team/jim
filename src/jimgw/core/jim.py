@@ -216,15 +216,24 @@ class Jim(object):
 
     def get_samples(
         self,
-        training: bool = False,
-        rng_key: PRNGKeyArray = jax.random.PRNGKey(0),
         n_samples: int = 0,
+        rng_key: PRNGKeyArray = jax.random.PRNGKey(21),
+        training: bool = False,
     ) -> dict[str, Float[Array, " n_chains n_dims"]]:
         """
-        Get the samples from the sampler.
+        Get the samples from the sampler, with optional weighted resampling.
+
+        When `n_samples` > 0, performs weighted resampling where each sample is selected
+        with probability proportional to its posterior probability (exponential of log_prob).
+        This helps focus the returned samples on high-probability regions of the posterior.
 
         Parameters
         ----------
+        n_samples : int, optional
+            Number of samples to return via weighted resampling. If 0, return all samples
+            with transforms applied, by default 0
+        rng_key : PRNGKeyArray, optional
+            RNG key for weighted resampling, by default jax.random.PRNGKey(21)
         training : bool, optional
             Whether to get the training samples or the production samples, by default False
         rng_key : PRNGKeyArray, optional
@@ -237,7 +246,8 @@ class Jim(object):
         Returns
         -------
         dict
-            Dictionary of samples
+            Dictionary of samples with parameter names as keys and sample arrays as values.
+            All sample transforms are reversed to return samples in the prior parameter space.
 
         """
         if training:
@@ -245,11 +255,21 @@ class Jim(object):
                 chains := self.sampler.resources["positions_training"], Buffer
             )
             chains = chains.data
+
+            assert isinstance(
+                log_probs := self.sampler.resources["log_prob_training"], Buffer
+            )
+            log_probs = log_probs.data
         else:
             assert isinstance(
                 chains := self.sampler.resources["positions_production"], Buffer
             )
             chains = chains.data
+
+            assert isinstance(
+                log_probs := self.sampler.resources["log_prob_production"], Buffer
+            )
+            log_probs = log_probs.data
 
         chains = chains.reshape(-1, self.prior.n_dims)
 
@@ -272,4 +292,40 @@ class Jim(object):
         chains = jax.vmap(self.add_name)(chains)
         for sample_transform in reversed(self.sample_transforms):
             chains = jax.vmap(sample_transform.backward)(chains)
+
+        if n_samples > 0:
+            n_total_samples = chains[list(chains.keys())[0]].shape[0]
+
+            # If requesting more samples than available, just return all
+            if n_samples >= n_total_samples:
+                return chains
+
+            # For large sample sets, do two-stage sampling to avoid OOM
+            # Use adaptive factor based on the ratio of total to requested samples
+            intermediate_factor = max(10, min(100, n_total_samples // n_samples // 10))
+            n_intermediate = min(n_samples * intermediate_factor, n_total_samples)
+
+            log_probs_intermediate = log_probs.reshape(-1)
+
+            if n_intermediate < n_total_samples:
+                # Stage 1: Uniform random downsample to intermediate size
+                rng_key, subkey = jax.random.split(rng_key)
+                downsample_indices_1 = jax.random.choice(
+                    subkey, n_total_samples, (n_intermediate,), replace=False
+                )
+                log_probs_intermediate = log_probs_intermediate[downsample_indices_1]
+                chains_intermediate = {
+                    key: val[downsample_indices_1] for key, val in chains.items()
+                }
+            else:
+                chains_intermediate = chains
+
+            # Stage 2: Weighted resample from intermediate set
+            downsample_indices_2 = jax.random.categorical(
+                rng_key, log_probs_intermediate, shape=(n_samples,)
+            )
+            chains = {
+                key: val[downsample_indices_2]
+                for key, val in chains_intermediate.items()
+            }
         return chains
