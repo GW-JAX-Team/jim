@@ -1,5 +1,5 @@
 """
-GW170817 analysis using MultibandedTransientLikelihoodFD.
+GW170817-like injection analysis using MultibandedTransientLikelihoodFD.
 
 This example demonstrates the multibanding likelihood for BNS parameter estimation,
 which provides significant speedup (~20x) compared to standard likelihood evaluation.
