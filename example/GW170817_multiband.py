@@ -22,7 +22,6 @@ from jimgw.core.prior import (
 )
 from jimgw.core.single_event.detector import get_H1, get_L1, get_V1
 from jimgw.core.single_event.likelihood import MultibandedTransientLikelihoodFD
-from jimgw.core.single_event.data import Data
 from jimgw.core.single_event.waveform import RippleIMRPhenomPv2
 from jimgw.core.transforms import BoundToUnbound
 from jimgw.core.single_event.transforms import (
@@ -33,6 +32,9 @@ from jimgw.core.single_event.transforms import (
     GeocentricArrivalTimeToDetectorArrivalTimeTransform,
     GeocentricArrivalPhaseToDetectorArrivalPhaseTransform,
 )
+from jimgw.core.single_event.gps_times import (
+    greenwich_mean_sidereal_time as compute_gmst,
+)
 from flowMC.strategy.optimization import optimization_Adam
 
 ###########################################
@@ -40,46 +42,79 @@ from flowMC.strategy.optimization import optimization_Adam
 ###########################################
 
 total_time_start = time.time()
+rng_key = jax.random.PRNGKey(int(total_time_start))
+rng_key, *sub_key = jax.random.split(rng_key, 2)
 
-# first, fetch a 128s segment centered on GW170817
-gps = 1187008882.43
+# Simulation parameters
+gps = gps_time = total_time_start - 1000
 duration = 128.0
-# Request a segment with 2.0 s post-merger
-start = gps + 2.0 - duration
-end = start + duration
-
-# fetch 8192s of data to estimate the PSD
-psd_start = gps - 4096
-psd_end = gps + 4096
-
 fmin = minimum_frequency = 20
 fmax = maximum_frequency = 2048
 f_ref = fmin
+sampling_frequency = fmax * 2
+
+# Initialize waveform (needed for injection)
+waveform = RippleIMRPhenomPv2(f_ref=f_ref)
+
+# Generate random sky location
+random_samples = jax.random.uniform(sub_key[0], (3,), maxval=jnp.pi)
+
+# Injection parameters for GW170817-like BNS
+injection_parameters = {
+    "M_c": 1.17,  # chirp mass in solar masses
+    "eta": 0.249,  # from q=0.9: eta = q/(1+q)^2
+    "s1_x": 0.0,  # zero spins
+    "s1_y": 0.0,
+    "s1_z": 0.0,
+    "s2_x": 0.0,
+    "s2_y": 0.0,
+    "s2_z": 0.0,
+    "ra": random_samples[0] * 2.0,
+    "dec": random_samples[1] - jnp.pi / 2,
+    "psi": random_samples[2] - jnp.pi / 2,
+    "d_L": 40.0,  # distance in Mpc (approximately GW170817)
+    "iota": 0.4,
+    "phase_c": jnp.pi - 0.3,
+    "t_c": 0.0,
+}
+injection_parameters["gmst"] = compute_gmst(gps_time)
+
+# Convert injection parameters to include spherical spin coordinates
+_inj_params = injection_parameters.copy()
+q_eta_transform = MassRatioToSymmetricMassRatioTransform
+s1_transform = SphereSpinToCartesianSpinTransform("s1")
+s2_transform = SphereSpinToCartesianSpinTransform("s2")
+_inj_params = q_eta_transform.backward(_inj_params)
+_inj_params = s1_transform.backward(_inj_params)
+_inj_params = s2_transform.backward(_inj_params)
+injection_parameters.update(_inj_params)
+
+print("The injection parameters are")
+for key, value in injection_parameters.items():
+    print(f"-- {key + ':':10} {float(value):> 13.6f}")
+injection_parameters = {
+    key: jnp.array(value) for key, value in injection_parameters.items()
+}
 
 # initialize detectors
 ifos = [get_H1(), get_L1(), get_V1()]
 
-print("Fetching data from GWOSC...")
+print("Setting up detectors with injected signal...")
 data_start = time.time()
 
 for ifo in ifos:
-    # set analysis data
-    strain_data = Data.from_gwosc(ifo.name, start, end)
-    ifo.set_data(strain_data)
+    ifo.load_and_set_psd()
+    ifo.frequency_bounds = (fmin, fmax)
+    ifo.inject_signal(
+        duration,
+        sampling_frequency,
+        0.0,
+        waveform,
+        injection_parameters,
+        is_zero_noise=False,
+    )
 
-    # set PSD (Welch estimate)
-    psd_data = Data.from_gwosc(ifo.name, psd_start, psd_end)
-    # set an NFFT corresponding to the analysis segment duration
-    psd_fftlength = strain_data.duration * strain_data.sampling_frequency
-    ifo.set_psd(psd_data.to_psd(nperseg=psd_fftlength))
-
-print(f"Data fetched in {time.time() - data_start:.1f}s")
-
-###########################################
-########## Set up waveform ################
-###########################################
-
-waveform = RippleIMRPhenomPv2(f_ref=f_ref)
+print(f"Injection setup completed in {time.time() - data_start:.1f}s")
 
 ###########################################
 ########## Set up priors ##################
@@ -130,10 +165,10 @@ prior = CombinePrior(prior)
 ###########################################
 
 sample_transforms = [
-    DistanceToSNRWeightedDistanceTransform(gps_time=gps, ifos=ifos),
-    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(gps_time=gps, ifo=ifos[0]),
-    GeocentricArrivalTimeToDetectorArrivalTimeTransform(gps_time=gps, ifo=ifos[0]),
-    SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps, ifos=ifos),
+    DistanceToSNRWeightedDistanceTransform(gps_time=gps_time, ifos=ifos),
+    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(gps_time=gps_time, ifo=ifos[0]),
+    GeocentricArrivalTimeToDetectorArrivalTimeTransform(gps_time=gps_time, ifo=ifos[0]),
+    SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps_time, ifos=ifos),
     BoundToUnbound(
         name_mapping=(["M_c"], ["M_c_unbounded"]),
         original_lower_bound=M_c_min,
@@ -223,7 +258,7 @@ likelihood = MultibandedTransientLikelihoodFD(
     reference_chirp_mass=reference_chirp_mass,
     f_min=fmin,
     f_max=fmax,
-    trigger_time=gps,
+    trigger_time=gps_time,
     # Multibanding parameters
     accuracy_factor=5.0,  # L parameter from paper
     time_offset=2.12,  # Standard for LVK priors
