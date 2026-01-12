@@ -18,6 +18,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "anesthetic>=2.11.0",
     "astropy>=7.0.1",
     "beartype>=0.19.0",
     "flowmc>=0.4.5",

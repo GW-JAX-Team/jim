@@ -32,6 +32,7 @@ from jimgw.core.single_event.detector import get_H1, get_L1, get_V1
 from jimgw.core.single_event.likelihood import (
     HeterodynedPhaseMarginalizedLikelihoodFD,
     HeterodynedTransientLikelihoodFD,
+    MultibandedTransientLikelihoodFD,
 )
 from jimgw.core.single_event.transforms import (
     DistanceToSNRWeightedDistanceTransform,
@@ -385,7 +386,7 @@ def body(args):
         ref_params = {}
         print("Will search for reference waveform for relative binning")
 
-    # Always use the heterodyned, phase-marginalized likelihood
+    # Always use the heterodyned, phase-marginalized likelihood first
     likelihood_class = HeterodynedPhaseMarginalizedLikelihoodFD
     print("Using phase-marginalized heterodyned likelihood")
 
@@ -488,15 +489,14 @@ def body(args):
         SphereSpinToCartesianSpinTransform("s2"),
     ]
 
-    def loglikelihood(x):
+    def loglikelihood(x, target_likelihood):
         for transform in reversed(sample_transforms):
                 x, _ = transform.inverse(x)
         for transform in reversed(likelihood_transforms):
                 x = transform.forward(x)
         # x["d_L"] = config["d_L"]
         # x["psi"] = config["psi"]        
-        like = likelihood.evaluate(x, None)
-        return like
+        return target_likelihood.evaluate(x, None)
 
 
     def log_prior(x):
@@ -527,54 +527,6 @@ def body(args):
 
 
     # | Initialize the Nested Sampling algorithm
-    nested_sampler = blackjax.nss(
-        logprior_fn=log_prior,
-        loglikelihood_fn=loglikelihood,
-        num_delete=n_delete,
-        num_inner_steps=num_mcmc_steps,
-    )
-
-    @jax.jit
-    def one_step(carry, xs):
-        state, k = carry
-        k, subk = jax.random.split(k, 2)
-        state, dead_point = nested_sampler.step(subk, state)
-        return (state, k), dead_point
-
-
-
-    # | Sample live points from the prior
-    rng_key = jax.random.PRNGKey(0)
-    rng_key, init_key = jax.random.split(rng_key, 2)
-    initial_particles = complete_prior.sample(init_key, n_live)
-    initial_particles = sample_to_unbound(initial_particles)
-
-    first_key = next(iter(initial_particles.keys()))
-    print(f"using device {initial_particles[first_key].device}")
-
-    state = nested_sampler.init(initial_particles)
-
-    (state_dummy, rng_key), _ = one_step((state, rng_key), None)
-    jax.block_until_ready(state_dummy.logZ)
-
-    sampling_start = time.time()
-    dead = []
-    with tqdm(desc="Dead points", unit=" dead points") as pbar:
-            while not state.logZ_live - state.logZ < -3:
-                (state, rng_key), dead_info = one_step((state, rng_key), None)
-                dead.append(dead_info)
-                pbar.update(n_delete)  # Update progress bar
-
-    sampling_elapsed = time.time() - sampling_start
-    samples = blackjax.ns.utils.finalise(state,dead)
-
-    unbounded_samples = jax.vmap(unbound_to_sample)(samples.particles)
-    sample_dict = {key: np.array(value) for key, value in unbounded_samples.items()}
-    if "q" not in sample_dict and "eta" in sample_dict:
-        sample_dict["q"] = np.array(eta_to_q(sample_dict["eta"]))
-    q_samples = sample_dict["q"]
-    sample_dict["eta"] = q_samples / (1.0 + q_samples) ** 2
-
     labels = {
     "M_c": r"$M_c$",
     "q": r"$q$",
@@ -596,9 +548,94 @@ def body(args):
         "lambda_2": r"$\Lambda_2$",
     }
 
-    dataframe = NestedSamples(data = sample_dict, logL = samples.loglikelihood, logL_birth = samples.loglikelihood_birth, labels=labels)
-    
-    posterior_df = dataframe.compress(1000)
+    def run_nested_sampling(target_likelihood, label, rng_key, progress_desc):
+        nested_sampler = blackjax.nss(
+            logprior_fn=log_prior,
+            loglikelihood_fn=lambda x: loglikelihood(x, target_likelihood),
+            num_delete=n_delete,
+            num_inner_steps=num_mcmc_steps,
+        )
+
+        @jax.jit
+        def one_step(carry, xs):
+            state, k = carry
+            k, subk = jax.random.split(k, 2)
+            state, dead_point = nested_sampler.step(subk, state)
+            return (state, k), dead_point
+
+        rng_key, init_key = jax.random.split(rng_key, 2)
+        initial_particles = complete_prior.sample(init_key, n_live)
+        initial_particles = sample_to_unbound(initial_particles)
+
+        first_key = next(iter(initial_particles.keys()))
+        print(f"{label} using device {initial_particles[first_key].device}")
+
+        state = nested_sampler.init(initial_particles)
+        (state_dummy, rng_key), _ = one_step((state, rng_key), None)
+        jax.block_until_ready(state_dummy.logZ)
+
+        sampling_start = time.time()
+        dead = []
+        with tqdm(desc=progress_desc, unit=" dead points") as pbar:
+            while not state.logZ_live - state.logZ < -3:
+                (state, rng_key), dead_info = one_step((state, rng_key), None)
+                dead.append(dead_info)
+                pbar.update(n_delete)
+
+        sampling_elapsed = time.time() - sampling_start
+        samples = blackjax.ns.utils.finalise(state, dead)
+
+        unbounded_samples = jax.vmap(unbound_to_sample)(samples.particles)
+        sample_dict = {key: np.array(value) for key, value in unbounded_samples.items()}
+        if "q" not in sample_dict and "eta" in sample_dict:
+            sample_dict["q"] = np.array(eta_to_q(sample_dict["eta"]))
+        q_samples = sample_dict["q"]
+        sample_dict["eta"] = q_samples / (1.0 + q_samples) ** 2
+
+        dataframe = NestedSamples(
+            data=sample_dict,
+            logL=samples.loglikelihood,
+            logL_birth=samples.loglikelihood_birth,
+            labels=labels,
+        )
+        posterior_df = dataframe.compress(1000)
+
+        ess_value = float(blackjax.ns.utils.ess(jax.random.PRNGKey(0), samples))
+        print(f"{label} NSS ESS (mean over stochastic weights): {ess_value:.1f}")
+        print(
+            f"{label} nested-sampling run finished in {sampling_elapsed:.1f} seconds (sampling only)"
+        )
+
+        return posterior_df, dataframe, sampling_elapsed, rng_key
+
+    rng_key = jax.random.PRNGKey(0)
+    posterior_df, dataframe, sampling_elapsed, rng_key = run_nested_sampling(
+        likelihood,
+        label="Heterodyned",
+        rng_key=rng_key,
+        progress_desc="Dead points (heterodyned)",
+    )
+
+    # Multiband follow-up run
+    mb_likelihood = MultibandedTransientLikelihoodFD(
+        ifos,
+        waveform=waveform,
+        reference_chirp_mass=inference_bounds["M_c"][0],
+        trigger_time=config["trigger_time"],
+        f_min=fmin,
+        f_max=fmax,
+    )
+    mb_bands = mb_likelihood.number_of_bands
+    print(f"Multiband setup uses {mb_bands} bands.")
+    if mb_bands <= 1:
+        print("WARNING: Multiband default settings yielded <=1 band.")
+
+    mb_posterior_df, mb_dataframe, mb_sampling_elapsed, rng_key = run_nested_sampling(
+        mb_likelihood,
+        label="Multiband",
+        rng_key=rng_key,
+        progress_desc="Dead points (multiband)",
+    )
 
     plot_params = [
         "M_c",
@@ -620,7 +657,19 @@ def body(args):
         "dec",
     ]
     f, a = anesthetic.make_2d_axes(plot_params, upper=False, figsize=(14, 12))
-    posterior_df.plot_2d(a, kinds=dict(diagonal='kde_1d', lower='scatter_2d'))
+    posterior_df.plot_2d(
+        a,
+        kinds=dict(diagonal="kde_1d", lower="scatter_2d"),
+        label="heterodyned",
+        color="C0",
+    )
+    mb_posterior_df.plot_2d(
+        a,
+        kinds=dict(diagonal="kde_1d", lower="scatter_2d"),
+        label="multiband",
+        color="C1",
+    )
+    a.iloc[-1, 0].legend(loc="upper right", labels=["heterodyned", "multiband"])
 
     reduced_corner_params = ["M_c", "q", "d_L", "iota", "lambda_1", "lambda_2", "ra", "dec"]
     # dataframe.plot_2d(["M_c", "d_L", "iota", "ra", "dec"])
@@ -654,10 +703,9 @@ def body(args):
     f_prior.savefig(os.path.join(outdir, "nested_corner_prior_posterior.pdf"))
     print(f"Saved prior/posterior corner plot to {prior_figure_path}")
 
-    ess_value = float(blackjax.ns.utils.ess(jax.random.PRNGKey(0), samples))
-    print(f"Nested sampling ESS (mean over stochastic weights): {ess_value:.1f}")
-    
-    print(f"Finished injection nested-sampling run in {sampling_elapsed:.1f} seconds (sampling only; JIT compile excluded)")
+    combined_figure_path = os.path.join(outdir, "nested_corner_combined.png")
+    f.savefig(combined_figure_path)
+    print(f"Saved combined corner plot to {combined_figure_path}")
 
 ############
 ### MAIN ###
