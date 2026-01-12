@@ -1,7 +1,8 @@
-from typing import Sequence, Optional
+from typing import Sequence, Optional, Literal
 import logging
 import jax
 import jax.numpy as jnp
+import numpy as np
 from flowMC.resource_strategy_bundle.RQSpline_MALA_PT import RQSpline_MALA_PT_Bundle
 from flowMC.resource.buffers import Buffer
 from flowMC.Sampler import Sampler
@@ -219,6 +220,7 @@ class Jim(object):
         n_samples: int = 0,
         rng_key: PRNGKeyArray = jax.random.PRNGKey(21),
         training: bool = False,
+        output_type: Literal["jax", "numpy"] = "numpy",
     ) -> dict[str, Float[Array, " n_chains n_dims"]]:
         """
         Get the samples from the sampler, with optional weighted resampling.
@@ -236,18 +238,16 @@ class Jim(object):
             RNG key for weighted resampling, by default jax.random.PRNGKey(21)
         training : bool, optional
             Whether to get the training samples or the production samples, by default False
-        rng_key : PRNGKeyArray, optional
-            Random key for downsampling, by default jax.random.PRNGKey(0).
-        n_samples : int, optional
-            Number of samples to return after downsampling. If 0 (default), returns all samples.
-            If the requested number exceeds available samples, a warning is logged and all
-            available samples are returned.
+        output_type : Literal["jax", "numpy"], optional
+            Type of array to return. If "numpy", converts JAX arrays to numpy arrays.
+            If "jax", returns JAX arrays, by default "numpy"
 
         Returns
         -------
         dict
             Dictionary of samples with parameter names as keys and sample arrays as values.
             All sample transforms are reversed to return samples in the prior parameter space.
+            Arrays are either numpy.ndarray or jax.Array depending on output_type.
 
         """
         if training:
@@ -296,36 +296,38 @@ class Jim(object):
         if n_samples > 0:
             n_total_samples = chains[list(chains.keys())[0]].shape[0]
 
-            # If requesting more samples than available, just return all
-            if n_samples >= n_total_samples:
-                return chains
+            # If requesting more samples than available, skip resampling
+            if n_samples < n_total_samples:
+                # For large sample sets, do two-stage sampling to avoid OOM
+                # Use adaptive factor based on the ratio of total to requested samples
+                intermediate_factor = max(10, min(100, n_total_samples // n_samples // 10))
+                n_intermediate = min(n_samples * intermediate_factor, n_total_samples)
 
-            # For large sample sets, do two-stage sampling to avoid OOM
-            # Use adaptive factor based on the ratio of total to requested samples
-            intermediate_factor = max(10, min(100, n_total_samples // n_samples // 10))
-            n_intermediate = min(n_samples * intermediate_factor, n_total_samples)
+                log_probs_intermediate = log_probs.reshape(-1)
 
-            log_probs_intermediate = log_probs.reshape(-1)
+                if n_intermediate < n_total_samples:
+                    # Stage 1: Uniform random downsample to intermediate size
+                    rng_key, subkey = jax.random.split(rng_key)
+                    downsample_indices_1 = jax.random.choice(
+                        subkey, n_total_samples, (n_intermediate,), replace=False
+                    )
+                    log_probs_intermediate = log_probs_intermediate[downsample_indices_1]
+                    chains_intermediate = {
+                        key: val[downsample_indices_1] for key, val in chains.items()
+                    }
+                else:
+                    chains_intermediate = chains
 
-            if n_intermediate < n_total_samples:
-                # Stage 1: Uniform random downsample to intermediate size
-                rng_key, subkey = jax.random.split(rng_key)
-                downsample_indices_1 = jax.random.choice(
-                    subkey, n_total_samples, (n_intermediate,), replace=False
+                # Stage 2: Weighted resample from intermediate set
+                downsample_indices_2 = jax.random.categorical(
+                    rng_key, log_probs_intermediate, shape=(n_samples,)
                 )
-                log_probs_intermediate = log_probs_intermediate[downsample_indices_1]
-                chains_intermediate = {
-                    key: val[downsample_indices_1] for key, val in chains.items()
+                chains = {
+                    key: val[downsample_indices_2]
+                    for key, val in chains_intermediate.items()
                 }
-            else:
-                chains_intermediate = chains
 
-            # Stage 2: Weighted resample from intermediate set
-            downsample_indices_2 = jax.random.categorical(
-                rng_key, log_probs_intermediate, shape=(n_samples,)
-            )
-            chains = {
-                key: val[downsample_indices_2]
-                for key, val in chains_intermediate.items()
-            }
+        if output_type == "numpy":
+            chains = {key: np.array(val) for key, val in chains.items()}
+
         return chains
