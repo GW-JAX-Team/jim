@@ -25,7 +25,7 @@ dependencies = [
     "jax>=0.8.2",
     "jaxtyping>=0.3.3",
     "ripplegw>=0.0.9",
-    "scipy<0.17.0",
+    "scipy<1.17.0",
 ]
 
 [project.optional-dependencies]
