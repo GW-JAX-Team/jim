@@ -5,6 +5,7 @@ import scipy.stats as stats
 from jimgw.core.prior import (
     LogisticDistribution,
     StandardNormalDistribution,
+    UniformDistribution,
     UniformPrior,
     SinePrior,
     CosinePrior,
@@ -12,9 +13,8 @@ from jimgw.core.prior import (
     PowerLawPrior,
     GaussianPrior,
     RayleighPrior,
-    ConstrainedPrior,
-    SimpleConstrainedPrior,
-    CombinePrior,
+    BoundedMixin,
+    SequentialTransformPrior,
 )
 
 jax.config.update("jax_enable_x64", True)
@@ -30,7 +30,7 @@ def assert_all_in_range(arr, low, high):
 
 
 class TestUnivariatePrior:
-    def test_logistic(self):
+    def test_logistic_distribution(self):
         """Test the LogisticDistribution prior."""
         p = LogisticDistribution(["x"])
 
@@ -49,12 +49,12 @@ class TestUnivariatePrior:
         )
 
         # Check log_prob is jittable
-        jitted_log_prob = jax.jit(p.log_prob)
-        jitted_val = jax.vmap(jitted_log_prob)(p.add_name(x[None]))
+        jitted_log_prob = jax.jit(jax.vmap(p.log_prob))
+        jitted_val = jitted_log_prob(p.add_name(x[None]))
         assert_all_finite(jitted_val)
         assert jnp.allclose(jitted_val, jax.vmap(p.log_prob)(p.add_name(x[None])))
 
-    def test_standard_normal(self):
+    def test_standard_normal_distribution(self):
         """Test the StandardNormalDistribution prior."""
         p = StandardNormalDistribution(["x"])
 
@@ -73,10 +73,41 @@ class TestUnivariatePrior:
         )
 
         # Check log_prob is jittable
-        jitted_log_prob = jax.jit(p.log_prob)
-        jitted_val = jax.vmap(jitted_log_prob)(p.add_name(x[None]))
+        jitted_log_prob = jax.jit(jax.vmap(p.log_prob))
+        jitted_val = jitted_log_prob(p.add_name(x[None]))
         assert_all_finite(jitted_val)
         assert jnp.allclose(jitted_val, jax.vmap(p.log_prob)(p.add_name(x[None])))
+
+    def test_uniform_distribution(self):
+        """Test the UniformDistribution prior."""
+        p = UniformDistribution(["x"])
+        xmin, xmax = p.xmin, p.xmax  # 0.0, 1.0
+
+        # Draw samples and check they are finite and in range
+        samples = p.sample(jax.random.PRNGKey(0), 10000)
+        assert_all_finite(samples["x"])
+        assert_all_in_range(samples["x"], xmin, xmax)
+
+        # Check log_prob is finite for samples
+        log_prob = jax.vmap(p.log_prob)(samples)
+        assert_all_finite(log_prob)
+
+        # Check log_prob is correct in the support
+        x = p.add_name(jnp.linspace(xmin, xmax, 1000)[None])
+        assert jnp.allclose(
+            jax.vmap(p.log_prob)(x), -jnp.log(xmax - xmin) * jnp.ones_like(x["x"])
+        )
+
+        # Check log_prob is -inf outside the support
+        x_outside = p.add_name(jnp.array([xmin - 1.0, xmax + 1.0])[None])
+        logp_outside = jax.vmap(p.log_prob)(x_outside)
+        assert jnp.all(logp_outside == -jnp.inf)
+
+        # Check log_prob is jittable
+        jitted_log_prob = jax.jit(jax.vmap(p.log_prob))
+        jitted_val = jitted_log_prob(x)
+        assert_all_finite(jitted_val)
+        assert jnp.allclose(jitted_val, jax.vmap(p.log_prob)(x))
 
     def test_uniform(self):
         """Test the UniformPrior prior."""
@@ -92,14 +123,19 @@ class TestUnivariatePrior:
         log_prob = jax.vmap(p.log_prob)(samples)
         assert_all_finite(log_prob)
 
-        # Check log_prob is correct in the support
-        x = p.trace_prior_parent([])[0].add_name(jnp.linspace(-10.0, 10.0, 1000)[None])
+        # Check log_prob is correct in the support (use valid range [0, 1] for base)
+        x = p.trace_prior_parent([])[0].add_name(jnp.linspace(0.0, 1.0, 1000)[None])
         y = jax.vmap(p.transform)(x)
         assert jnp.allclose(jax.vmap(p.log_prob)(y), -jnp.log(xmax - xmin))
 
+        # Check log_prob is -inf outside the support
+        x_outside = p.add_name(jnp.array([xmin - 1.0, xmax + 1.0])[None])
+        logp_outside = jax.vmap(p.log_prob)(x_outside)
+        assert jnp.all(logp_outside == -jnp.inf)
+
         # Check log_prob is jittable
-        jitted_log_prob = jax.jit(p.log_prob)
-        jitted_val = jax.vmap(jitted_log_prob)(y)
+        jitted_log_prob = jax.jit(jax.vmap(p.log_prob))
+        jitted_val = jitted_log_prob(y)
         assert_all_finite(jitted_val)
         assert jnp.allclose(jitted_val, jax.vmap(p.log_prob)(y))
 
@@ -116,16 +152,21 @@ class TestUnivariatePrior:
         log_prob = jax.vmap(p.log_prob)(samples)
         assert_all_finite(log_prob)
 
-        # Check log_prob is correct in the support
-        x = p.trace_prior_parent([])[0].add_name(jnp.linspace(-10.0, 10.0, 1000)[None])
-        y = jax.vmap(p.base_prior[0].base_prior[0].transform)(x)
-        y = jax.vmap(p.base_prior[0].transform)(y)
+        # Check log_prob is correct in the support (use valid range (0, 1) exclusive
+        # to avoid boundaries where sin(x) = 0 gives log_prob = -inf)
+        x = p.trace_prior_parent([])[0].add_name(jnp.linspace(0.001, 0.999, 1000)[None])
+        y = jax.vmap(p.base_prior[0].transform)(x)
         y = jax.vmap(p.transform)(y)
         assert jnp.allclose(jax.vmap(p.log_prob)(y), jnp.log(jnp.sin(y["x"]) / 2.0))
 
+        # Check log_prob is -inf outside the support
+        x_outside = p.add_name(jnp.array([-0.5, jnp.pi + 0.5])[None])
+        logp_outside = jax.vmap(p.log_prob)(x_outside)
+        assert jnp.all(logp_outside == -jnp.inf)
+
         # Check log_prob is jittable
-        jitted_log_prob = jax.jit(p.log_prob)
-        jitted_val = jax.vmap(jitted_log_prob)(y)
+        jitted_log_prob = jax.jit(jax.vmap(p.log_prob))
+        jitted_val = jitted_log_prob(y)
         assert_all_finite(jitted_val)
         assert jnp.allclose(jitted_val, jax.vmap(p.log_prob)(y))
 
@@ -142,34 +183,26 @@ class TestUnivariatePrior:
         log_prob = jax.vmap(p.log_prob)(samples)
         assert_all_finite(log_prob)
 
-        # Check log_prob is correct in the support
-        x = p.trace_prior_parent([])[0].add_name(jnp.linspace(-10.0, 10.0, 1000)[None])
-        y = jax.vmap(p.base_prior[0].transform)(x)
+        # Check log_prob is correct in the support (use valid range (0, 1) exclusive
+        # to avoid boundaries where cos(x) = 0 gives log_prob = -inf)
+        x = p.trace_prior_parent([])[0].add_name(jnp.linspace(0.001, 0.999, 1000)[None])
+        y = jax.vmap(p.base_prior[0].base_prior[0].transform)(x)
+        y = jax.vmap(p.base_prior[0].transform)(y)
         y = jax.vmap(p.transform)(y)
         assert jnp.allclose(jax.vmap(p.log_prob)(y), jnp.log(jnp.cos(y["x"]) / 2.0))
 
+        # Check log_prob is -inf outside the support
+        x_outside = p.add_name(
+            jnp.array([-jnp.pi / 2.0 - 0.5, jnp.pi / 2.0 + 0.5])[None]
+        )
+        logp_outside = jax.vmap(p.log_prob)(x_outside)
+        assert jnp.all(logp_outside == -jnp.inf)
+
         # Check log_prob is jittable
-        jitted_log_prob = jax.jit(p.log_prob)
-        jitted_val = jax.vmap(jitted_log_prob)(y)
+        jitted_log_prob = jax.jit(jax.vmap(p.log_prob))
+        jitted_val = jitted_log_prob(y)
         assert_all_finite(jitted_val)
         assert jnp.allclose(jitted_val, jax.vmap(p.log_prob)(y))
-
-    def test_uniform_sphere(self):
-        """Test the UniformSpherePrior prior."""
-        p = UniformSpherePrior(["x"])
-
-        # Draw samples and check they are finite and in range
-        samples = p.sample(jax.random.PRNGKey(0), 10000)
-        assert_all_finite(samples["x_mag"])
-        assert_all_finite(samples["x_theta"])
-        assert_all_finite(samples["x_phi"])
-        assert_all_in_range(samples["x_mag"], 0.0, 1.0)
-        assert_all_in_range(samples["x_theta"], 0.0, jnp.pi)
-        assert_all_in_range(samples["x_phi"], 0.0, 2 * jnp.pi)
-
-        # Check log_prob is finite for samples
-        log_prob = jax.vmap(p.log_prob)(samples)
-        assert_all_finite(log_prob)
 
     def test_power_law(self):
         """Test the PowerLawPrior prior for various exponents."""
@@ -187,9 +220,10 @@ class TestUnivariatePrior:
             log_prob = jax.vmap(p.log_prob)(samples)
             assert_all_finite(log_prob)
 
-            # Check log_prob is correct in the support
+            # Check log_prob is correct in the support (use valid range (0, 1] for base,
+            # excluding 0 as it maps to the boundary where log_prob = -inf)
             x = p.trace_prior_parent([])[0].add_name(
-                jnp.linspace(-10.0, 10.0, 1000)[None]
+                jnp.linspace(0.001, 1.0, 1000)[None]
             )
             y = jax.vmap(p.transform)(x)
             if alpha < -1.0:
@@ -208,9 +242,14 @@ class TestUnivariatePrior:
                 expected = -jnp.log(y["x"]) - jnp.log(jnp.log(xmax) - jnp.log(xmin))
             assert jnp.allclose(jax.vmap(p.log_prob)(y), expected)
 
+            # Check log_prob is -inf outside the support
+            x_outside = p.add_name(jnp.array([xmin - 0.01, xmax + 1.0])[None])
+            logp_outside = jax.vmap(p.log_prob)(x_outside)
+            assert jnp.all(logp_outside == -jnp.inf)
+
             # Check log_prob is jittable
-            jitted_log_prob = jax.jit(p.log_prob)
-            jitted_val = jax.vmap(jitted_log_prob)(y)
+            jitted_log_prob = jax.jit(jax.vmap(p.log_prob))
+            jitted_val = jitted_log_prob(y)
             assert_all_finite(jitted_val)
             assert jnp.allclose(jitted_val, jax.vmap(p.log_prob)(y))
 
@@ -235,8 +274,8 @@ class TestUnivariatePrior:
         )
 
         # Check log_prob is jittable
-        jitted_log_prob = jax.jit(p.log_prob)
-        jitted_val = jax.vmap(jitted_log_prob)(y)
+        jitted_log_prob = jax.jit(jax.vmap(p.log_prob))
+        jitted_val = jitted_log_prob(y)
         assert_all_finite(jitted_val)
         assert jnp.allclose(jitted_val, jax.vmap(p.log_prob)(y))
 
@@ -254,107 +293,74 @@ class TestUnivariatePrior:
         log_prob = jax.vmap(p.log_prob)(samples)
         assert_all_finite(log_prob)
 
-        # Check log_prob is correct in the support
-        x = p.trace_prior_parent([])[0].add_name(jnp.linspace(0.0, 10.0, 1000)[None])
+        # Check log_prob is correct in the support (use valid range (0, 1) exclusive
+        # to avoid boundaries: 0 maps to inf and 1 maps to the boundary where log_prob = -inf)
+        x = p.trace_prior_parent([])[0].add_name(jnp.linspace(0.001, 0.999, 1000)[None])
         y = jax.vmap(p.base_prior[0].transform)(x)
         y = jax.vmap(p.transform)(y)
         assert jnp.allclose(
             jax.vmap(p.log_prob)(y), stats.rayleigh.logpdf(y["x"], scale=sigma)
         )
 
+        # Check log_prob is -inf for negative values (outside support [0, inf))
+        x_outside = p.add_name(jnp.array([-1.0, -10.0])[None])
+        logp_outside = jax.vmap(p.log_prob)(x_outside)
+        assert jnp.all(logp_outside == -jnp.inf)
+
         # Check log_prob is jittable
-        jitted_log_prob = jax.jit(p.log_prob)
-        jitted_val = jax.vmap(jitted_log_prob)(y)
+        jitted_log_prob = jax.jit(jax.vmap(p.log_prob))
+        jitted_val = jitted_log_prob(y)
         assert_all_finite(jitted_val)
         assert jnp.allclose(jitted_val, jax.vmap(p.log_prob)(y))
 
 
-class TestConstrainedPrior:
-    def test_simple_unbounded_prior_1d(self):
-        """Test SimpleConstrainedPrior for correct constraint enforcement and sampling."""
-        base = UniformPrior(0.0, 1.0, ["x"])
-        p = SimpleConstrainedPrior([base])
+class TestMultivariatePrior:
+    def test_uniform_sphere(self):
+        """Test the UniformSpherePrior prior."""
+        p = UniformSpherePrior(["x"])
 
         # Draw samples and check they are finite and in range
         samples = p.sample(jax.random.PRNGKey(0), 10000)
-        assert jnp.all((samples["x"] > 0.0) & (samples["x"] < 1.0))
+        assert_all_finite(samples["x_mag"])
+        assert_all_finite(samples["x_theta"])
+        assert_all_finite(samples["x_phi"])
+        assert_all_in_range(samples["x_mag"], 0.0, 1.0)
+        assert_all_in_range(samples["x_theta"], 0.0, jnp.pi)
+        assert_all_in_range(samples["x_phi"], 0.0, 2 * jnp.pi)
 
-        # Check log_prob is finite for samples in range and -inf outside
-        xs = jnp.linspace(-0.5, 1.5, 1000)
-        xs_dict = p.add_name(xs[None])
-        logp = jax.vmap(p.log_prob)(xs_dict)
-        mask = (xs >= 0.0) & (xs <= 1.0)
-        assert jnp.all(jnp.isfinite(logp[mask]))
-        assert jnp.all(logp[~mask] == -jnp.inf)
+        # Check log_prob is finite for samples
+        log_prob = jax.vmap(p.log_prob)(samples)
+        assert_all_finite(log_prob)
 
-        # Check log_prob matches base prior in the valid region
-        base_logp = jax.vmap(base.log_prob)(xs_dict)
-        assert jnp.allclose(logp[mask], base_logp[mask])
 
-        # Add extra constraint (simulate by subclassing SimpleConstrainedPrior)
-        class ExtraConstraintPrior(SimpleConstrainedPrior):
-            def constraints(self, x):
-                return jnp.logical_and(super().constraints(x), x["x"] < 0.5)
+class TestOther:
+    def test_bounded_mixin(self):
+        """Test the BoundedMixin mixin."""
 
-        p2 = ExtraConstraintPrior([base])
+        class TestBoundedPrior(BoundedMixin, SequentialTransformPrior):
+            xmin: float = -2.0
+            xmax: float = 3.0
 
-        # Draw samples and check they are finite and in range
-        samples2 = p2.sample(jax.random.PRNGKey(1), 10000)
-        assert jnp.all((samples2["x"] > 0.0) & (samples2["x"] < 0.5))
+            def __init__(self, parameter_names):
+                super().__init__(
+                    [StandardNormalDistribution([f"{parameter_names[0]}_base"])],
+                    [],
+                )
 
-        # Check log_prob is finite for samples in range and -inf outside
-        xs2 = jnp.linspace(-0.5, 1.5, 1000)
-        xs2_dict = p2.add_name(xs2[None])
-        logp2 = jax.vmap(p2.log_prob)(xs2_dict)
-        mask2 = (xs2 >= 0.0) & (xs2 < 0.5)
-        assert jnp.all(jnp.isfinite(logp2[mask2]))
-        assert jnp.all(logp2[~mask2] == -jnp.inf)
+        p = TestBoundedPrior(["x"])
 
-        # Check log_prob is jittable
-        jitted_log_prob = jax.jit(p.log_prob)
-        jitted_vals = jax.vmap(jitted_log_prob)(xs_dict)
-        assert jnp.allclose(jitted_vals, logp)
+        # Check log_prob is finite inside bounds
+        x_inside = p.add_name(jnp.array([-1.5, 0.0, 2.5])[None])
+        logp_inside = jax.vmap(p.log_prob)(x_inside)
+        assert_all_finite(logp_inside)
 
-    def test_unbounded_prior_2d(self):
-        """Test ConstrainedPrior for 2D priors with joint constraints and sampling."""
+        # Check log_prob is -inf outside bounds
+        x_outside = p.add_name(jnp.array([-2.5, 3.5])[None])
+        logp_outside = jax.vmap(p.log_prob)(x_outside)
+        assert jnp.all(logp_outside == -jnp.inf)
 
-        class JointConstraintPrior(ConstrainedPrior):
-            def __init__(self):
-                base_priors = [
-                    CombinePrior(
-                        [
-                            SimpleConstrainedPrior([UniformPrior(0.0, 1.0, ["x"])]),
-                            SimpleConstrainedPrior([UniformPrior(-2.0, 2.0, ["y"])]),
-                        ]
-                    ),
-                ]
-                super().__init__(base_priors)
-
-            def constraints(self, x):
-                return x["x"] + x["y"] < 1.0
-
-        p = JointConstraintPrior()
-
-        # Draw samples and check they are finite and in range
-        samples = p.sample(jax.random.PRNGKey(1), 10000)
-        assert jnp.all((samples["x"] > 0.0) & (samples["x"] < 1.0))
-        assert jnp.all((samples["y"] > -2.0) & (samples["y"] < 2.0))
-        assert jnp.all(samples["x"] + samples["y"] < 1.0)
-
-        # Check log_prob is finite for samples in range and -inf outside
-        xs = jnp.linspace(-0.5, 1.5, 100)
-        ys = jnp.linspace(-2.5, 2.5, 100)
-        grid_x, grid_y = jnp.meshgrid(xs, ys, indexing="ij")
-        flat_x = grid_x.ravel()
-        flat_y = grid_y.ravel()
-        xs_dict = {"x": flat_x, "y": flat_y}
-        mask = (flat_x > 0.0) & (flat_x < 1.0) & (flat_y > -2.0) & (flat_y < 2.0)
-        logp = jax.vmap(p.log_prob)(xs_dict)
-        mask2 = mask & (flat_x + flat_y < 1.0)
-        assert jnp.all(jnp.isfinite(logp[mask2]))
-        assert jnp.all(logp[~mask2] == -jnp.inf)
-
-        # Check log_prob is jittable
-        jitted_log_prob = jax.jit(p.log_prob)
-        jitted_vals = jax.vmap(jitted_log_prob)(xs_dict)
-        assert jnp.allclose(jitted_vals, logp)
+        # Check JIT works correctly
+        x = p.add_name(jnp.linspace(-3.0, 4.0, 100)[None])
+        logp = jax.vmap(p.log_prob)(x)
+        jitted_logp = jax.jit(jax.vmap(p.log_prob))(x)
+        assert jnp.allclose(logp, jitted_logp)

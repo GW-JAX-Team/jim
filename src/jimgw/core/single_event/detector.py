@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import Optional
+import logging
 
 import jax
 import jax.numpy as jnp
@@ -6,7 +8,6 @@ from jaxtyping import Array, Float, Complex, PRNGKeyArray, jaxtyped, Bool
 from numpy import loadtxt
 import requests
 from beartype import beartype as typechecker
-from typing import Optional
 
 from jimgw.core.constants import (
     C_SI,
@@ -17,6 +18,8 @@ from jimgw.core.constants import (
 from jimgw.core.single_event.wave import Polarization
 from jimgw.core.single_event.data import Data, PowerSpectrum
 from jimgw.core.single_event.utils import inner_product, complex_inner_product
+
+logger = logging.getLogger(__name__)
 
 # TODO: Need to expand this list. Currently it is only O3.
 asd_file_dict = {
@@ -142,9 +145,9 @@ class Detector(ABC):
         data, freqs_1 = self.data.frequency_slice(*self.frequency_bounds)
         psd, freqs_2 = self.psd.frequency_slice(*self.frequency_bounds)
 
-        assert jnp.array_equal(
-            freqs_1, freqs_2
-        ), f"The {self.name} data and PSD must have same frequencies"
+        assert jnp.array_equal(freqs_1, freqs_2), (
+            f"The {self.name} data and PSD must have same frequencies"
+        )
 
         self._sliced_frequencies = freqs_1
         self._sliced_fd_data = data
@@ -505,7 +508,7 @@ class GroundBased2G(Detector):
             f, asd_vals = loadtxt(asd_file, unpack=True)
             psd_vals = asd_vals**2
         else:
-            print("Grabbing GWTC-2 PSD for " + self.name)
+            logger.info("Grabbing GWTC-2 PSD for " + self.name)
             url = asd_file_dict[self.name]
             data = requests.get(url)
             tmp_file_name = f"fetched_default_asd_{self.name}.txt"
@@ -540,7 +543,7 @@ class GroundBased2G(Detector):
         """Add data to the detector.
 
         Args:
-            data (Union[Data, Array]): Data to be added to the detector, either as a `Data` object
+            data (Data | Array): Data to be added to the detector, either as a `Data` object
                 or as a timeseries array.
             **kws (dict): Additional keyword arguments to pass to `Data` constructor.
 
@@ -559,7 +562,7 @@ class GroundBased2G(Detector):
         """Add PSD to the detector.
 
         Args:
-            psd (Union[PowerSpectrum, Array]): PSD to be added to the detector, either as a `PowerSpectrum`
+            psd (PowerSpectrum | Array): PSD to be added to the detector, either as a `PowerSpectrum`
                 object or as a timeseries array.
             **kws (dict): Additional keyword arguments to pass to `PowerSpectrum` constructor.
 
@@ -597,7 +600,8 @@ class GroundBased2G(Detector):
             None
         """
         # 1. Set empty data to initialise the detector
-        n_times = int(duration * sampling_frequency)
+        # n_times = int(duration * sampling_frequency)
+        n_times = int(jnp.round(duration * sampling_frequency))
         self.set_data(
             Data(
                 name=f"{self.name}_empty",
@@ -621,7 +625,7 @@ class GroundBased2G(Detector):
         self.set_data(
             Data.from_fd(
                 name=f"{self.name}_injected",
-                fd=strain_data,
+                fd_strain=strain_data,
                 frequencies=self.frequencies,
                 epoch=self.data.epoch,
             )
@@ -641,13 +645,12 @@ class GroundBased2G(Detector):
         )
         match_filtered_snr /= optimal_snr
 
-        # Store the optimal SNR as an attribute for later access
+        # Store the optimal SNR as an attribute for later access.
         self.injected_signal_snr = float(optimal_snr)
 
-        # NOTE: Change this to logging later.
-        print(f"For detector {self.name}, the injected signal has:")
-        print(f"  - Optimal SNR: {optimal_snr:.4f}")
-        print(f"  - Match filtered SNR: {match_filtered_snr:.4f}")
+        logger.info(f"For detector {self.name}, the injected signal has:")
+        logger.info(f"  - Optimal SNR: {optimal_snr:.4f}")
+        logger.info(f"  - Match filtered SNR: {match_filtered_snr:.4f}")
 
     def get_whitened_frequency_domain_strain(
         self, frequency_series: Complex[Array, " n_freq"]
@@ -762,11 +765,7 @@ def get_ET() -> list[GroundBased2G]:
     earth_approx_radius = (
         a
         * b
-        / (
-            jnp.sqrt(
-                a ** (2) * jnp.sin(latitude) ** 2 + b ** (2) * jnp.cos(latitude) ** 2
-            )
-        )
+        / (jnp.sqrt(a**2 * jnp.sin(latitude) ** 2 + b**2 * jnp.cos(latitude) ** 2))
     )
     earth_approx_radius *= 1e3
 
@@ -774,7 +773,7 @@ def get_ET() -> list[GroundBased2G]:
     for i in range(3):
         ifos.append(
             GroundBased2G(
-                f"{name}{i+1}",
+                f"{name}{i + 1}",
                 latitude=float(latitude),
                 longitude=float(longitude),
                 xarm_azimuth=xarm_azimuth,

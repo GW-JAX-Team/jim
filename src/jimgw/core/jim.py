@@ -11,6 +11,8 @@ from jimgw.core.base import LikelihoodBase
 from jimgw.core.prior import Prior
 from jimgw.core.transforms import BijectiveTransform, NtoMTransform
 
+logger = logging.getLogger(__name__)
+
 
 class Jim(object):
     """
@@ -23,7 +25,7 @@ class Jim(object):
     # Name of parameters to sample from
     sample_transforms: Sequence[BijectiveTransform]
     likelihood_transforms: Sequence[NtoMTransform]
-    parameter_names: list[str]
+    parameter_names: tuple[str, ...]
     sampler: Sampler
 
     def __init__(
@@ -33,22 +35,22 @@ class Jim(object):
         sample_transforms: Sequence[BijectiveTransform] = [],
         likelihood_transforms: Sequence[NtoMTransform] = [],
         rng_key: PRNGKeyArray = jax.random.PRNGKey(0),
-        n_chains: int = 50,
-        n_local_steps: int = 10,
-        n_global_steps: int = 10,
+        n_chains: int = 1000,
+        n_local_steps: int = 100,
+        n_global_steps: int = 1000,
         n_training_loops: int = 20,
-        n_production_loops: int = 20,
+        n_production_loops: int = 10,
         n_epochs: int = 20,
-        mala_step_size: float = 0.01,
+        mala_step_size: Float | Float[Array, " n_dims"] = 2e-3,
         chain_batch_size: int = 0,
         rq_spline_hidden_units: list[int] = [128, 128],
         rq_spline_n_bins: int = 10,
-        rq_spline_n_layers: int = 2,
+        rq_spline_n_layers: int = 8,
         learning_rate: float = 1e-3,
         batch_size: int = 10000,
-        n_max_examples: int = 10000,
+        n_max_examples: int = 30000,
         local_thinning: int = 1,
-        global_thinning: int = 1,
+        global_thinning: int = 100,
         n_NFproposal_batch_size: int = 1000,
         history_window: int = 100,
         n_temperatures: int = 5,
@@ -64,21 +66,21 @@ class Jim(object):
         self.parameter_names = prior.parameter_names
 
         if len(sample_transforms) == 0:
-            print(
+            logger.info(
                 "No sample transforms provided. Using prior parameters as sampling parameters"
             )
         else:
-            print("Using sample transforms")
+            logger.info("Using sample transforms")
             for transform in sample_transforms:
                 self.parameter_names = transform.propagate_name(self.parameter_names)
 
         if len(likelihood_transforms) == 0:
-            print(
+            logger.info(
                 "No likelihood transforms provided. Using prior parameters as likelihood parameters"
             )
 
         if rng_key is jax.random.PRNGKey(0):
-            print("No rng_key provided. Using default key with seed=0.")
+            logger.info("No rng_key provided. Using default key with seed=0.")
 
         rng_key, subkey = jax.random.split(rng_key)
 
@@ -92,7 +94,7 @@ class Jim(object):
             n_training_loops=n_training_loops,
             n_production_loops=n_production_loops,
             n_epochs=n_epochs,
-            mala_step_size=mala_step_size,
+            mala_step_size=mala_step_size,  # type: ignore # Type ignored should be removed once the FlowMC fix is published
             chain_batch_size=chain_batch_size,
             rq_spline_hidden_units=rq_spline_hidden_units,
             rq_spline_n_bins=rq_spline_n_bins,
@@ -112,7 +114,7 @@ class Jim(object):
         )
 
         if n_temperatures == 0:
-            logging.info(
+            logger.info(
                 "The number of temperatures is set to 0. No tempering will be applied."
             )
             resource_strategy_bundle.strategy_order = [
@@ -161,40 +163,23 @@ class Jim(object):
         return self.likelihood.evaluate(named_params, data) + prior
 
     def sample_initial_condition(self) -> Float[Array, " n_chains n_dims"]:
-        initial_position = (
-            jnp.zeros((self.sampler.n_chains, self.prior.n_dims)) + jnp.nan
-        )
-
         rng_key, subkey = jax.random.split(self.sampler.rng_key)
 
-        while not jax.tree.reduce(
-            jnp.logical_and,
-            jax.tree.map(lambda x: jnp.isfinite(x), initial_position),
-        ).all():
-            non_finite_index = jnp.where(
-                jnp.any(
-                    ~jax.tree.reduce(
-                        jnp.logical_and,
-                        jax.tree.map(lambda x: jnp.isfinite(x), initial_position),
-                    ),
-                    axis=1,
-                )
-            )[0]
+        initial_position = self.prior.sample(subkey, self.sampler.n_chains)
+        for transform in self.sample_transforms:
+            initial_position = jax.vmap(transform.forward)(initial_position)
+        initial_position = jnp.array(
+            [initial_position[key] for key in self.parameter_names]
+        ).T
 
-            rng_key, subkey = jax.random.split(rng_key)
-            guess = self.prior.sample(subkey, self.sampler.n_chains)
-            for transform in self.sample_transforms:
-                guess = jax.vmap(transform.forward)(guess)
-            guess = jnp.array([guess[key] for key in self.parameter_names]).T
+        if not jnp.all(jnp.isfinite(initial_position)):
+            raise ValueError(
+                "Initial positions contain non-finite values (NaN or inf). "
+                "Check your priors and transforms for validity."
+            )
 
-            finite_guess = jnp.where(
-                jnp.all(jax.tree.map(lambda x: jnp.isfinite(x), guess), axis=1)
-            )[0]
-            common_length = min(len(finite_guess), len(non_finite_index))
-            initial_position = initial_position.at[
-                non_finite_index[:common_length]
-            ].set(guess[:common_length])
         self.sampler.rng_key = rng_key
+
         return initial_position
 
     def sample(
@@ -202,7 +187,7 @@ class Jim(object):
         initial_position: Optional[Float[Array, " n_chains n_dims"]] = None,
     ):
         if initial_position is None:
-            print("No initial_position provided. Sampling from prior.")
+            logger.info("No initial_position provided. Sampling from prior.")
             initial_position = self.sample_initial_condition()
         else:
             initial_position = jnp.asarray(initial_position)
@@ -211,7 +196,9 @@ class Jim(object):
                     raise ValueError(
                         f"initial_position must have shape (n_dims,) or (n_chains, n_dims). Got shape {initial_position.shape}."
                     )
-                print("1D initial_position provided. Broadcasting it to all chains.")
+                logger.info(
+                    "1D initial_position provided. Broadcasting it to all chains."
+                )
                 initial_position = jnp.broadcast_to(
                     initial_position, (self.sampler.n_chains, self.prior.n_dims)
                 )
@@ -220,7 +207,7 @@ class Jim(object):
                     raise ValueError(
                         f"initial_position must have shape (n_dims,) or (n_chains, n_dims). Got shape {initial_position.shape}."
                     )
-                print("Using the provided initial positions for sampling.")
+                logger.info("Using the provided initial positions for sampling.")
             else:
                 raise ValueError(
                     f"initial_position must have shape (n_dims,) or (n_chains, n_dims). Got shape {initial_position.shape}."
@@ -228,15 +215,24 @@ class Jim(object):
         self.sampler.sample(initial_position, {})
 
     def get_samples(
-        self, training: bool = False
+        self,
+        training: bool = False,
+        rng_key: PRNGKeyArray = jax.random.PRNGKey(0),
+        n_samples: int = 0,
     ) -> dict[str, Float[Array, " n_chains n_dims"]]:
         """
-        Get the samples from the sampler
+        Get the samples from the sampler.
 
         Parameters
         ----------
         training : bool, optional
             Whether to get the training samples or the production samples, by default False
+        rng_key : PRNGKeyArray, optional
+            Random key for downsampling, by default jax.random.PRNGKey(0).
+        n_samples : int, optional
+            Number of samples to return after downsampling. If 0 (default), returns all samples.
+            If the requested number exceeds available samples, a warning is logged and all
+            available samples are returned.
 
         Returns
         -------
@@ -256,6 +252,23 @@ class Jim(object):
             chains = chains.data
 
         chains = chains.reshape(-1, self.prior.n_dims)
+
+        # Downsample to requested number of samples
+        n_available = chains.shape[0]
+        if n_samples > 0:
+            if n_samples > n_available:
+                logger.warning(
+                    f"Requested {n_samples} samples but only {n_available} available "
+                    f"after rejection sampling. Returning all available samples."
+                )
+            else:
+                # Randomly select n_samples from the accepted chains
+                rng_key, subkey = jax.random.split(rng_key)
+                indices = jax.random.choice(
+                    subkey, n_available, shape=(n_samples,), replace=False
+                )
+                chains = chains[indices]
+
         chains = jax.vmap(self.add_name)(chains)
         for sample_transform in reversed(self.sample_transforms):
             chains = jax.vmap(sample_transform.backward)(chains)

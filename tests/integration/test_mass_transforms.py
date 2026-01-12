@@ -99,11 +99,11 @@ jim = Jim(
     combine_prior,
     likelihood_transforms=[mass_transform],
     n_chains=10,
-    parameter_names=["M_c", "q"],
-    n_loop_training=2,
-    n_loop_production=2,
-    local_sampler_arg=local_sampler_arg,
+    n_local_steps=10,
+    n_global_steps=10,
+    n_training_loops=2,
+    n_production_loops=2,
+    mala_step_size=step,
 )
 
-jim.sample(jax.random.PRNGKey(0))
-jim.print_summary()
+jim.sample()
