@@ -539,12 +539,16 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         f_max = jnp.max(f_valid)
         f_min = jnp.min(f_valid)
 
-        # Mask based on center frequencies to keep complete bins
+        mask_heterodyne_grid = jnp.where((freq_grid <= f_max) & (freq_grid >= f_min))[0]
+        mask_heterodyne_low = jnp.where(
+            (self.freq_grid_low <= f_max) & (self.freq_grid_low >= f_min)
+        )[0]
         mask_heterodyne_center = jnp.where(
             (self.freq_grid_center <= f_max) & (self.freq_grid_center >= f_min)
         )[0]
+        freq_grid = freq_grid[mask_heterodyne_grid]
+        self.freq_grid_low = self.freq_grid_low[mask_heterodyne_low]
         self.freq_grid_center = self.freq_grid_center[mask_heterodyne_center]
-        self.freq_grid_low = self.freq_grid_low[mask_heterodyne_center]
 
         # Ensure frequency grids all reference the same number of bins
         n_centers = len(self.freq_grid_center)
@@ -1279,7 +1283,7 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
                 tddata = np.fft.irfft(fddata_band)[-Mb:]
                 fddata_shortened = np.fft.rfft(tddata)[Ks : Ke + 1]
 
-                # Apply window and normalization
+                # Apply window and normalization (matches bilby formula)
                 coeffs = (4.0 / db) * window * np.conj(fddata_shortened)
                 coeffs_list.extend(coeffs)
 
