@@ -8,6 +8,7 @@ which provides significant speedup (~20x) compared to standard likelihood evalua
 import time
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
@@ -354,30 +355,34 @@ jim = Jim(
     n_chains=1000,
     n_local_steps=10,
     n_global_steps=1000,
-    n_training_loops=100,
-    n_production_loops=20,
-    n_epochs=20,
-    mala_step_size=mass_matrix * 1e-3,
-    rq_spline_hidden_units=[128, 128],
-    rq_spline_n_bins=10,
-    rq_spline_n_layers=8,
-    learning_rate=1e-3,
-    batch_size=30000,
-    n_max_examples=30000,
-    n_NFproposal_batch_size=100000,
-    local_thinning=1,
-    global_thinning=10,
-    history_window=200,
-    n_temperatures=15,
-    max_temperature=20,
-    n_tempered_steps=-1,
-    verbose=True,
+    n_training_loops=5,
+    n_production_loops=5,
+    # n_epochs=20,
+    # mala_step_size=mass_matrix * 1e-3,
+    # rq_spline_hidden_units=[128, 128],
+    # rq_spline_n_bins=10,
+    # rq_spline_n_layers=8,
+    # learning_rate=1e-3,
+    # batch_size=30000,
+    # n_max_examples=30000,
+    # n_NFproposal_batch_size=100000,
+    # local_thinning=1,
+    # global_thinning=10,
+    # history_window=200,
+    # n_temperatures=15,
+    # max_temperature=20,
+    # n_tempered_steps=-1,
+    # verbose=True,
 )
 
 print("\nStarting sampling...")
 sampling_start = time.time()
 
 jim.sample()
+samples = jim.get_samples()
+print(f"going to save samples:")
+np.savez("samples.npz", **samples)
+print(f"going to save samples DONE.")
 
 sampling_time = time.time() - sampling_start
 total_time = time.time() - total_time_start
