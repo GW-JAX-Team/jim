@@ -165,17 +165,32 @@ class Jim(object):
     def sample_initial_condition(self) -> Float[Array, " n_chains n_dims"]:
         rng_key, subkey = jax.random.split(self.sampler.rng_key)
 
-        initial_position = self.prior.sample(subkey, self.sampler.n_chains)
-        for transform in self.sample_transforms:
-            initial_position = jax.vmap(transform.forward)(initial_position)
-        initial_position = jnp.array(
-            [initial_position[key] for key in self.parameter_names]
-        ).T
+        # Keep resampling until we get all finite values
+        max_attempts = 100
+        attempt = 0
+
+        while attempt < max_attempts:
+            initial_position = self.prior.sample(subkey, self.sampler.n_chains)
+            for transform in self.sample_transforms:
+                initial_position = jax.vmap(transform.forward)(initial_position)
+            initial_position = jnp.array(
+                [initial_position[key] for key in self.parameter_names]
+            ).T
+
+            # Check if all values are finite
+            if jnp.all(jnp.isfinite(initial_position)):
+                break
+
+            # If not all finite, split key and try again
+            attempt += 1
+            if attempt < max_attempts:
+                rng_key, subkey = jax.random.split(rng_key)
+                logger.info(f"Non-finite values in initial position, resampling (attempt {attempt}/{max_attempts})...")
 
         if not jnp.all(jnp.isfinite(initial_position)):
             # Debug information before raising error
             print("=" * 80)
-            print("DEBUG: Non-finite values detected in initial_position")
+            print("DEBUG: Non-finite values detected in initial_position after max attempts")
             print("=" * 80)
             print(f"initial_position shape: {initial_position.shape}")
             print(f"parameter_names: {self.parameter_names}")
@@ -200,7 +215,7 @@ class Jim(object):
             print("=" * 80)
 
             raise ValueError(
-                "Initial positions contain non-finite values (NaN or inf). "
+                f"Initial positions contain non-finite values (NaN or inf) after {max_attempts} attempts. "
                 "Check your priors and transforms for validity."
             )
 
