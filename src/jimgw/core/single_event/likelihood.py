@@ -1033,6 +1033,7 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             return None, None
 
         # Bisection search
+        f = (fmin + fmax) / 2.0
         while fmax - fmin > 1e-2 / duration:
             f = (fmin + fmax) / 2.0
             if _is_above_fnext(f):
@@ -1072,7 +1073,9 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
                 break
 
         # Add final boundary
-        fb_dfb_list.append([self.maximum_frequency + self.delta_f_end, self.delta_f_end])
+        fb_dfb_list.append(
+            [self.maximum_frequency + self.delta_f_end, self.delta_f_end]
+        )
 
         self.durations = jnp.array(durations_list)
         self.fb_dfb = jnp.array(fb_dfb_list)
@@ -1110,7 +1113,9 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             fnext = float(self.fb_dfb[b + 1, 0])
 
             Nb = max(
-                self._round_up_to_power_of_two(int(2.0 * fnext * original_duration + 1)),
+                self._round_up_to_power_of_two(
+                    int(2.0 * fnext * original_duration + 1)
+                ),
                 2**b,
             )
             Nbs_list.append(Nb)
@@ -1201,9 +1206,13 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
 
         window = np.zeros(length)
 
-        increase_start = max(0, min(length, math.floor((fnow - dfnow) / delta_f) - start_idx + 1))
+        increase_start = max(
+            0, min(length, math.floor((fnow - dfnow) / delta_f) - start_idx + 1)
+        )
         unity_start = max(0, min(length, math.ceil(fnow / delta_f) - start_idx))
-        decrease_start = max(0, min(length, math.floor((fnext - dfnext) / delta_f) - start_idx + 1))
+        decrease_start = max(
+            0, min(length, math.floor((fnext - dfnext) / delta_f) - start_idx + 1)
+        )
         decrease_stop = max(0, min(length, math.ceil(fnext / delta_f) - start_idx))
 
         # Unity region
@@ -1218,12 +1227,14 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
 
         # Decreasing taper
         if decrease_start < decrease_stop:
-            frequencies = (np.arange(decrease_start, decrease_stop) + start_idx) * delta_f
+            frequencies = (
+                np.arange(decrease_start, decrease_stop) + start_idx
+            ) * delta_f
             window[decrease_start:decrease_stop] = (
                 1.0 - np.cos(np.pi * (frequencies - fnext) / dfnext)
             ) / 2.0
 
-        return window
+        return jnp.array(window)
 
     def _setup_linear_coefficients(self) -> None:
         """Pre-compute coefficients for (d|h) inner product.
@@ -1239,7 +1250,6 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
         """
         import numpy as np
 
-        original_duration = self.detectors[0].data.duration
         N = int(self.Nbs[-1])
 
         self.linear_coeffs = {}
@@ -1256,7 +1266,9 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             fddata = np.zeros(N // 2 + 1, dtype=complex)
             valid_len = min(len(data_fd), N // 2 + 1)
             mask_valid = freq_mask[:valid_len]
-            fddata[:valid_len][mask_valid] = data_fd[:valid_len][mask_valid] / psd[:valid_len][mask_valid]
+            fddata[:valid_len][mask_valid] = (
+                data_fd[:valid_len][mask_valid] / psd[:valid_len][mask_valid]
+            )
 
             coeffs_list = []
 
@@ -1309,15 +1321,22 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             for b in range(self.number_of_bands):
                 logger.debug(f"Pre-computing quadratic coefficients for band {b}")
 
-                start_idx, end_idx = int(self.start_end_idxs[b, 0]), int(self.start_end_idxs[b, 1])
-                banded_freqs = np.array(self.banded_frequency_points[start_idx : end_idx + 1])
+                start_idx, end_idx = (
+                    int(self.start_end_idxs[b, 0]),
+                    int(self.start_end_idxs[b, 1]),
+                )
+                banded_freqs = np.array(
+                    self.banded_frequency_points[start_idx : end_idx + 1]
+                )
                 prefactor = 4 * float(self.durations[b]) / original_duration
 
                 # Get window for original resolution
                 fnow, dfnow = float(self.fb_dfb[b, 0]), float(self.fb_dfb[b, 1])
                 fnext = float(self.fb_dfb[b + 1, 0])
                 start_idx_orig = math.ceil((fnow - dfnow) * original_duration)
-                window_length = math.floor(fnext * original_duration) - start_idx_orig + 1
+                window_length = (
+                    math.floor(fnext * original_duration) - start_idx_orig + 1
+                )
 
                 window = self._get_window_sequence(
                     1.0 / original_duration, start_idx_orig, window_length, b
@@ -1428,7 +1447,8 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
 
             # Compute (h|h) using pre-computed quadratic coefficients and linear interpolation
             h_inner_h = jnp.sum(
-                jnp.real(strain * jnp.conj(strain)) * self.quadratic_coeffs[detector.name]
+                jnp.real(strain * jnp.conj(strain))
+                * self.quadratic_coeffs[detector.name]
             )
 
             # Accumulate log-likelihood: Re(d|h) - (h|h)/2
