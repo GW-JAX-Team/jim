@@ -173,6 +173,32 @@ class Jim(object):
         ).T
 
         if not jnp.all(jnp.isfinite(initial_position)):
+            # Debug information before raising error
+            print("=" * 80)
+            print("DEBUG: Non-finite values detected in initial_position")
+            print("=" * 80)
+            print(f"initial_position shape: {initial_position.shape}")
+            print(f"parameter_names: {self.parameter_names}")
+            print(f"\nFinite mask:\n{jnp.isfinite(initial_position)}")
+            print(f"\nNumber of non-finite values: {jnp.sum(~jnp.isfinite(initial_position))}")
+
+            # Show statistics for each parameter
+            print("\nPer-parameter statistics:")
+            for i, name in enumerate(self.parameter_names):
+                param_values = initial_position[:, i]
+                n_nonfinite = jnp.sum(~jnp.isfinite(param_values))
+                print(f"  {name}:")
+                print(f"    Non-finite count: {n_nonfinite}/{len(param_values)}")
+                if n_nonfinite > 0:
+                    print(f"    Min (finite): {jnp.min(jnp.where(jnp.isfinite(param_values), param_values, jnp.inf))}")
+                    print(f"    Max (finite): {jnp.max(jnp.where(jnp.isfinite(param_values), param_values, -jnp.inf))}")
+                    print(f"    Has NaN: {jnp.any(jnp.isnan(param_values))}")
+                    print(f"    Has Inf: {jnp.any(jnp.isinf(param_values))}")
+                else:
+                    print(f"    Min: {jnp.min(param_values)}")
+                    print(f"    Max: {jnp.max(param_values)}")
+            print("=" * 80)
+
             raise ValueError(
                 "Initial positions contain non-finite values (NaN or inf). "
                 "Check your priors and transforms for validity."
