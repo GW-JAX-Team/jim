@@ -53,7 +53,6 @@ dagster = [
 
 [dependency-groups]
 dev = [
-    "jimgw",
     "pre-commit>=4.2.0",
     "coverage>=7.7.0",
     "coveralls>=4.0.1",
