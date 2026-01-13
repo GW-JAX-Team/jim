@@ -222,19 +222,19 @@ class Jim(object):
         training: bool = False,
     ) -> dict[str, np.ndarray]:
         """
-        Get the samples from the sampler, with optional weighted resampling.
+        Get the samples from the sampler, with optional uniform downsampling.
 
-        When `n_samples` > 0, performs weighted resampling where each sample is selected
-        with probability proportional to its posterior probability (exponential of log_prob).
-        This helps focus the returned samples on high-probability regions of the posterior.
+        When `n_samples` > 0, performs uniform random downsampling to return a subset
+        of the total samples. This is useful for reducing memory usage when plotting
+        or analyzing large sample sets.
 
         Parameters
         ----------
         n_samples : int, optional
-            Number of samples to return via weighted resampling. If 0, return all samples
+            Number of samples to return via uniform random downsampling. If 0, return all samples
             with transforms applied, by default 0
         rng_key : PRNGKeyArray, optional
-            RNG key for weighted resampling, by default jax.random.PRNGKey(21)
+            RNG key for downsampling, by default jax.random.PRNGKey(21)
         training : bool, optional
             Whether to get the training samples or the production samples, by default False
 
@@ -251,34 +251,24 @@ class Jim(object):
                 chains := self.sampler.resources["positions_training"], Buffer
             )
             chains = chains.data
-
-            assert isinstance(
-                log_probs := self.sampler.resources["log_prob_training"], Buffer
-            )
-            log_probs = log_probs.data
         else:
             assert isinstance(
                 chains := self.sampler.resources["positions_production"], Buffer
             )
             chains = chains.data
 
-            assert isinstance(
-                log_probs := self.sampler.resources["log_prob_production"], Buffer
-            )
-            log_probs = log_probs.data
-
         chains = chains.reshape(-1, self.prior.n_dims)
 
-        # Downsample to requested number of samples
+        # Downsample to requested number of samples (uniform random sampling)
         n_available = chains.shape[0]
         if n_samples > 0:
             if n_samples > n_available:
                 logger.warning(
-                    f"Requested {n_samples} samples but only {n_available} available "
-                    f"after rejection sampling. Returning all available samples."
+                    f"Requested {n_samples} samples but only {n_available} available. "
+                    f"Returning all available samples."
                 )
             else:
-                # Randomly select n_samples from the accepted chains
+                # Uniformly randomly select n_samples from the chains
                 rng_key, subkey = jax.random.split(rng_key)
                 indices = jax.random.choice(
                     subkey, n_available, shape=(n_samples,), replace=False
@@ -288,44 +278,6 @@ class Jim(object):
         chains = jax.vmap(self.add_name)(chains)
         for sample_transform in reversed(self.sample_transforms):
             chains = jax.vmap(sample_transform.backward)(chains)
-
-        if n_samples > 0:
-            n_total_samples = chains[list(chains.keys())[0]].shape[0]
-
-            # If requesting more samples than available, skip resampling
-            if n_samples < n_total_samples:
-                # For large sample sets, do two-stage sampling to avoid OOM
-                # Use adaptive factor based on the ratio of total to requested samples
-                intermediate_factor = max(
-                    10, min(100, n_total_samples // n_samples // 10)
-                )
-                n_intermediate = min(n_samples * intermediate_factor, n_total_samples)
-
-                log_probs_intermediate = log_probs.reshape(-1)
-
-                if n_intermediate < n_total_samples:
-                    # Stage 1: Uniform random downsample to intermediate size
-                    rng_key, subkey = jax.random.split(rng_key)
-                    downsample_indices_1 = jax.random.choice(
-                        subkey, n_total_samples, (n_intermediate,), replace=False
-                    )
-                    log_probs_intermediate = log_probs_intermediate[
-                        downsample_indices_1
-                    ]
-                    chains_intermediate = {
-                        key: val[downsample_indices_1] for key, val in chains.items()
-                    }
-                else:
-                    chains_intermediate = chains
-
-                # Stage 2: Weighted resample from intermediate set
-                downsample_indices_2 = jax.random.categorical(
-                    rng_key, log_probs_intermediate, shape=(n_samples,)
-                )
-                chains = {
-                    key: val[downsample_indices_2]
-                    for key, val in chains_intermediate.items()
-                }
 
         # Convert to numpy arrays for compatibility with plotting and serialization
         chains = {key: np.array(val) for key, val in chains.items()}
