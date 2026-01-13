@@ -259,4 +259,3 @@ try:
     fig.savefig("test.png")
 except ImportError:
     print("corner not installed, skipping corner plot")
-    pass
