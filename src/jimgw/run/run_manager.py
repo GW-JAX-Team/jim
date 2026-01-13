@@ -51,11 +51,11 @@ class RunManager:
 
     ### Data-fetching functions ###
 
-    def get_chain_samples(
-        self, training: bool = False
-    ) -> dict[str, Float[Array, "n_chains n_dims"]]:
+    def get_chain_samples(self, training: bool = False) -> dict[str, np.ndarray]:
         """
         Fetch the samples from the sampler.
+
+        Returns numpy arrays (can be saved directly with np.savez).
         """
         return self.jim.get_samples(training=training)
 

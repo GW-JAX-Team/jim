@@ -1,4 +1,4 @@
-from typing import Sequence, Optional, Literal
+from typing import Sequence, Optional
 import logging
 import jax
 import jax.numpy as jnp
@@ -220,8 +220,7 @@ class Jim(object):
         n_samples: int = 0,
         rng_key: PRNGKeyArray = jax.random.PRNGKey(21),
         training: bool = False,
-        output_type: Literal["jax", "numpy"] = "numpy",
-    ) -> dict[str, Float[Array, " n_chains n_dims"]]:
+    ) -> dict[str, np.ndarray]:
         """
         Get the samples from the sampler, with optional weighted resampling.
 
@@ -238,16 +237,13 @@ class Jim(object):
             RNG key for weighted resampling, by default jax.random.PRNGKey(21)
         training : bool, optional
             Whether to get the training samples or the production samples, by default False
-        output_type : Literal["jax", "numpy"], optional
-            Type of array to return. If "numpy", converts JAX arrays to numpy arrays.
-            If "jax", returns JAX arrays, by default "numpy"
 
         Returns
         -------
-        dict
-            Dictionary of samples with parameter names as keys and sample arrays as values.
+        dict[str, np.ndarray]
+            Dictionary of samples with parameter names as keys and numpy array values.
             All sample transforms are reversed to return samples in the prior parameter space.
-            Arrays are either numpy.ndarray or jax.Array depending on output_type.
+            Returns numpy arrays for compatibility with plotting libraries and easy serialization.
 
         """
         if training:
@@ -300,7 +296,9 @@ class Jim(object):
             if n_samples < n_total_samples:
                 # For large sample sets, do two-stage sampling to avoid OOM
                 # Use adaptive factor based on the ratio of total to requested samples
-                intermediate_factor = max(10, min(100, n_total_samples // n_samples // 10))
+                intermediate_factor = max(
+                    10, min(100, n_total_samples // n_samples // 10)
+                )
                 n_intermediate = min(n_samples * intermediate_factor, n_total_samples)
 
                 log_probs_intermediate = log_probs.reshape(-1)
@@ -311,7 +309,9 @@ class Jim(object):
                     downsample_indices_1 = jax.random.choice(
                         subkey, n_total_samples, (n_intermediate,), replace=False
                     )
-                    log_probs_intermediate = log_probs_intermediate[downsample_indices_1]
+                    log_probs_intermediate = log_probs_intermediate[
+                        downsample_indices_1
+                    ]
                     chains_intermediate = {
                         key: val[downsample_indices_1] for key, val in chains.items()
                     }
@@ -327,7 +327,7 @@ class Jim(object):
                     for key, val in chains_intermediate.items()
                 }
 
-        if output_type == "numpy":
-            chains = {key: np.array(val) for key, val in chains.items()}
+        # Convert to numpy arrays for compatibility with plotting and serialization
+        chains = {key: np.array(val) for key, val in chains.items()}
 
         return chains
