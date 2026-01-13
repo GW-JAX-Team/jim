@@ -162,12 +162,12 @@ sample_transforms = [
     BoundToUnbound(
         name_mapping=(["s1_mag"], ["s1_mag_unbounded"]),
         original_lower_bound=0.0,
-        original_upper_bound=0.99,
+        original_upper_bound=1.0,
     ),
     BoundToUnbound(
         name_mapping=(["s2_mag"], ["s2_mag_unbounded"]),
         original_lower_bound=0.0,
-        original_upper_bound=0.99,
+        original_upper_bound=1.0,
     ),
     BoundToUnbound(
         name_mapping=(["phase_det"], ["phase_det_unbounded"]),
@@ -234,7 +234,11 @@ jim = Jim(
     verbose=True,
 )
 #
+start_time = time.time()
 jim.sample()
+end_time = time.time()
+sample_time_mins = (end_time - start_time)/60
+print(f"Sampling took {sample_time_mins:.2f} mins")
 
 print("Done!")
 
@@ -243,10 +247,13 @@ print(jnp.mean(logprob))
 
 chains = jim.get_samples()
 
-import numpy as np
-import corner
+try:
+    import numpy as np
+    import corner
 
-fig = corner.corner(
-    np.stack([chains[key] for key in jim.prior.parameter_names]).T[::10]
-)
-fig.savefig("test")
+    fig = corner.corner(
+        np.stack([chains[key] for key in jim.prior.parameter_names]).T[::10]
+    )
+    fig.savefig("test.png")
+except ImportError:
+    print("corner not installed, skipping corner plot")
