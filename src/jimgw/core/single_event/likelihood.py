@@ -484,7 +484,9 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
 
         if reference_parameters:
             self.reference_parameters = reference_parameters.copy()
-            logger.info(f"Reference parameters provided, which are {self.reference_parameters}")
+            logger.info(
+                f"Reference parameters provided, which are {self.reference_parameters}"
+            )
         elif prior:
             logger.info("No reference parameters are provided, finding it...")
             reference_parameters = self.maximize_likelihood(
@@ -494,7 +496,9 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
                 popsize=popsize,
                 n_steps=n_steps,
             )
-            self.reference_parameters = {key: float(value) for key, value in reference_parameters.items()}
+            self.reference_parameters = {
+                key: float(value) for key, value in reference_parameters.items()
+            }
             logger.info(f"The reference parameters are {self.reference_parameters}")
         else:
             raise ValueError(
@@ -554,7 +558,9 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         freq_grid = freq_grid[start_idx:end_idx]
 
         h_sky_low = reference_waveform(self.freq_grid_low, self.reference_parameters)
-        h_sky_center = reference_waveform(self.freq_grid_center, self.reference_parameters)
+        h_sky_center = reference_waveform(
+            self.freq_grid_center, self.reference_parameters
+        )
 
         for detector in self.detectors:
             # Get the reference waveforms
