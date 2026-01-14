@@ -38,6 +38,7 @@ def jim_sampler():
         n_training_loops=1,
         n_production_loops=1,
         n_epochs=1,
+        global_thinning=1,
     )
 
     # Mock the sampler resources instead of running sample()
@@ -73,12 +74,12 @@ def test_get_samples_returns_numpy(jim_sampler):
 
     assert isinstance(samples, dict)
     for key, val in samples.items():
-        assert isinstance(
-            val, np.ndarray
-        ), f"Expected numpy.ndarray, got {type(val)} for key {key}"
-        assert not isinstance(
-            val, jax.Array
-        ), f"Should return numpy arrays, not JAX arrays for key {key}"
+        assert isinstance(val, np.ndarray), (
+            f"Expected numpy.ndarray, got {type(val)} for key {key}"
+        )
+        assert not isinstance(val, jax.Array), (
+            f"Should return numpy arrays, not JAX arrays for key {key}"
+        )
 
 
 def test_get_samples_shape(jim_sampler):

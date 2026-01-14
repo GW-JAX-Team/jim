@@ -1,9 +1,7 @@
 import jax
 import jax.numpy as jnp
-
 import numpy as np
 from itertools import combinations
-from pathlib import Path
 
 from jimgw.core.transforms import (
     ScaleTransform,
@@ -24,8 +22,8 @@ from jimgw.core.single_event.transforms import (
     SkyFrameToDetectorFrameSkyPositionTransform,
 )
 
-from jimgw.core.single_event.utils import m1_m2_to_Mc_q
 from jimgw.core.single_event.detector import get_detector_preset
+from tests.utils import common_keys_allclose
 
 jax.config.update("jax_enable_x64", True)
 
@@ -34,33 +32,6 @@ detector_preset = get_detector_preset()
 H1 = detector_preset["H1"]
 L1 = detector_preset["L1"]
 V1 = detector_preset["V1"]
-
-
-def common_keys_allclose(
-    dict_1: dict, dict_2: dict, atol: float = 1e-8, rtol: float = 1e-5
-):
-    """
-    Check the common values between two result dictionaries are close.
-
-    Parameters
-    ----------
-    dict_1 : dict
-        Result dictionary from the 1st transform.
-    dict_2 : dict
-        Result dictionary from the 2nd transform.
-    atol : float
-        Absolute tolerance between the two values, default 1e-8.
-    rtol : float
-        Relative tolerance between the two values, default 1e-5.
-
-    The default values for atol and rtol here follows those
-    in jax.numpy.isclose, for their definitions, see e.g.:
-    https://docs.jax.dev/en/latest/_autosummary/jax.numpy.isclose.html
-    """
-    common_keys = set.intersection({*dict_1.keys()}, {*dict_2.keys()})
-    tuples = jnp.array([[dict_1[key], dict_2[key]] for key in common_keys])
-    tuple_array = jnp.swapaxes(tuples, 0, 1)
-    return jnp.allclose(*tuple_array, atol=atol, rtol=rtol)
 
 
 class TestBasicTransforms:
@@ -418,7 +389,7 @@ class TestDistanceTransform:
         )
         forward_transform_output, _ = jax.vmap(distance_transform.transform)(inputs)
         output, _ = jax.vmap(distance_transform.inverse)(forward_transform_output)
-        assert jnp.allclose(output["d_L"], dL)
+        assert np.allclose(output["d_L"], dL)
         # default atol: 1e-8, rtol: 1e-5
 
     def test_jitted_forward_transform(self):
@@ -490,9 +461,7 @@ class TestDistanceTransform:
             psi[0],
             iota[0],
         ]
-        sample_dict = dict(
-            zip(["d_hat", "M_c", "ra", "dec", "psi", "iota"], sample)
-        )
+        sample_dict = dict(zip(["d_hat", "M_c", "ra", "dec", "psi", "iota"], sample))
 
         # Create a JIT compiled version of the transform.
         jit_inverse_transform = jax.jit(
@@ -658,67 +627,6 @@ class TestSpinAnglesToCartesianSpinTransform:
         "phase_c",
     )
 
-    def test_forward_spin_transform(self):
-        """
-        Test transformation from spin angles to cartesian spins
-
-        """
-        input_dir = Path("test/unit/source_files/spin_angles_input")
-        output_dir = Path("test/unit/source_files/cartesian_spins_output_for_bilby")
-        input_files = input_dir.glob("*.npz")
-
-        for file in input_files:
-            input_dict = dict(jnp.load(file).items())
-            fRef = int(input_dict.pop("fRef")[0])
-            print("Testing forward transform for fRef =", fRef)
-
-            m_1 = input_dict.pop("m_1")
-            m_2 = input_dict.pop("m_2")
-            M_c, q = m1_m2_to_Mc_q(m_1, m_2)
-            input_dict["M_c"] = M_c
-            input_dict["q"] = q
-
-            # read outputs from binary
-            output_file = list(output_dir.glob(f"*fRef_{fRef}*.npz"))[0]
-            bilby_spins = dict(jnp.load(output_file).items())
-
-            transform = SpinAnglesToCartesianSpinTransform(freq_ref=fRef)
-            jimgw_spins, jacobian = jax.vmap(transform.transform)(input_dict)
-
-            assert common_keys_allclose(jimgw_spins, bilby_spins)
-            assert not jnp.isnan(jacobian).any()
-
-    def test_backward_spin_transform(self):
-        """
-        Test transformation from cartesian spins to spin angles
-
-        """
-        input_dir = Path("test/unit/source_files/cartesian_spins_input")
-        output_dir = Path("test/unit/source_files/spin_angles_output_for_bilby")
-        input_files = input_dir.glob("*.npz")
-
-        for file in input_files:
-            input_dict = dict(jnp.load(file).items())
-            fRef = int(input_dict.pop("fRef")[0])
-            print("Testing backward transform for fRef =", fRef)
-
-            m_1 = input_dict.pop("m_1")
-            m_2 = input_dict.pop("m_2")
-            M_c, q = m1_m2_to_Mc_q(m_1, m_2)
-            input_dict["M_c"] = M_c
-            input_dict["q"] = q
-
-            # read outputs from binary
-            output_file = list(output_dir.glob(f"*fRef_{fRef}*.npz"))[0]
-            bilby_spins = dict(jnp.load(output_file).items())
-
-            transform = SpinAnglesToCartesianSpinTransform(freq_ref=fRef)
-            jimgw_spins, jacobian = jax.vmap(transform.inverse)(input_dict)
-
-            # default atol: 1e-8, rtol: 1e-5
-            assert common_keys_allclose(jimgw_spins, bilby_spins)
-            assert not jnp.isnan(jacobian).any()
-
     def test_forward_backward_consistency(self):
         """
         Test that the forward and inverse transformations are consistent
@@ -756,7 +664,7 @@ class TestSpinAnglesToCartesianSpinTransform:
             ).transform(jimgw_spins)
             jimgw_spins = jnp.array(list(jimgw_spins.values()))
             # default atol: 1e-8, rtol: 1e-5
-            assert jnp.allclose(jimgw_spins, jnp.array([*sample[7:], *sample[:7]]))
+            assert np.allclose(jimgw_spins, jnp.array([*sample[7:], *sample[:7]]))
 
     def test_jitted_forward_transform(self):
         """
@@ -854,38 +762,6 @@ class TestSpinAnglesToCartesianSpinTransform:
 
 
 class TestSkyFrameToDetectorFrameSkyPositionTransform:
-    # This was the custom tolerance for RA as Bilby and Jim use different
-    # algorithm to compute gmst, which induces errors to RA, and this
-    # was the minimum precision that passes.
-    # In the latter version, Jim has adopted the Bilby/LAL algorithm to
-    # compute gmst, and the agreement is at the level of 0.0, which
-    # renders this tolerance obsolete.
-    # RA_ATOL = 5e-5
-
-    def test_backward_transform(self):
-        """
-        Test the backward transformation from spherical to detector frame sky position with different sets of detectors
-        """
-        input_dir = Path("test/unit/source_files/sky_locations")
-        files = input_dir.glob("*.npz")
-        for file in files:
-            data = jnp.load(file, allow_pickle=True)
-
-            bilby_outputs = {key: data[key] for key in ("ra", "dec")}
-            zenith_azimuth = {key: data[key] for key in ("zenith", "azimuth")}
-            ifos = [get_detector_preset()[ifo_name] for ifo_name in data["ifo_pair"]]
-
-            transform = SkyFrameToDetectorFrameSkyPositionTransform(
-                gps_time=data["gps_time"],
-                ifos=ifos,
-            )
-            # test the forward transform
-            jim_outputs, jacobian = jax.vmap(transform.inverse)(zenith_azimuth)
-
-            assert jnp.allclose(jim_outputs["ra"], bilby_outputs["ra"])
-            assert jnp.allclose(jim_outputs["dec"], bilby_outputs["dec"])
-            assert not jnp.isnan(jacobian).any()
-
     def test_forward_backward_consistency(self):
         """
         Test that the forward and inverse transformations are consistent
@@ -914,7 +790,6 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
 
                 # default atol: 1e-8, rtol: 1e-5
                 assert common_keys_allclose(outputs, inputs)
-                # best accuracy for zenith and azimuth is 1e-16
 
     def test_jitted_forward_transform(self):
         """

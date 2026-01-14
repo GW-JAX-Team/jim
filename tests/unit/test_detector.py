@@ -196,18 +196,8 @@ class TestDataInterface:
         # Check that data with noise differs from zero-noise data
         # (they should differ due to the noise component)
         assert not jnp.allclose(
-            detector.sliced_fd_data, detector_with_noise.sliced_fd_data,
-            rtol=1e-05, atol=1e-23
+            detector.sliced_fd_data,
+            detector_with_noise.sliced_fd_data,
+            rtol=1e-05,
+            atol=1e-23,
         )
-
-    # def test_user_provide_data(self):
-
-    #     detector = H1
-    #     with pytest.raises(AssertionError):
-    #         detector.data.frequency_slice(20., 2048.)
-
-    #     detector.set_data(data)
-    #     detector.set_psd(psd)
-    #     assert detector.data.frequency_slice(0., 0.5)
-    #     with pytest.raises(AssertionError):
-    #         assert detector.data.frequency_slice(0., 2048.)
