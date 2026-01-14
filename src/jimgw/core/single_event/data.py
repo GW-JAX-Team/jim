@@ -353,7 +353,7 @@ class Data(ABC):
         td = data["td"]
         dt = float(data["dt"])
         epoch = float(data["epoch"])
-        assert isinstance(name := data["name"], str), "Name must be a string"
+        name = str(data["name"])
         return cls(td, dt, epoch, name)
 
     def to_file(self, path: str):
@@ -546,7 +546,7 @@ class PowerSpectrum(ABC):
             raise ValueError("The file must contain 'values' and 'frequencies' keys.")
         values = data["values"]
         frequencies = data["frequencies"]
-        name = data.get("name", "")
+        name = str(data.get("name", ""))
         return cls(values, frequencies, name)
 
     def to_file(self, path: str):
