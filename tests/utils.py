@@ -90,12 +90,12 @@ def common_keys_allclose(
 
 # Cross-validation specific utilities
 def check_bilby_available() -> None:
-    """Check if bilby and lalsimulation are available.
+    """Check if bilby is available.
 
     This is used by cross-validation tests to skip when bilby is not installed.
 
     Raises:
-        ImportError: If bilby or lalsimulation cannot be imported.
+        ImportError: If bilby cannot be imported.
     """
     try:
         import bilby  # noqa: F401
