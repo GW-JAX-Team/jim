@@ -78,7 +78,7 @@ class TestBaseTransientLikelihoodFD:
         ifos = [get_H1(), get_L1()]
         for ifo in ifos:
             psd = PowerSpectrum.from_file(
-                str(FIXTURES_DIR / f"gw150914_psd_{ifo.name}.npz")
+                str(FIXTURES_DIR / f"GW150914_psd_{ifo.name}.npz")
             )
             ifo.set_psd(psd)
             # Intentionally not setting data
@@ -102,7 +102,7 @@ class TestBaseTransientLikelihoodFD:
         # Add a detector with PSD but no data
         new_detector = get_H1()
         psd = PowerSpectrum.from_file(
-            str(FIXTURES_DIR / f"gw150914_psd_{new_detector.name}.npz")
+            str(FIXTURES_DIR / f"GW150914_psd_{new_detector.name}.npz")
         )
         new_detector.set_psd(psd)
         # Intentionally not setting data for this detector
@@ -126,7 +126,7 @@ class TestBaseTransientLikelihoodFD:
         # Create detectors with data but no PSD
         ifos = [get_H1(), get_L1()]
         for ifo in ifos:
-            data = Data.from_file(str(FIXTURES_DIR / f"gw150914_strain_{ifo.name}.npz"))
+            data = Data.from_file(str(FIXTURES_DIR / f"GW150914_strain_{ifo.name}.npz"))
             ifo.set_data(data)
             # Intentionally not setting PSD
 
@@ -149,7 +149,7 @@ class TestBaseTransientLikelihoodFD:
         # Add a detector with data but no PSD
         new_detector = get_H1()
         data = Data.from_file(
-            str(FIXTURES_DIR / f"gw150914_strain_{new_detector.name}.npz")
+            str(FIXTURES_DIR / f"GW150914_strain_{new_detector.name}.npz")
         )
         new_detector.set_data(data)
         # Intentionally not setting PSD for this detector
