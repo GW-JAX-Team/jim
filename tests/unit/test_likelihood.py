@@ -1,7 +1,7 @@
 import jax
+import jax.numpy as jnp
 import pytest
 from pathlib import Path
-from tests.utils import assert_finite, assert_allclose
 from jimgw.core.single_event.likelihood import (
     ZeroLikelihood,
     BaseTransientLikelihoodFD,
@@ -174,16 +174,15 @@ class TestBaseTransientLikelihoodFD:
         params = example_params(likelihood.gmst)
 
         log_likelihood = likelihood.evaluate(params, {})
-        assert_finite(log_likelihood, "Log likelihood should be finite")
+        assert jnp.isfinite(log_likelihood), "Log likelihood should be finite"
 
         log_likelihood_jit = jax.jit(likelihood.evaluate)(params, {})
-        assert_finite(log_likelihood_jit, "Log likelihood should be finite")
+        assert jnp.isfinite(log_likelihood_jit), "Log likelihood should be finite"
 
-        assert_allclose(
+        assert jnp.allclose(
             log_likelihood,
             log_likelihood_jit,
-            msg="JIT and non-JIT results should match",
-        )
+        ), "JIT and non-JIT results should match"
 
         likelihood = BaseTransientLikelihoodFD(
             detectors=ifos,
@@ -193,17 +192,15 @@ class TestBaseTransientLikelihoodFD:
             trigger_time=gps,
         )
         log_likelihood_diff_fmin = likelihood.evaluate(params, {})
-        assert_finite(
-            log_likelihood_diff_fmin,
-            "Log likelihood with different f_min should be finite",
+        assert jnp.isfinite(log_likelihood_diff_fmin), (
+            "Log likelihood with different f_min should be finite"
         )
 
-        assert_allclose(
+        assert jnp.allclose(
             log_likelihood,
             log_likelihood_diff_fmin,
             atol=1e-2,
-            msg="Log likelihoods should be close with small differences",
-        )
+        ), "Log likelihoods should be close with small differences"
 
 
 class TestHeterodynedTransientLikelihoodFD:
@@ -229,12 +226,13 @@ class TestHeterodynedTransientLikelihoodFD:
         # Test evaluation at reference parameters
         params = example_params(likelihood.gmst)
         result = likelihood.evaluate(params, {})
-        assert_finite(result, "Heterodyned likelihood should be finite")
+        assert jnp.isfinite(result), "Heterodyned likelihood should be finite"
 
         # Test that heterodyned likelihood matches base likelihood at reference parameters
         base_result = base_likelihood.evaluate(params, {})
-        assert_allclose(
+        assert jnp.allclose(
             result,
             base_result,
-            msg=f"Heterodyned likelihood ({result}) should match base likelihood ({base_result}) at reference parameters",
+        ), (
+            f"Heterodyned likelihood ({result}) should match base likelihood ({base_result}) at reference parameters"
         )

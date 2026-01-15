@@ -34,35 +34,6 @@ def assert_all_in_range(arr, low, high):
     assert jnp.all((arr >= low) & (arr <= high)), f"Values not in [{low}, {high}]"
 
 
-def assert_finite(value, msg="Value should be finite"):
-    """Assert a scalar value is finite.
-
-    Args:
-        value: Scalar value to check.
-        msg: Custom error message.
-
-    Raises:
-        AssertionError: If value is not finite (NaN or inf).
-    """
-    assert jnp.isfinite(value), msg
-
-
-def assert_allclose(actual, expected, rtol=1e-5, atol=1e-8, msg="Arrays not close"):
-    """Assert two arrays are close with custom message.
-
-    Args:
-        actual: Actual values.
-        expected: Expected values.
-        rtol: Relative tolerance.
-        atol: Absolute tolerance.
-        msg: Custom error message.
-
-    Raises:
-        AssertionError: If arrays are not close.
-    """
-    assert jnp.allclose(actual, expected, rtol=rtol, atol=atol), msg
-
-
 def common_keys_allclose(
     dict_1: dict, dict_2: dict, atol: float = 1e-8, rtol: float = 1e-5
 ):
