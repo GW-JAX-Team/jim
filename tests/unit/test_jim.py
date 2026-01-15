@@ -162,6 +162,54 @@ class TestGetSamples:
             assert isinstance(training_samples[key], np.ndarray)
             assert isinstance(production_samples[key], np.ndarray)
 
+    def test_get_samples_with_sample_transforms(self, mock_likelihood, gw_prior):
+        """Test get_samples with sample transforms applied."""
+        transform = BoundToUnbound(
+            name_mapping=[["M_c"], ["M_c_unbounded"]],
+            original_lower_bound=10.0,
+            original_upper_bound=80.0,
+        )
+
+        jim = Jim(
+            likelihood=mock_likelihood,
+            prior=gw_prior,
+            sample_transforms=[transform],
+            rng_key=jax.random.PRNGKey(42),
+            n_chains=10,
+            n_local_steps=5,
+            n_global_steps=5,
+            n_training_loops=1,
+            n_production_loops=1,
+            n_epochs=1,
+            global_thinning=1,
+        )
+
+        # Mock sampler resources
+        n_loops = 2
+        n_chains = 10
+        n_dims = 2  # M_c_unbounded and q
+
+        mock_positions = jnp.ones((n_loops, n_chains, n_dims)) * 0.5
+
+        production_buffer = Buffer(
+            name="positions_production", shape=(n_loops, n_chains, n_dims)
+        )
+        production_buffer.data = mock_positions
+        jim.sampler.resources["positions_production"] = production_buffer
+
+        samples = jim.get_samples()
+
+        # Check that untransformed parameter names are returned
+        assert isinstance(samples, dict)
+        assert "M_c" in samples  # Should get original parameter name
+        assert "q" in samples
+        assert "M_c_unbounded" not in samples  # Transformed name should not appear
+
+        # All should be numpy arrays
+        for val in samples.values():
+            assert isinstance(val, np.ndarray)
+            assert_all_finite(val)
+
 
 class TestJimInitialization:
     """Test Jim sampler initialization."""
@@ -315,6 +363,68 @@ class TestJimPosteriorEvaluation:
         log_posterior = jim.evaluate_posterior(samples_invalid, {})
 
         assert log_posterior == -jnp.inf
+
+    def test_evaluate_posterior_with_likelihood_transforms(self, gw_prior):
+        """Test posterior evaluation with likelihood transforms applied."""
+        from jimgw.core.single_event.transforms import (
+            MassRatioToSymmetricMassRatioTransform,
+        )
+
+        # Create a mock likelihood that expects 'eta' instead of 'q'
+        class EtaLikelihood:
+            def evaluate(self, params, data):
+                # Check that eta is present (not q)
+                assert "eta" in params
+                assert "M_c" in params
+                # Simple likelihood: sum of transformed parameters
+                return params["M_c"] + params["eta"]
+
+        jim = Jim(
+            likelihood=EtaLikelihood(),
+            prior=gw_prior,
+            likelihood_transforms=[MassRatioToSymmetricMassRatioTransform],
+            n_chains=5,
+            n_local_steps=2,
+            n_global_steps=2,
+            global_thinning=1,
+        )
+
+        # Sample in M_c, q space (prior space)
+        samples_valid = jnp.array([30.0, 0.5])
+        log_posterior = jim.evaluate_posterior(samples_valid, {})
+
+        # Should be finite since transform should convert q to eta
+        assert jnp.isfinite(log_posterior)
+
+    def test_evaluate_posterior_with_sample_transforms(self, mock_likelihood, gw_prior):
+        """Test posterior evaluation with sample transforms applied."""
+        transform = BoundToUnbound(
+            name_mapping=[["M_c"], ["M_c_unbounded"]],
+            original_lower_bound=10.0,
+            original_upper_bound=80.0,
+        )
+
+        jim = Jim(
+            likelihood=mock_likelihood,
+            prior=gw_prior,
+            sample_transforms=[transform],
+            n_chains=5,
+            n_local_steps=2,
+            n_global_steps=2,
+            global_thinning=1,
+        )
+
+        # Verify that parameter names have been updated with transformed names
+        assert "M_c_unbounded" in jim.parameter_names
+        assert "q" in jim.parameter_names
+
+        # Sample in transformed space (M_c_unbounded, q)
+        # The sample space has M_c transformed to unbounded, q stays as is
+        samples_transformed = jnp.array([0.5, 0.6])
+        log_posterior = jim.evaluate_posterior(samples_transformed, {})
+
+        # Should be finite - the transform chain converts M_c_unbounded back to M_c for prior/likelihood evaluation
+        assert jnp.isfinite(log_posterior)
 
 
 class TestJimUtilityMethods:
