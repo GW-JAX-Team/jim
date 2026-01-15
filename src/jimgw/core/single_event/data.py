@@ -531,7 +531,6 @@ class PowerSpectrum(ABC):
         noise_imag = jax.random.normal(subkey, shape=var.shape) * jnp.sqrt(var)
         return noise_real + 1j * noise_imag
 
-    # TODO: Add function to save to file and load data from file.
     @classmethod
     def from_file(cls, path: str) -> Self:
         """Load power spectrum from a file. This assumes the data to be in .npz format.
