@@ -210,6 +210,26 @@ class TestGetSamples:
             assert isinstance(val, np.ndarray)
             assert_all_finite(val)
 
+    def test_get_samples_warning_when_requesting_more_than_available(
+        self, jim_sampler, caplog
+    ):
+        """Test that get_samples logs a warning when requesting more samples than available."""
+        # jim_sampler has 20 total samples (2 loops * 10 chains)
+        n_available = 20
+
+        # Request more than available
+        with caplog.at_level("WARNING"):
+            samples = jim_sampler.get_samples(n_samples=100)
+
+        # Check that warning was logged
+        assert any(
+            "Requested 100 samples" in record.message and f"only {n_available} available" in record.message
+            for record in caplog.records
+        )
+
+        # Should return all available samples
+        assert samples["M_c"].shape[0] == n_available
+
 
 class TestJimInitialization:
     """Test Jim sampler initialization."""
@@ -548,3 +568,116 @@ class TestJimUtilityMethods:
         # Both columns should contain finite values from the transformed space
         # M_c_unbounded can be any finite value (unbounded)
         # q is still in the dict but ordered according to parameter_names
+
+    def test_sample_initial_condition_raises_on_non_finite(self, mock_likelihood):
+        """Test that sample_initial_condition raises ValueError on non-finite samples."""
+        # Create a prior that produces NaN values
+        class BadPrior:
+            n_dims = 2
+            parameter_names = ("param1", "param2")
+
+            def sample(self, rng_key, n_samples):
+                # Return dict with NaN values
+                return {
+                    "param1": jnp.full(n_samples, jnp.nan),
+                    "param2": jnp.full(n_samples, jnp.nan),
+                }
+
+        jim = Jim(
+            likelihood=mock_likelihood,
+            prior=BadPrior(),
+            rng_key=jax.random.PRNGKey(42),
+            n_chains=5,
+            n_local_steps=2,
+            n_global_steps=2,
+            global_thinning=1,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Initial positions contain non-finite values.*Check your priors and transforms",
+        ):
+            jim.sample_initial_condition()
+
+
+class TestJimSampleMethod:
+    """Test the sample method validation without running expensive sampling."""
+
+    def test_sample_raises_on_wrong_1d_shape(self, mock_likelihood, gw_prior, monkeypatch):
+        """Test that sample raises ValueError with wrong 1D shape."""
+        jim = Jim(
+            likelihood=mock_likelihood,
+            prior=gw_prior,
+            n_chains=5,
+            n_local_steps=2,
+            n_global_steps=2,
+            global_thinning=1,
+        )
+
+        # Mock out the expensive sampler.sample() call
+        def mock_sample(initial_position, data):
+            pass
+
+        monkeypatch.setattr(jim.sampler, "sample", mock_sample)
+
+        # Wrong number of dimensions (3 instead of 2)
+        initial_pos = jnp.array([30.0, 0.5, 0.8])
+
+        with pytest.raises(
+            ValueError,
+            match="initial_position must have shape.*Got shape",
+        ):
+            jim.sample(initial_position=initial_pos)
+
+    def test_sample_raises_on_wrong_2d_shape(self, mock_likelihood, gw_prior, monkeypatch):
+        """Test that sample raises ValueError with wrong 2D shape."""
+        jim = Jim(
+            likelihood=mock_likelihood,
+            prior=gw_prior,
+            n_chains=5,
+            n_local_steps=2,
+            n_global_steps=2,
+            global_thinning=1,
+        )
+
+        # Mock out the expensive sampler.sample() call
+        def mock_sample(initial_position, data):
+            pass
+
+        monkeypatch.setattr(jim.sampler, "sample", mock_sample)
+
+        # Wrong shape: (3, 2) instead of (5, 2)
+        initial_pos = jnp.ones((3, 2))
+
+        with pytest.raises(
+            ValueError,
+            match="initial_position must have shape.*Got shape",
+        ):
+            jim.sample(initial_position=initial_pos)
+
+    def test_sample_raises_on_3d_initial_position(self, mock_likelihood, gw_prior, monkeypatch):
+        """Test that sample raises ValueError with 3D initial position."""
+        jim = Jim(
+            likelihood=mock_likelihood,
+            prior=gw_prior,
+            n_chains=5,
+            n_local_steps=2,
+            n_global_steps=2,
+            global_thinning=1,
+        )
+
+        # Mock out the expensive sampler.sample() call
+        def mock_sample(initial_position, data):
+            pass
+
+        monkeypatch.setattr(jim.sampler, "sample", mock_sample)
+
+        # 3D array is not supported
+        initial_pos = jnp.ones((5, 2, 3))
+
+        with pytest.raises(
+            ValueError,
+            match="initial_position must have shape.*Got shape",
+        ):
+            jim.sample(initial_position=initial_pos)
+
