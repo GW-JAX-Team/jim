@@ -15,7 +15,7 @@ from jimgw.core.constants import (
     EARTH_SEMI_MINOR_AXIS,
     DEG_TO_RAD,
 )
-from jimgw.core.single_event.wave import Polarization
+from jimgw.core.single_event.polarization import Polarization
 from jimgw.core.single_event.data import Data, PowerSpectrum
 from jimgw.core.single_event.utils import inner_product, complex_inner_product
 
