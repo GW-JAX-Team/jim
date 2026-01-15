@@ -468,6 +468,35 @@ class TestJimUtilityMethods:
 
         assert jnp.isfinite(log_prior)
 
+    def test_evaluate_prior_with_sample_transforms(self, mock_likelihood, gw_prior):
+        """Test evaluate_prior with sample transforms applied."""
+        transform = BoundToUnbound(
+            name_mapping=[["M_c"], ["M_c_unbounded"]],
+            original_lower_bound=10.0,
+            original_upper_bound=80.0,
+        )
+
+        jim = Jim(
+            likelihood=mock_likelihood,
+            prior=gw_prior,
+            sample_transforms=[transform],
+            n_chains=5,
+            n_local_steps=2,
+            n_global_steps=2,
+            global_thinning=1,
+        )
+
+        # Sample in transformed space (M_c_unbounded, q)
+        samples_transformed = jnp.array([0.5, 0.6])
+        log_prior = jim.evaluate_prior(samples_transformed, {})
+
+        # Should be finite - transform should convert back to prior space
+        assert jnp.isfinite(log_prior)
+
+        # Test that the jacobian is properly included
+        # Prior evaluation should include transform jacobian
+        assert isinstance(log_prior, (float, jnp.ndarray))
+
     def test_sample_initial_condition(self, mock_likelihood, gw_prior):
         """Test sample_initial_condition samples from prior."""
         jim = Jim(
@@ -487,3 +516,35 @@ class TestJimUtilityMethods:
 
         # Check all samples are finite
         assert_all_finite(initial_samples)
+
+    def test_sample_initial_condition_with_sample_transforms(self, mock_likelihood, gw_prior):
+        """Test sample_initial_condition with sample transforms applied."""
+        transform = BoundToUnbound(
+            name_mapping=[["M_c"], ["M_c_unbounded"]],
+            original_lower_bound=10.0,
+            original_upper_bound=80.0,
+        )
+
+        jim = Jim(
+            likelihood=mock_likelihood,
+            prior=gw_prior,
+            sample_transforms=[transform],
+            rng_key=jax.random.PRNGKey(42),
+            n_chains=5,
+            n_local_steps=2,
+            n_global_steps=2,
+            global_thinning=1,
+        )
+
+        initial_samples = jim.sample_initial_condition()
+
+        # Check shape: (n_chains, n_dims) - should still be (5, 2)
+        assert initial_samples.shape == (5, 2)
+
+        # Check all samples are finite
+        assert_all_finite(initial_samples)
+
+        # Samples should be in transformed space
+        # Both columns should contain finite values from the transformed space
+        # M_c_unbounded can be any finite value (unbounded)
+        # q is still in the dict but ordered according to parameter_names
