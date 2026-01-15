@@ -23,8 +23,6 @@ class RunManager:
             self.run = run
         elif isinstance(run, str):
             self.run = RunDefinition.from_file(run)
-        else:
-            logger.error("Run object or path not given.")
 
         assert isinstance(run, RunDefinition), (
             "Run object or path not given. Please provide a Run object or a path to a serialized Run object."

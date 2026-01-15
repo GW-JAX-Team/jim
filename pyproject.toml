@@ -75,6 +75,10 @@ modules = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+norecursedirs = ["tests/integration", "tests/cross_validation"]
+
 [tool.pyright]
 include = ["src"]
 

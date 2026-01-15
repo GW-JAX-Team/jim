@@ -353,7 +353,7 @@ class Data(ABC):
         td = data["td"]
         dt = float(data["dt"])
         epoch = float(data["epoch"])
-        assert isinstance(name := data["name"], str), "Name must be a string"
+        name = str(data["name"])
         return cls(td, dt, epoch, name)
 
     def to_file(self, path: str):
@@ -531,7 +531,6 @@ class PowerSpectrum(ABC):
         noise_imag = jax.random.normal(subkey, shape=var.shape) * jnp.sqrt(var)
         return noise_real + 1j * noise_imag
 
-    # TODO: Add function to save to file and load data from file.
     @classmethod
     def from_file(cls, path: str) -> Self:
         """Load power spectrum from a file. This assumes the data to be in .npz format.
@@ -546,7 +545,7 @@ class PowerSpectrum(ABC):
             raise ValueError("The file must contain 'values' and 'frequencies' keys.")
         values = data["values"]
         frequencies = data["frequencies"]
-        name = data.get("name", "")
+        name = str(data.get("name", ""))
         return cls(values, frequencies, name)
 
     def to_file(self, path: str):

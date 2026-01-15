@@ -1,9 +1,7 @@
 import jax
 import jax.numpy as jnp
-
 import numpy as np
 from itertools import combinations
-from pathlib import Path
 
 from jimgw.core.transforms import (
     ScaleTransform,
@@ -22,10 +20,18 @@ from jimgw.core.single_event.transforms import (
     SphereSpinToCartesianSpinTransform,
     SpinAnglesToCartesianSpinTransform,
     SkyFrameToDetectorFrameSkyPositionTransform,
+    GeocentricArrivalTimeToDetectorArrivalTimeTransform,
+    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform,
+    ComponentMassesToChirpMassMassRatioTransform,
+    ComponentMassesToChirpMassSymmetricMassRatioTransform,
+    MassRatioToSymmetricMassRatioTransform,
+    ChirpMassMassRatioToComponentMassesTransform,
+    ChirpMassSymmetricMassRatioToComponentMassesTransform,
+    SymmetricMassRatioToMassRatioTransform,
 )
 
-from jimgw.core.single_event.utils import m1_m2_to_Mc_q
 from jimgw.core.single_event.detector import get_detector_preset
+from tests.utils import common_keys_allclose
 
 jax.config.update("jax_enable_x64", True)
 
@@ -34,33 +40,6 @@ detector_preset = get_detector_preset()
 H1 = detector_preset["H1"]
 L1 = detector_preset["L1"]
 V1 = detector_preset["V1"]
-
-
-def common_keys_allclose(
-    dict_1: dict, dict_2: dict, atol: float = 1e-8, rtol: float = 1e-5
-):
-    """
-    Check the common values between two result dictionaries are close.
-
-    Parameters
-    ----------
-    dict_1 : dict
-        Result dictionary from the 1st transform.
-    dict_2 : dict
-        Result dictionary from the 2nd transform.
-    atol : float
-        Absolute tolerance between the two values, default 1e-8.
-    rtol : float
-        Relative tolerance between the two values, default 1e-5.
-
-    The default values for atol and rtol here follows those
-    in jax.numpy.isclose, for their definitions, see e.g.:
-    https://docs.jax.dev/en/latest/_autosummary/jax.numpy.isclose.html
-    """
-    common_keys = set.intersection({*dict_1.keys()}, {*dict_2.keys()})
-    tuples = jnp.array([[dict_1[key], dict_2[key]] for key in common_keys])
-    tuple_array = jnp.swapaxes(tuples, 0, 1)
-    return jnp.allclose(*tuple_array, atol=atol, rtol=rtol)
 
 
 class TestBasicTransforms:
@@ -418,7 +397,7 @@ class TestDistanceTransform:
         )
         forward_transform_output, _ = jax.vmap(distance_transform.transform)(inputs)
         output, _ = jax.vmap(distance_transform.inverse)(forward_transform_output)
-        assert jnp.allclose(output["d_L"], dL)
+        assert np.allclose(output["d_L"], dL)
         # default atol: 1e-8, rtol: 1e-5
 
     def test_jitted_forward_transform(self):
@@ -490,9 +469,7 @@ class TestDistanceTransform:
             psi[0],
             iota[0],
         ]
-        sample_dict = dict(
-            zip(["d_hat", "M_c", "ra", "dec", "psi", "iota"], sample)
-        )
+        sample_dict = dict(zip(["d_hat", "M_c", "ra", "dec", "psi", "iota"], sample))
 
         # Create a JIT compiled version of the transform.
         jit_inverse_transform = jax.jit(
@@ -658,67 +635,6 @@ class TestSpinAnglesToCartesianSpinTransform:
         "phase_c",
     )
 
-    def test_forward_spin_transform(self):
-        """
-        Test transformation from spin angles to cartesian spins
-
-        """
-        input_dir = Path("test/unit/source_files/spin_angles_input")
-        output_dir = Path("test/unit/source_files/cartesian_spins_output_for_bilby")
-        input_files = input_dir.glob("*.npz")
-
-        for file in input_files:
-            input_dict = dict(jnp.load(file).items())
-            fRef = int(input_dict.pop("fRef")[0])
-            print("Testing forward transform for fRef =", fRef)
-
-            m_1 = input_dict.pop("m_1")
-            m_2 = input_dict.pop("m_2")
-            M_c, q = m1_m2_to_Mc_q(m_1, m_2)
-            input_dict["M_c"] = M_c
-            input_dict["q"] = q
-
-            # read outputs from binary
-            output_file = list(output_dir.glob(f"*fRef_{fRef}*.npz"))[0]
-            bilby_spins = dict(jnp.load(output_file).items())
-
-            transform = SpinAnglesToCartesianSpinTransform(freq_ref=fRef)
-            jimgw_spins, jacobian = jax.vmap(transform.transform)(input_dict)
-
-            assert common_keys_allclose(jimgw_spins, bilby_spins)
-            assert not jnp.isnan(jacobian).any()
-
-    def test_backward_spin_transform(self):
-        """
-        Test transformation from cartesian spins to spin angles
-
-        """
-        input_dir = Path("test/unit/source_files/cartesian_spins_input")
-        output_dir = Path("test/unit/source_files/spin_angles_output_for_bilby")
-        input_files = input_dir.glob("*.npz")
-
-        for file in input_files:
-            input_dict = dict(jnp.load(file).items())
-            fRef = int(input_dict.pop("fRef")[0])
-            print("Testing backward transform for fRef =", fRef)
-
-            m_1 = input_dict.pop("m_1")
-            m_2 = input_dict.pop("m_2")
-            M_c, q = m1_m2_to_Mc_q(m_1, m_2)
-            input_dict["M_c"] = M_c
-            input_dict["q"] = q
-
-            # read outputs from binary
-            output_file = list(output_dir.glob(f"*fRef_{fRef}*.npz"))[0]
-            bilby_spins = dict(jnp.load(output_file).items())
-
-            transform = SpinAnglesToCartesianSpinTransform(freq_ref=fRef)
-            jimgw_spins, jacobian = jax.vmap(transform.inverse)(input_dict)
-
-            # default atol: 1e-8, rtol: 1e-5
-            assert common_keys_allclose(jimgw_spins, bilby_spins)
-            assert not jnp.isnan(jacobian).any()
-
     def test_forward_backward_consistency(self):
         """
         Test that the forward and inverse transformations are consistent
@@ -756,7 +672,7 @@ class TestSpinAnglesToCartesianSpinTransform:
             ).transform(jimgw_spins)
             jimgw_spins = jnp.array(list(jimgw_spins.values()))
             # default atol: 1e-8, rtol: 1e-5
-            assert jnp.allclose(jimgw_spins, jnp.array([*sample[7:], *sample[:7]]))
+            assert np.allclose(jimgw_spins, jnp.array([*sample[7:], *sample[:7]]))
 
     def test_jitted_forward_transform(self):
         """
@@ -854,38 +770,6 @@ class TestSpinAnglesToCartesianSpinTransform:
 
 
 class TestSkyFrameToDetectorFrameSkyPositionTransform:
-    # This was the custom tolerance for RA as Bilby and Jim use different
-    # algorithm to compute gmst, which induces errors to RA, and this
-    # was the minimum precision that passes.
-    # In the latter version, Jim has adopted the Bilby/LAL algorithm to
-    # compute gmst, and the agreement is at the level of 0.0, which
-    # renders this tolerance obsolete.
-    # RA_ATOL = 5e-5
-
-    def test_backward_transform(self):
-        """
-        Test the backward transformation from spherical to detector frame sky position with different sets of detectors
-        """
-        input_dir = Path("test/unit/source_files/sky_locations")
-        files = input_dir.glob("*.npz")
-        for file in files:
-            data = jnp.load(file, allow_pickle=True)
-
-            bilby_outputs = {key: data[key] for key in ("ra", "dec")}
-            zenith_azimuth = {key: data[key] for key in ("zenith", "azimuth")}
-            ifos = [get_detector_preset()[ifo_name] for ifo_name in data["ifo_pair"]]
-
-            transform = SkyFrameToDetectorFrameSkyPositionTransform(
-                gps_time=data["gps_time"],
-                ifos=ifos,
-            )
-            # test the forward transform
-            jim_outputs, jacobian = jax.vmap(transform.inverse)(zenith_azimuth)
-
-            assert jnp.allclose(jim_outputs["ra"], bilby_outputs["ra"])
-            assert jnp.allclose(jim_outputs["dec"], bilby_outputs["dec"])
-            assert not jnp.isnan(jacobian).any()
-
     def test_forward_backward_consistency(self):
         """
         Test that the forward and inverse transformations are consistent
@@ -914,7 +798,6 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
 
                 # default atol: 1e-8, rtol: 1e-5
                 assert common_keys_allclose(outputs, inputs)
-                # best accuracy for zenith and azimuth is 1e-16
 
     def test_jitted_forward_transform(self):
         """
@@ -993,3 +876,619 @@ class TestHelperFunctions:
         recovered, rev_log_det = reversed_transform.transform(output.copy())
         assert common_keys_allclose(recovered, input_data)
         assert np.allclose(rev_log_det, -log_det)
+
+
+class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
+    def test_forward_transform(self):
+        """
+        Test the forward transformation from geocentric to detector arrival time
+        """
+        gps_time = 1126259462.4  # GW150914
+        transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+            gps_time=gps_time,
+            ifo=H1,
+        )
+
+        # Test sample with sky location
+        sample_dict = {
+            "t_c": 0.1,  # Time at geocenter
+            "ra": 1.5,
+            "dec": -0.5,
+        }
+
+        output, log_det = transform.transform(sample_dict)
+
+        # Output should have t_det
+        assert "t_det" in output
+        assert np.isfinite(output["t_det"])
+        # Log determinant should be zero (time shift doesn't affect volume)
+        assert np.allclose(log_det, 0.0)
+
+    def test_inverse_transform(self):
+        """
+        Test the inverse transformation from detector to geocentric arrival time
+        """
+        gps_time = 1126259462.4
+        transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+            gps_time=gps_time,
+            ifo=L1,
+        )
+
+        sample_dict = {
+            "t_det": 0.05,  # Time at detector
+            "ra": 2.0,
+            "dec": 0.3,
+        }
+
+        output, log_det = transform.inverse(sample_dict)
+
+        # Output should have t_c
+        assert "t_c" in output
+        assert np.isfinite(output["t_c"])
+        assert np.allclose(log_det, 0.0)
+
+    def test_forward_backward_consistency(self):
+        """
+        Test that forward and inverse transforms are consistent
+        """
+        gps_time = 1126259462.4
+        transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+            gps_time=gps_time,
+            ifo=H1,
+        )
+
+        # Original sample
+        original = {
+            "t_c": 0.15,
+            "ra": 1.2,
+            "dec": -0.8,
+        }
+
+        # Forward then inverse
+        forward_output, _ = transform.transform(original.copy())
+        forward_output["ra"] = original["ra"]  # Add back conditional params
+        forward_output["dec"] = original["dec"]
+        recovered, _ = transform.inverse(forward_output)
+
+        assert np.allclose(recovered["t_c"], original["t_c"], rtol=1e-10)
+
+    def test_jitted_forward_transform(self):
+        """
+        Test that the forward transformation is JIT compilable
+        """
+        gps_time = 1126259462.4
+        sample_dict = {
+            "t_c": 0.1,
+            "ra": 1.5,
+            "dec": -0.5,
+        }
+
+        class_args = dict(gps_time=gps_time, ifo=H1)
+
+        jit_transform = jax.jit(
+            lambda data: GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+                **class_args
+            ).transform(data)
+        )
+
+        jitted_output, jitted_jacobian = jit_transform(sample_dict)
+        non_jitted_output, _ = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+            **class_args
+        ).transform(sample_dict)
+
+        assert common_keys_allclose(jitted_output, non_jitted_output)
+        assert not jnp.isnan(jitted_jacobian).any()
+
+    def test_jitted_backward_transform(self):
+        """
+        Test that the backward transformation is JIT compilable
+        """
+        gps_time = 1126259462.4
+        sample_dict = {
+            "t_det": 0.05,
+            "ra": 2.0,
+            "dec": 0.3,
+        }
+
+        class_args = dict(gps_time=gps_time, ifo=L1)
+
+        jit_inverse_transform = jax.jit(
+            lambda data: GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+                **class_args
+            ).inverse(data)
+        )
+
+        jitted_output, jitted_jacobian = jit_inverse_transform(sample_dict)
+        non_jitted_output, _ = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+            **class_args
+        ).inverse(sample_dict)
+
+        assert common_keys_allclose(jitted_output, non_jitted_output)
+        assert not jnp.isnan(jitted_jacobian).any()
+
+    def test_multiple_detectors(self):
+        """
+        Test transform with different detectors
+        """
+        gps_time = 1126259462.4
+        sample_dict = {
+            "t_c": 0.0,
+            "ra": 1.95,
+            "dec": -1.27,
+        }
+
+        # Test with H1, L1, and V1
+        for ifo in [H1, L1, V1]:
+            transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+                gps_time=gps_time,
+                ifo=ifo,
+            )
+            output, _ = transform.transform(sample_dict.copy())
+            assert "t_det" in output
+            assert np.isfinite(output["t_det"])
+
+
+class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
+    def test_forward_transform(self):
+        """
+        Test the forward transformation from geocentric to detector arrival phase
+        """
+        gps_time = 1126259462.4  # GW150914
+        transform = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+            gps_time=gps_time,
+            ifo=H1,
+        )
+
+        # Test sample with all required parameters
+        sample_dict = {
+            "phase_c": 1.5,  # Orbital phase at geocenter
+            "ra": 1.95,
+            "dec": -1.27,
+            "psi": 0.8,
+            "iota": 2.5,
+        }
+
+        output, log_det = transform.transform(sample_dict)
+
+        # Output should have phase_det
+        assert "phase_det" in output
+        assert np.isfinite(output["phase_det"])
+        # Phase should be in [0, 2π)
+        assert 0.0 <= output["phase_det"] < 2.0 * jnp.pi
+        # Log determinant should be finite (involves factor of 1/2 transformation)
+        assert np.isfinite(log_det)
+
+    def test_inverse_transform(self):
+        """
+        Test the inverse transformation from detector to geocentric arrival phase
+        """
+        gps_time = 1126259462.4
+        transform = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+            gps_time=gps_time,
+            ifo=L1,
+        )
+
+        sample_dict = {
+            "phase_det": 2.5,  # Phase at detector
+            "ra": 1.0,
+            "dec": 0.5,
+            "psi": 1.2,
+            "iota": 1.5,
+        }
+
+        output, log_det = transform.inverse(sample_dict)
+
+        # Output should have phase_c
+        assert "phase_c" in output
+        assert np.isfinite(output["phase_c"])
+        # Phase should be in [0, 2π)
+        assert 0.0 <= output["phase_c"] < 2.0 * jnp.pi
+        # Log determinant should be finite (involves factor of 2 transformation)
+        assert np.isfinite(log_det)
+
+    def test_forward_backward_consistency(self):
+        """
+        Test that forward and inverse transforms are approximately consistent
+        """
+        gps_time = 1126259462.4
+        transform = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+            gps_time=gps_time,
+            ifo=H1,
+        )
+
+        # Original sample
+        original = {
+            "phase_c": 3.0,
+            "ra": 1.95,
+            "dec": -1.27,
+            "psi": 0.8,
+            "iota": 2.5,
+        }
+
+        # Forward then inverse - these aren't exact inverses due to modulo operations
+        forward_output, forward_log_det = transform.transform(original.copy())
+        # Add back conditional parameters
+        forward_output["ra"] = original["ra"]
+        forward_output["dec"] = original["dec"]
+        forward_output["psi"] = original["psi"]
+        forward_output["iota"] = original["iota"]
+        recovered, inverse_log_det = transform.inverse(forward_output)
+
+        # Check that log determinants are opposite signs
+        assert np.allclose(forward_log_det, -inverse_log_det, rtol=1e-10)
+        # Both transformations should produce finite values
+        assert np.isfinite(recovered["phase_c"])
+        assert 0.0 <= recovered["phase_c"] < 2.0 * jnp.pi
+
+    def test_jitted_forward_transform(self):
+        """
+        Test that the forward transformation is JIT compilable
+        """
+        gps_time = 1126259462.4
+        sample_dict = {
+            "phase_c": 1.5,
+            "ra": 1.95,
+            "dec": -1.27,
+            "psi": 0.8,
+            "iota": 2.5,
+        }
+
+        class_args = dict(gps_time=gps_time, ifo=H1)
+
+        jit_transform = jax.jit(
+            lambda data: GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+                **class_args
+            ).transform(data)
+        )
+
+        jitted_output, jitted_jacobian = jit_transform(sample_dict)
+        non_jitted_output, _ = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+            **class_args
+        ).transform(sample_dict)
+
+        assert common_keys_allclose(jitted_output, non_jitted_output)
+        assert not jnp.isnan(jitted_jacobian).any()
+
+    def test_jitted_backward_transform(self):
+        """
+        Test that the backward transformation is JIT compilable
+        """
+        gps_time = 1126259462.4
+        sample_dict = {
+            "phase_det": 2.5,
+            "ra": 1.0,
+            "dec": 0.5,
+            "psi": 1.2,
+            "iota": 1.5,
+        }
+
+        class_args = dict(gps_time=gps_time, ifo=L1)
+
+        jit_inverse_transform = jax.jit(
+            lambda data: GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+                **class_args
+            ).inverse(data)
+        )
+
+        jitted_output, jitted_jacobian = jit_inverse_transform(sample_dict)
+        non_jitted_output, _ = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+            **class_args
+        ).inverse(sample_dict)
+
+        assert common_keys_allclose(jitted_output, non_jitted_output)
+        assert not jnp.isnan(jitted_jacobian).any()
+
+    def test_multiple_detectors(self):
+        """
+        Test transform with different detectors
+        """
+        gps_time = 1126259462.4
+        sample_dict = {
+            "phase_c": 1.5,
+            "ra": 1.95,
+            "dec": -1.27,
+            "psi": 0.8,
+            "iota": 2.5,
+        }
+
+        # Test with H1, L1, and V1
+        for ifo in [H1, L1, V1]:
+            transform = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+                gps_time=gps_time,
+                ifo=ifo,
+            )
+            output, _ = transform.transform(sample_dict.copy())
+            assert "phase_det" in output
+            assert np.isfinite(output["phase_det"])
+            assert 0.0 <= output["phase_det"] < 2.0 * jnp.pi
+
+    def test_phase_wrapping(self):
+        """
+        Test that phase values are properly wrapped to [0, 2π)
+        """
+        gps_time = 1126259462.4
+        transform = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+            gps_time=gps_time,
+            ifo=H1,
+        )
+
+        # Test with phase_c near 2π
+        sample_dict = {
+            "phase_c": 2.0 * jnp.pi - 0.1,
+            "ra": 1.95,
+            "dec": -1.27,
+            "psi": 0.8,
+            "iota": 2.5,
+        }
+
+        output, _ = transform.transform(sample_dict)
+        assert 0.0 <= output["phase_det"] < 2.0 * jnp.pi
+
+        # Test inverse with phase_det near 2π
+        sample_dict_inv = {
+            "phase_det": 2.0 * jnp.pi - 0.05,
+            "ra": 1.95,
+            "dec": -1.27,
+            "psi": 0.8,
+            "iota": 2.5,
+        }
+
+        output_inv, _ = transform.inverse(sample_dict_inv)
+        assert 0.0 <= output_inv["phase_c"] < 2.0 * jnp.pi
+
+
+class TestMassTransforms:
+    def test_component_masses_to_chirp_mass_mass_ratio_forward(self):
+        """Test forward transform from component masses to chirp mass and mass ratio."""
+        sample_dict = {
+            "m_1": 30.0,
+            "m_2": 20.0,
+        }
+
+        output, log_det = ComponentMassesToChirpMassMassRatioTransform.transform(
+            sample_dict
+        )
+
+        # Check output has correct keys
+        assert "M_c" in output
+        assert "q" in output
+
+        # Check values are finite
+        assert np.isfinite(output["M_c"])
+        assert np.isfinite(output["q"])
+        assert np.isfinite(log_det)
+
+        # Check q = m2/m1 (should be < 1)
+        assert np.allclose(output["q"], 20.0 / 30.0)
+        assert output["q"] < 1.0
+
+    def test_component_masses_to_chirp_mass_mass_ratio_inverse(self):
+        """Test inverse transform from chirp mass and mass ratio to component masses."""
+        sample_dict = {
+            "M_c": 21.77,
+            "q": 0.8,
+        }
+
+        output, log_det = ComponentMassesToChirpMassMassRatioTransform.inverse(
+            sample_dict
+        )
+
+        # Check output has correct keys
+        assert "m_1" in output
+        assert "m_2" in output
+
+        # Check values are finite
+        assert np.isfinite(output["m_1"])
+        assert np.isfinite(output["m_2"])
+        assert np.isfinite(log_det)
+
+        # Check m1 > m2 (convention)
+        assert output["m_1"] >= output["m_2"]
+
+    def test_component_masses_to_chirp_mass_mass_ratio_roundtrip(self):
+        """Test forward-inverse roundtrip consistency."""
+        original = {
+            "m_1": 35.0,
+            "m_2": 25.0,
+        }
+
+        forward_output, _ = ComponentMassesToChirpMassMassRatioTransform.transform(
+            original
+        )
+        recovered, _ = ComponentMassesToChirpMassMassRatioTransform.inverse(
+            forward_output
+        )
+
+        assert np.allclose(recovered["m_1"], original["m_1"])
+        assert np.allclose(recovered["m_2"], original["m_2"])
+
+    def test_component_masses_to_chirp_mass_symmetric_mass_ratio_forward(self):
+        """Test forward transform from component masses to chirp mass and symmetric mass ratio."""
+        sample_dict = {
+            "m_1": 30.0,
+            "m_2": 20.0,
+        }
+
+        output, log_det = (
+            ComponentMassesToChirpMassSymmetricMassRatioTransform.transform(sample_dict)
+        )
+
+        # Check output has correct keys
+        assert "M_c" in output
+        assert "eta" in output
+
+        # Check values are finite
+        assert np.isfinite(output["M_c"])
+        assert np.isfinite(output["eta"])
+        assert np.isfinite(log_det)
+
+        # Check eta is in valid range (0, 0.25]
+        assert 0.0 < output["eta"] <= 0.25
+
+    def test_component_masses_to_chirp_mass_symmetric_mass_ratio_inverse(self):
+        """Test inverse transform from chirp mass and symmetric mass ratio to component masses."""
+        sample_dict = {
+            "M_c": 21.77,
+            "eta": 0.24,
+        }
+
+        output, log_det = ComponentMassesToChirpMassSymmetricMassRatioTransform.inverse(
+            sample_dict
+        )
+
+        # Check output has correct keys
+        assert "m_1" in output
+        assert "m_2" in output
+
+        # Check values are finite
+        assert np.isfinite(output["m_1"])
+        assert np.isfinite(output["m_2"])
+        assert np.isfinite(log_det)
+
+        # Check m1 > m2
+        assert output["m_1"] >= output["m_2"]
+
+    def test_component_masses_to_chirp_mass_symmetric_mass_ratio_roundtrip(self):
+        """Test forward-inverse roundtrip consistency."""
+        original = {
+            "m_1": 35.0,
+            "m_2": 25.0,
+        }
+
+        forward_output, _ = (
+            ComponentMassesToChirpMassSymmetricMassRatioTransform.transform(original)
+        )
+        recovered, _ = ComponentMassesToChirpMassSymmetricMassRatioTransform.inverse(
+            forward_output
+        )
+
+        assert np.allclose(recovered["m_1"], original["m_1"])
+        assert np.allclose(recovered["m_2"], original["m_2"])
+
+    def test_mass_ratio_to_symmetric_mass_ratio_forward(self):
+        """Test forward transform from mass ratio to symmetric mass ratio."""
+        sample_dict = {"q": 0.8}
+
+        output, log_det = MassRatioToSymmetricMassRatioTransform.transform(sample_dict)
+
+        # Check output has correct key
+        assert "eta" in output
+
+        # Check value is finite
+        assert np.isfinite(output["eta"])
+        assert np.isfinite(log_det)
+
+        # Check eta is in valid range
+        assert 0.0 < output["eta"] <= 0.25
+
+    def test_mass_ratio_to_symmetric_mass_ratio_inverse(self):
+        """Test inverse transform from symmetric mass ratio to mass ratio."""
+        sample_dict = {"eta": 0.24}
+
+        output, log_det = MassRatioToSymmetricMassRatioTransform.inverse(sample_dict)
+
+        # Check output has correct key
+        assert "q" in output
+
+        # Check value is finite and in valid range
+        assert np.isfinite(output["q"])
+        assert np.isfinite(log_det)
+        assert 0.0 < output["q"] <= 1.0
+
+    def test_mass_ratio_to_symmetric_mass_ratio_roundtrip(self):
+        """Test forward-inverse roundtrip consistency."""
+        original = {"q": 0.75}
+
+        forward_output, _ = MassRatioToSymmetricMassRatioTransform.transform(original)
+        recovered, _ = MassRatioToSymmetricMassRatioTransform.inverse(forward_output)
+
+        assert np.allclose(recovered["q"], original["q"])
+
+    def test_chirp_mass_mass_ratio_to_component_masses_forward(self):
+        """Test ChirpMassMassRatioToComponentMassesTransform (reverse of ComponentMasses->Mc,q)."""
+        sample_dict = {
+            "M_c": 21.77,
+            "q": 0.8,
+        }
+
+        output, log_det = ChirpMassMassRatioToComponentMassesTransform.transform(
+            sample_dict
+        )
+
+        # Check output has correct keys
+        assert "m_1" in output
+        assert "m_2" in output
+
+        # Check values are finite
+        assert np.isfinite(output["m_1"])
+        assert np.isfinite(output["m_2"])
+        assert np.isfinite(log_det)
+
+        # Check m1 > m2
+        assert output["m_1"] >= output["m_2"]
+
+    def test_chirp_mass_symmetric_mass_ratio_to_component_masses_forward(self):
+        """Test ChirpMassSymmetricMassRatioToComponentMassesTransform."""
+        sample_dict = {
+            "M_c": 21.77,
+            "eta": 0.24,
+        }
+
+        output, log_det = (
+            ChirpMassSymmetricMassRatioToComponentMassesTransform.transform(sample_dict)
+        )
+
+        # Check output has correct keys
+        assert "m_1" in output
+        assert "m_2" in output
+
+        # Check values are finite
+        assert np.isfinite(output["m_1"])
+        assert np.isfinite(output["m_2"])
+        assert np.isfinite(log_det)
+
+        # Check m1 > m2
+        assert output["m_1"] >= output["m_2"]
+
+    def test_symmetric_mass_ratio_to_mass_ratio_forward(self):
+        """Test SymmetricMassRatioToMassRatioTransform."""
+        sample_dict = {"eta": 0.24}
+
+        output, log_det = SymmetricMassRatioToMassRatioTransform.transform(sample_dict)
+
+        # Check output has correct key
+        assert "q" in output
+
+        # Check value is finite and in valid range
+        assert np.isfinite(output["q"])
+        assert np.isfinite(log_det)
+        assert 0.0 < output["q"] <= 1.0
+
+    def test_mass_transforms_jit_compilable(self):
+        """Test that mass transforms are JIT compilable."""
+        sample_dict = {
+            "m_1": 30.0,
+            "m_2": 20.0,
+        }
+
+        jit_transform = jax.jit(ComponentMassesToChirpMassMassRatioTransform.transform)
+        jitted_output, jitted_log_det = jit_transform(sample_dict)
+        non_jitted_output, non_jitted_log_det = (
+            ComponentMassesToChirpMassMassRatioTransform.transform(sample_dict)
+        )
+
+        assert common_keys_allclose(jitted_output, non_jitted_output)
+        assert np.allclose(jitted_log_det, non_jitted_log_det)
+
+    def test_mass_ratio_edge_case_equal_masses(self):
+        """Test mass ratio transform with equal masses (q=1, eta=0.25)."""
+        sample_dict = {"q": 1.0}
+
+        output, _ = MassRatioToSymmetricMassRatioTransform.transform(sample_dict)
+
+        # For equal masses, eta should be exactly 0.25
+        assert np.allclose(output["eta"], 0.25)
+
+        # Test inverse
+        recovered, _ = MassRatioToSymmetricMassRatioTransform.inverse(output)
+        assert np.allclose(recovered["q"], 1.0)

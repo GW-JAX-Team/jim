@@ -433,7 +433,7 @@ class PhaseTimeMarginalizedLikelihoodFD(TimeMarginalizedLikelihoodFD):
 
 class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
     n_bins: int  # Number of bins to use for the likelihood
-    ref_params: dict  # Reference parameters for the likelihood
+    reference_parameters: dict  # Reference parameters for the likelihood
     freq_grid_low: Array  # Heterodyned frequency grid
     freq_grid_center: Array  # Heterodyned frequency grid at the center of the bin
     waveform_low_ref: dict[
@@ -466,7 +466,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         n_bins: int = 100,
         popsize: int = 100,
         n_steps: int = 2000,
-        ref_params: dict = {},
+        reference_parameters: dict = {},
         reference_waveform: Optional[Waveform] = None,
         prior: Optional[Prior] = None,
         sample_transforms: list[BijectiveTransform] = [],
@@ -482,35 +482,39 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         if reference_waveform is None:
             reference_waveform = waveform
 
-        if ref_params:
-            self.ref_params = ref_params.copy()
-            logger.info(f"Reference parameters provided, which are {self.ref_params}")
+        if reference_parameters:
+            self.reference_parameters = reference_parameters.copy()
+            logger.info(
+                f"Reference parameters provided, which are {self.reference_parameters}"
+            )
         elif prior:
             logger.info("No reference parameters are provided, finding it...")
-            ref_params = self.maximize_likelihood(
+            reference_parameters = self.maximize_likelihood(
                 prior=prior,
                 sample_transforms=sample_transforms,
                 likelihood_transforms=likelihood_transforms,
                 popsize=popsize,
                 n_steps=n_steps,
             )
-            self.ref_params = {key: float(value) for key, value in ref_params.items()}
-            logger.info(f"The reference parameters are {self.ref_params}")
+            self.reference_parameters = {
+                key: float(value) for key, value in reference_parameters.items()
+            }
+            logger.info(f"The reference parameters are {self.reference_parameters}")
         else:
             raise ValueError(
                 "Either reference parameters or parameter names must be provided"
             )
         # safe guard for the reference parameters
         # since ripple cannot handle eta=0.25
-        if jnp.isclose(self.ref_params["eta"], 0.25):
-            self.ref_params["eta"] = 0.249995
+        if jnp.isclose(self.reference_parameters["eta"], 0.25):
+            self.reference_parameters["eta"] = 0.249995
             logger.warning("The eta of the reference parameter is close to 0.25")
-            logger.warning(f"The eta is adjusted to {self.ref_params['eta']}")
+            logger.warning(f"The eta is adjusted to {self.reference_parameters['eta']}")
 
         logger.info("Constructing reference waveforms..")
 
-        self.ref_params["trigger_time"] = self.trigger_time
-        self.ref_params["gmst"] = self.gmst
+        self.reference_parameters["trigger_time"] = self.trigger_time
+        self.reference_parameters["gmst"] = self.gmst
 
         self.waveform_low_ref = {}
         self.waveform_center_ref = {}
@@ -528,7 +532,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         )
         self.freq_grid_low = freq_grid[:-1]
 
-        h_sky = reference_waveform(frequency_original, self.ref_params)
+        h_sky = reference_waveform(frequency_original, self.reference_parameters)
 
         # Get frequency masks to be applied, for both original
         # and heterodyne frequency grid
@@ -553,19 +557,21 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         # +1 for inclusive, +1 for the extra edge
         freq_grid = freq_grid[start_idx:end_idx]
 
-        h_sky_low = reference_waveform(self.freq_grid_low, self.ref_params)
-        h_sky_center = reference_waveform(self.freq_grid_center, self.ref_params)
+        h_sky_low = reference_waveform(self.freq_grid_low, self.reference_parameters)
+        h_sky_center = reference_waveform(
+            self.freq_grid_center, self.reference_parameters
+        )
 
         for detector in self.detectors:
             # Get the reference waveforms
             waveform_ref = detector.fd_response(
-                frequency_original, h_sky, self.ref_params
+                frequency_original, h_sky, self.reference_parameters
             )
             self.waveform_low_ref[detector.name] = detector.fd_response(
-                self.freq_grid_low, h_sky_low, self.ref_params
+                self.freq_grid_low, h_sky_low, self.reference_parameters
             )
             self.waveform_center_ref[detector.name] = detector.fd_response(
-                self.freq_grid_center, h_sky_center, self.ref_params
+                self.freq_grid_center, h_sky_center, self.reference_parameters
             )
             A0, A1, B0, B1 = self.compute_coefficients(
                 detector.sliced_fd_data,
