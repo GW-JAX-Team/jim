@@ -1457,6 +1457,104 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
         return log_likelihood
 
 
+class PhaseMarginalizedMultibandedTransientLikelihoodFD(MultibandedTransientLikelihoodFD):
+    """Phase-marginalized multi-banded likelihood for gravitational wave transient events.
+
+    This class combines the multi-banding method (S. Morisaki, 2021, arXiv:2104.07813)
+    with analytic marginalization over the coalescence phase parameter. Phase marginalization
+    uses the modified Bessel function of the first kind to marginalize over the phase.
+
+    The likelihood evaluation is similar to MultibandedTransientLikelihoodFD, but computes
+    complex inner products and applies phase marginalization using log_i0.
+
+    Args:
+        detectors (Sequence[Detector]): List of detector objects.
+        waveform (Waveform): Waveform model to evaluate.
+        reference_chirp_mass (Float): Reference chirp mass (typically prior minimum).
+        fixed_parameters (Optional[dict]): Fixed parameters for the likelihood.
+        f_min (Float): Minimum frequency for likelihood evaluation.
+        f_max (Float): Maximum frequency for likelihood evaluation.
+        trigger_time (Float): GPS time of the event trigger.
+        highest_mode (int): Maximum magnetic number (default 2, for 22-mode only).
+        accuracy_factor (Float): Accuracy parameter L (default 5.0).
+        time_offset (Float): Time offset in seconds (default 2.12).
+        delta_f_end (Float): End frequency taper scale in Hz (default 53.0).
+        maximum_banding_frequency (Optional[Float]): Upper limit on band starting frequency.
+        minimum_banding_duration (Float): Minimum duration for bands.
+    """
+
+    def evaluate(self, params: dict[str, Float], data: dict) -> Float:
+        """Evaluate the phase-marginalized log-likelihood for given parameters.
+
+        Parameters
+        ----------
+        params : dict[str, Float]
+            Dictionary of model parameters.
+        data : dict
+            Data dictionary (not used, data stored in detectors).
+
+        Returns
+        -------
+        Float
+            Phase-marginalized log-likelihood value.
+        """
+        params = params.copy()
+        params.update(self.fixed_parameters)
+        params["phase_c"] = 0.0  # Fix phase to 0 for phase marginalization
+        params["trigger_time"] = self.trigger_time
+        params["gmst"] = self.gmst
+        return self._likelihood(params, data)
+
+    def _likelihood(self, params: dict[str, Float], data: dict) -> Float:
+        """Core phase-marginalized likelihood evaluation using multi-banding.
+
+        Parameters
+        ----------
+        params : dict[str, Float]
+            Dictionary of model parameters.
+        data : dict
+            Data dictionary (not used).
+
+        Returns
+        -------
+        Float
+            Phase-marginalized log-likelihood value.
+        """
+        # Generate waveform at unique frequencies
+        waveform_sky = self.waveform(self.unique_frequencies, params)
+
+        log_likelihood = 0.0
+        complex_d_inner_h = 0.0 + 0.0j
+
+        for detector in self.detectors:
+            # Get detector response at banded frequencies
+            # First evaluate at unique frequencies, then map to banded
+            h_det_unique = detector.fd_response(
+                self.unique_frequencies, waveform_sky, params
+            )
+
+            # Map from unique to banded frequency points
+            strain = h_det_unique[self.unique_to_original]
+
+            # Compute complex (d|h) using pre-computed linear coefficients
+            # Note: linear_coeffs already contains the conjugated data
+            complex_d_inner_h += jnp.sum(strain * self.linear_coeffs[detector.name])
+
+            # Compute (h|h) using pre-computed quadratic coefficients and linear interpolation
+            h_inner_h = jnp.sum(
+                jnp.real(strain * jnp.conj(strain))
+                * self.quadratic_coeffs[detector.name]
+            )
+
+            # Accumulate -(h|h)/2 part
+            log_likelihood += -h_inner_h / 2
+
+        # Add phase marginalization term using modified Bessel function
+        log_likelihood += log_i0(jnp.absolute(complex_d_inner_h))
+
+        return log_likelihood
+
+
 likelihood_presets = {
     "BaseTransientLikelihoodFD": BaseTransientLikelihoodFD,
     "TimeMarginalizedLikelihoodFD": TimeMarginalizedLikelihoodFD,
@@ -1465,4 +1563,5 @@ likelihood_presets = {
     "HeterodynedTransientLikelihoodFD": HeterodynedTransientLikelihoodFD,
     "PhaseMarginalizedHeterodynedLikelihoodFD": HeterodynedPhaseMarginalizedLikelihoodFD,
     "MultibandedTransientLikelihoodFD": MultibandedTransientLikelihoodFD,
+    "PhaseMarginalizedMultibandedTransientLikelihoodFD": PhaseMarginalizedMultibandedTransientLikelihoodFD,
 }
