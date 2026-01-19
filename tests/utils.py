@@ -54,6 +54,11 @@ def common_keys_allclose(
         https://docs.jax.dev/en/latest/_autosummary/jax.numpy.isclose.html
     """
     common_keys = set.intersection({*dict_1.keys()}, {*dict_2.keys()})
+    if not common_keys:
+        raise ValueError(
+            f"No common keys found between dictionaries. "
+            f"dict_1 keys: {set(dict_1.keys())}, dict_2 keys: {set(dict_2.keys())}"
+        )
     tuples = jnp.array([[dict_1[key], dict_2[key]] for key in common_keys])
     tuple_array = jnp.swapaxes(tuples, 0, 1)
     return jnp.allclose(*tuple_array, atol=atol, rtol=rtol)
