@@ -347,13 +347,13 @@ class Data(ABC):
         Args:
             path (str): Path to the .npz file containing the data.
         """
-        data = np.load(path)
-        if "td" not in data or "dt" not in data or "epoch" not in data:
-            raise ValueError("The file must contain 'td', 'dt', and 'epoch' keys.")
-        td = jnp.array(data["td"])
-        dt = float(data["dt"])
-        epoch = float(data["epoch"])
-        name = str(data.get("name", ""))
+        with np.load(path) as data:
+            if "td" not in data or "dt" not in data or "epoch" not in data:
+                raise ValueError("The file must contain 'td', 'dt', and 'epoch' keys.")
+            td = jnp.array(data["td"])
+            dt = float(data["dt"])
+            epoch = float(data["epoch"])
+            name = str(data.get("name", ""))
         return cls(td, dt, epoch, name)
 
     def to_file(self, path: str):
@@ -540,12 +540,12 @@ class PowerSpectrum(ABC):
         Args:
             path (str): Path to the .npz file containing the data.
         """
-        data = np.load(path)
-        if "values" not in data or "frequencies" not in data:
-            raise ValueError("The file must contain 'values' and 'frequencies' keys.")
-        values = jnp.array(data["values"])
-        frequencies = jnp.array(data["frequencies"])
-        name = str(data.get("name", ""))
+        with np.load(path) as data:
+            if "values" not in data or "frequencies" not in data:
+                raise ValueError("The file must contain 'values' and 'frequencies' keys.")
+            values = jnp.array(data["values"])
+            frequencies = jnp.array(data["frequencies"])
+            name = str(data.get("name", ""))
         return cls(values, frequencies, name)
 
     def to_file(self, path: str):
