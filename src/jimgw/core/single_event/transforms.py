@@ -47,6 +47,7 @@ class SpinAnglesToCartesianSpinTransform(ConditionalBijectiveTransform):
     def __init__(
         self,
         freq_ref: Float,
+        fixed_phase: bool = False,
     ):
         name_mapping = (
             ["theta_jn", "phi_jl", "tilt_1", "tilt_2", "phi_12", "a_1", "a_2"],
@@ -58,29 +59,54 @@ class SpinAnglesToCartesianSpinTransform(ConditionalBijectiveTransform):
 
         self.freq_ref = freq_ref
 
-        def named_transform(x):
-            iota, s1x, s1y, s1z, s2x, s2y, s2z = spin_angles_to_cartesian_spin(
-                x["theta_jn"],
-                x["phi_jl"],
-                x["tilt_1"],
-                x["tilt_2"],
-                x["phi_12"],
-                x["a_1"],
-                x["a_2"],
-                x["M_c"],
-                x["q"],
-                self.freq_ref,
-                x["phase_c"],
-            )
-            return {
-                "iota": iota,
-                "s1_x": s1x,
-                "s1_y": s1y,
-                "s1_z": s1z,
-                "s2_x": s2x,
-                "s2_y": s2y,
-                "s2_z": s2z,
-            }
+        if fixed_phase:
+            def named_transform(x):
+                iota, s1x, s1y, s1z, s2x, s2y, s2z = spin_angles_to_cartesian_spin(
+                    x["theta_jn"],
+                    x["phi_jl"],
+                    x["tilt_1"],
+                    x["tilt_2"],
+                    x["phi_12"],
+                    x["a_1"],
+                    x["a_2"],
+                    x["M_c"],
+                    x["q"],
+                    self.freq_ref,
+                    0.0,
+                )
+                return {
+                    "iota": iota,
+                    "s1_x": s1x,
+                    "s1_y": s1y,
+                    "s1_z": s1z,
+                    "s2_x": s2x,
+                    "s2_y": s2y,
+                    "s2_z": s2z,
+                }
+        else:
+            def named_transform(x):
+                iota, s1x, s1y, s1z, s2x, s2y, s2z = spin_angles_to_cartesian_spin(
+                    x["theta_jn"],
+                    x["phi_jl"],
+                    x["tilt_1"],
+                    x["tilt_2"],
+                    x["phi_12"],
+                    x["a_1"],
+                    x["a_2"],
+                    x["M_c"],
+                    x["q"],
+                    self.freq_ref,
+                    x["phase_c"],
+                )
+                return {
+                    "iota": iota,
+                    "s1_x": s1x,
+                    "s1_y": s1y,
+                    "s1_z": s1z,
+                    "s2_x": s2x,
+                    "s2_y": s2y,
+                    "s2_z": s2z,
+                }
 
         def named_inverse_transform(x):
             (
