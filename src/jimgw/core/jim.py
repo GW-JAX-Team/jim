@@ -10,6 +10,7 @@ from jaxtyping import Array, Float, PRNGKeyArray
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.prior import Prior
 from jimgw.core.transforms import BijectiveTransform, NtoMTransform
+from jimgw import logger
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,39 @@ class Jim(object):
         n_tempered_steps: int = 5,
         verbose: bool = False,
     ):
+        # Debug logging: Log all initialization parameters
+        logger.debug("="*80)
+        logger.debug("Jim.__init__ called with parameters:")
+        logger.debug(f"  likelihood: {type(likelihood).__name__}")
+        logger.debug(f"  prior: {type(prior).__name__}")
+        logger.debug(f"  prior.n_dims: {prior.n_dims}")
+        logger.debug(f"  prior.parameter_names: {prior.parameter_names}")
+        logger.debug(f"  n_chains: {n_chains}")
+        logger.debug(f"  n_local_steps: {n_local_steps}")
+        logger.debug(f"  n_global_steps: {n_global_steps}")
+        logger.debug(f"  n_training_loops: {n_training_loops}")
+        logger.debug(f"  n_production_loops: {n_production_loops}")
+        logger.debug(f"  n_epochs: {n_epochs}")
+        logger.debug(f"  mala_step_size: {mala_step_size}")
+        logger.debug(f"  chain_batch_size: {chain_batch_size}")
+        logger.debug(f"  rq_spline_hidden_units: {rq_spline_hidden_units}")
+        logger.debug(f"  rq_spline_n_bins: {rq_spline_n_bins}")
+        logger.debug(f"  rq_spline_n_layers: {rq_spline_n_layers}")
+        logger.debug(f"  learning_rate: {learning_rate}")
+        logger.debug(f"  batch_size: {batch_size}")
+        logger.debug(f"  n_max_examples: {n_max_examples}")
+        logger.debug(f"  local_thinning: {local_thinning}")
+        logger.debug(f"  global_thinning: {global_thinning}")
+        logger.debug(f"  n_NFproposal_batch_size: {n_NFproposal_batch_size}")
+        logger.debug(f"  history_window: {history_window}")
+        logger.debug(f"  n_temperatures: {n_temperatures}")
+        logger.debug(f"  max_temperature: {max_temperature}")
+        logger.debug(f"  n_tempered_steps: {n_tempered_steps}")
+        logger.debug(f"  verbose: {verbose}")
+        logger.debug(f"  sample_transforms: {[type(t).__name__ for t in sample_transforms]}")
+        logger.debug(f"  likelihood_transforms: {[type(t).__name__ for t in likelihood_transforms]}")
+        logger.debug("="*80)
+
         self.likelihood = likelihood
         self.prior = prior
 
@@ -73,16 +107,23 @@ class Jim(object):
             logger.info("Using sample transforms")
             for transform in sample_transforms:
                 self.parameter_names = transform.propagate_name(self.parameter_names)
+                logger.debug(f"  Applied transform {type(transform).__name__}: parameter_names = {self.parameter_names}")
 
         if len(likelihood_transforms) == 0:
             logger.info(
                 "No likelihood transforms provided. Using prior parameters as likelihood parameters"
             )
+        else:
+            logger.debug(f"Using {len(likelihood_transforms)} likelihood transform(s): {[type(t).__name__ for t in likelihood_transforms]}")
 
         if rng_key is jax.random.PRNGKey(0):
-            logger.info("No rng_key provided. Using default key with seed=0.")
+            logger.warning("No rng_key provided. Using default key with seed=0.")
 
         rng_key, subkey = jax.random.split(rng_key)
+
+        logger.debug("Creating RQSpline_MALA_PT_Bundle with flowMC parameters:")
+        logger.debug(f"  n_dims (from prior): {self.prior.n_dims}")
+        logger.debug(f"  Final parameter_names for sampling: {self.parameter_names}")
 
         resource_strategy_bundle = RQSpline_MALA_PT_Bundle(
             rng_key=subkey,
@@ -165,16 +206,57 @@ class Jim(object):
     def sample_initial_condition(self) -> Float[Array, " n_chains n_dims"]:
         rng_key, subkey = jax.random.split(self.sampler.rng_key)
 
-        initial_position = self.prior.sample(subkey, self.sampler.n_chains)
-        for transform in self.sample_transforms:
-            initial_position = jax.vmap(transform.forward)(initial_position)
-        initial_position = jnp.array(
-            [initial_position[key] for key in self.parameter_names]
-        ).T
+        # Keep resampling until we get all finite values
+        max_attempts = 100
+        attempt = 0
+
+        while attempt < max_attempts:
+            initial_position = self.prior.sample(subkey, self.sampler.n_chains)
+            for transform in self.sample_transforms:
+                initial_position = jax.vmap(transform.forward)(initial_position)
+            initial_position = jnp.array(
+                [initial_position[key] for key in self.parameter_names]
+            ).T
+
+            # Check if all values are finite
+            if jnp.all(jnp.isfinite(initial_position)):
+                break
+
+            # If not all finite, split key and try again
+            attempt += 1
+            if attempt < max_attempts:
+                rng_key, subkey = jax.random.split(rng_key)
+                logger.info(f"Non-finite values in initial position, resampling (attempt {attempt}/{max_attempts})...")
 
         if not jnp.all(jnp.isfinite(initial_position)):
+            # Debug information before raising error
+            print("=" * 80)
+            print("DEBUG: Non-finite values detected in initial_position after max attempts")
+            print("=" * 80)
+            print(f"initial_position shape: {initial_position.shape}")
+            print(f"parameter_names: {self.parameter_names}")
+            print(f"\nFinite mask:\n{jnp.isfinite(initial_position)}")
+            print(f"\nNumber of non-finite values: {jnp.sum(~jnp.isfinite(initial_position))}")
+
+            # Show statistics for each parameter
+            print("\nPer-parameter statistics:")
+            for i, name in enumerate(self.parameter_names):
+                param_values = initial_position[:, i]
+                n_nonfinite = jnp.sum(~jnp.isfinite(param_values))
+                print(f"  {name}:")
+                print(f"    Non-finite count: {n_nonfinite}/{len(param_values)}")
+                if n_nonfinite > 0:
+                    print(f"    Min (finite): {jnp.min(jnp.where(jnp.isfinite(param_values), param_values, jnp.inf))}")
+                    print(f"    Max (finite): {jnp.max(jnp.where(jnp.isfinite(param_values), param_values, -jnp.inf))}")
+                    print(f"    Has NaN: {jnp.any(jnp.isnan(param_values))}")
+                    print(f"    Has Inf: {jnp.any(jnp.isinf(param_values))}")
+                else:
+                    print(f"    Min: {jnp.min(param_values)}")
+                    print(f"    Max: {jnp.max(param_values)}")
+            print("=" * 80)
+
             raise ValueError(
-                "Initial positions contain non-finite values (NaN or inf). "
+                f"Initial positions contain non-finite values (NaN or inf) after {max_attempts} attempts. "
                 "Check your priors and transforms for validity."
             )
 
@@ -212,19 +294,35 @@ class Jim(object):
                 raise ValueError(
                     f"initial_position must have shape (n_dims,) or (n_chains, n_dims). Got shape {initial_position.shape}."
                 )
+
+        # Debug logging for initial_position
+        logger.debug(f"initial_position shape: {initial_position.shape}")
+        logger.debug(f"initial_position contains NaN: {jnp.any(jnp.isnan(initial_position))}")
+        logger.debug(f"initial_position contains Inf: {jnp.any(jnp.isinf(initial_position))}")
+        logger.info("Starting sampling...")
+
         self.sampler.sample(initial_position, {})
 
     def get_samples(
         self,
-        training: bool = False,
-        rng_key: PRNGKeyArray = jax.random.PRNGKey(0),
         n_samples: int = 0,
+        rng_key: PRNGKeyArray = jax.random.PRNGKey(21),
+        training: bool = False,
     ) -> dict[str, Float[Array, " n_chains n_dims"]]:
         """
-        Get the samples from the sampler.
+        Get the samples from the sampler, with optional weighted resampling.
+
+        When `n_samples` > 0, performs weighted resampling where each sample is selected
+        with probability proportional to its posterior probability (exponential of log_prob).
+        This helps focus the returned samples on high-probability regions of the posterior.
 
         Parameters
         ----------
+        n_samples : int, optional
+            Number of samples to return via weighted resampling. If 0, return all samples
+            with transforms applied, by default 0
+        rng_key : PRNGKeyArray, optional
+            RNG key for weighted resampling, by default jax.random.PRNGKey(21)
         training : bool, optional
             Whether to get the training samples or the production samples, by default False
         rng_key : PRNGKeyArray, optional
@@ -237,7 +335,8 @@ class Jim(object):
         Returns
         -------
         dict
-            Dictionary of samples
+            Dictionary of samples with parameter names as keys and sample arrays as values.
+            All sample transforms are reversed to return samples in the prior parameter space.
 
         """
         if training:
@@ -245,11 +344,21 @@ class Jim(object):
                 chains := self.sampler.resources["positions_training"], Buffer
             )
             chains = chains.data
+
+            assert isinstance(
+                log_probs := self.sampler.resources["log_prob_training"], Buffer
+            )
+            log_probs = log_probs.data
         else:
             assert isinstance(
                 chains := self.sampler.resources["positions_production"], Buffer
             )
             chains = chains.data
+
+            assert isinstance(
+                log_probs := self.sampler.resources["log_prob_production"], Buffer
+            )
+            log_probs = log_probs.data
 
         chains = chains.reshape(-1, self.prior.n_dims)
 
@@ -272,4 +381,40 @@ class Jim(object):
         chains = jax.vmap(self.add_name)(chains)
         for sample_transform in reversed(self.sample_transforms):
             chains = jax.vmap(sample_transform.backward)(chains)
+
+        if n_samples > 0:
+            n_total_samples = chains[list(chains.keys())[0]].shape[0]
+
+            # If requesting more samples than available, just return all
+            if n_samples >= n_total_samples:
+                return chains
+
+            # For large sample sets, do two-stage sampling to avoid OOM
+            # Use adaptive factor based on the ratio of total to requested samples
+            intermediate_factor = max(10, min(100, n_total_samples // n_samples // 10))
+            n_intermediate = min(n_samples * intermediate_factor, n_total_samples)
+
+            log_probs_intermediate = log_probs.reshape(-1)
+
+            if n_intermediate < n_total_samples:
+                # Stage 1: Uniform random downsample to intermediate size
+                rng_key, subkey = jax.random.split(rng_key)
+                downsample_indices_1 = jax.random.choice(
+                    subkey, n_total_samples, (n_intermediate,), replace=False
+                )
+                log_probs_intermediate = log_probs_intermediate[downsample_indices_1]
+                chains_intermediate = {
+                    key: val[downsample_indices_1] for key, val in chains.items()
+                }
+            else:
+                chains_intermediate = chains
+
+            # Stage 2: Weighted resample from intermediate set
+            downsample_indices_2 = jax.random.categorical(
+                rng_key, log_probs_intermediate, shape=(n_samples,)
+            )
+            chains = {
+                key: val[downsample_indices_2]
+                for key, val in chains_intermediate.items()
+            }
         return chains

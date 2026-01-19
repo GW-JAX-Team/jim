@@ -1039,6 +1039,7 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             return None, None
 
         # Bisection search
+        f = (fmin + fmax) / 2.0
         while fmax - fmin > 1e-2 / duration:
             f = (fmin + fmax) / 2.0
             if _is_above_fnext(f):
@@ -1078,7 +1079,9 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
                 break
 
         # Add final boundary
-        fb_dfb_list.append([self.maximum_frequency + self.delta_f_end, self.delta_f_end])
+        fb_dfb_list.append(
+            [self.maximum_frequency + self.delta_f_end, self.delta_f_end]
+        )
 
         self.durations = jnp.array(durations_list)
         self.fb_dfb = jnp.array(fb_dfb_list)
@@ -1116,7 +1119,9 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             fnext = float(self.fb_dfb[b + 1, 0])
 
             Nb = max(
-                self._round_up_to_power_of_two(int(2.0 * fnext * original_duration + 1)),
+                self._round_up_to_power_of_two(
+                    int(2.0 * fnext * original_duration + 1)
+                ),
                 2**b,
             )
             Nbs_list.append(Nb)
@@ -1207,9 +1212,13 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
 
         window = np.zeros(length)
 
-        increase_start = max(0, min(length, math.floor((fnow - dfnow) / delta_f) - start_idx + 1))
+        increase_start = max(
+            0, min(length, math.floor((fnow - dfnow) / delta_f) - start_idx + 1)
+        )
         unity_start = max(0, min(length, math.ceil(fnow / delta_f) - start_idx))
-        decrease_start = max(0, min(length, math.floor((fnext - dfnext) / delta_f) - start_idx + 1))
+        decrease_start = max(
+            0, min(length, math.floor((fnext - dfnext) / delta_f) - start_idx + 1)
+        )
         decrease_stop = max(0, min(length, math.ceil(fnext / delta_f) - start_idx))
 
         # Unity region
@@ -1224,12 +1233,14 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
 
         # Decreasing taper
         if decrease_start < decrease_stop:
-            frequencies = (np.arange(decrease_start, decrease_stop) + start_idx) * delta_f
+            frequencies = (
+                np.arange(decrease_start, decrease_stop) + start_idx
+            ) * delta_f
             window[decrease_start:decrease_stop] = (
                 1.0 - np.cos(np.pi * (frequencies - fnext) / dfnext)
             ) / 2.0
 
-        return window
+        return jnp.array(window)
 
     def _setup_linear_coefficients(self) -> None:
         """Pre-compute coefficients for (d|h) inner product.
@@ -1245,7 +1256,6 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
         """
         import numpy as np
 
-        original_duration = self.detectors[0].data.duration
         N = int(self.Nbs[-1])
 
         self.linear_coeffs = {}
@@ -1262,7 +1272,9 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             fddata = np.zeros(N // 2 + 1, dtype=complex)
             valid_len = min(len(data_fd), N // 2 + 1)
             mask_valid = freq_mask[:valid_len]
-            fddata[:valid_len][mask_valid] = data_fd[:valid_len][mask_valid] / psd[:valid_len][mask_valid]
+            fddata[:valid_len][mask_valid] = (
+                data_fd[:valid_len][mask_valid] / psd[:valid_len][mask_valid]
+            )
 
             coeffs_list = []
 
@@ -1315,15 +1327,22 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             for b in range(self.number_of_bands):
                 logger.debug(f"Pre-computing quadratic coefficients for band {b}")
 
-                start_idx, end_idx = int(self.start_end_idxs[b, 0]), int(self.start_end_idxs[b, 1])
-                banded_freqs = np.array(self.banded_frequency_points[start_idx : end_idx + 1])
+                start_idx, end_idx = (
+                    int(self.start_end_idxs[b, 0]),
+                    int(self.start_end_idxs[b, 1]),
+                )
+                banded_freqs = np.array(
+                    self.banded_frequency_points[start_idx : end_idx + 1]
+                )
                 prefactor = 4 * float(self.durations[b]) / original_duration
 
                 # Get window for original resolution
                 fnow, dfnow = float(self.fb_dfb[b, 0]), float(self.fb_dfb[b, 1])
                 fnext = float(self.fb_dfb[b + 1, 0])
                 start_idx_orig = math.ceil((fnow - dfnow) * original_duration)
-                window_length = math.floor(fnext * original_duration) - start_idx_orig + 1
+                window_length = (
+                    math.floor(fnext * original_duration) - start_idx_orig + 1
+                )
 
                 window = self._get_window_sequence(
                     1.0 / original_duration, start_idx_orig, window_length, b
@@ -1434,11 +1453,110 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
 
             # Compute (h|h) using pre-computed quadratic coefficients and linear interpolation
             h_inner_h = jnp.sum(
-                jnp.real(strain * jnp.conj(strain)) * self.quadratic_coeffs[detector.name]
+                jnp.real(strain * jnp.conj(strain))
+                * self.quadratic_coeffs[detector.name]
             )
 
             # Accumulate log-likelihood: Re(d|h) - (h|h)/2
             log_likelihood += jnp.real(d_inner_h) - h_inner_h / 2
+
+        return log_likelihood
+
+
+class PhaseMarginalizedMultibandedTransientLikelihoodFD(MultibandedTransientLikelihoodFD):
+    """Phase-marginalized multi-banded likelihood for gravitational wave transient events.
+
+    This class combines the multi-banding method (S. Morisaki, 2021, arXiv:2104.07813)
+    with analytic marginalization over the coalescence phase parameter. Phase marginalization
+    uses the modified Bessel function of the first kind to marginalize over the phase.
+
+    The likelihood evaluation is similar to MultibandedTransientLikelihoodFD, but computes
+    complex inner products and applies phase marginalization using log_i0.
+
+    Args:
+        detectors (Sequence[Detector]): List of detector objects.
+        waveform (Waveform): Waveform model to evaluate.
+        reference_chirp_mass (Float): Reference chirp mass (typically prior minimum).
+        fixed_parameters (Optional[dict]): Fixed parameters for the likelihood.
+        f_min (Float): Minimum frequency for likelihood evaluation.
+        f_max (Float): Maximum frequency for likelihood evaluation.
+        trigger_time (Float): GPS time of the event trigger.
+        highest_mode (int): Maximum magnetic number (default 2, for 22-mode only).
+        accuracy_factor (Float): Accuracy parameter L (default 5.0).
+        time_offset (Float): Time offset in seconds (default 2.12).
+        delta_f_end (Float): End frequency taper scale in Hz (default 53.0).
+        maximum_banding_frequency (Optional[Float]): Upper limit on band starting frequency.
+        minimum_banding_duration (Float): Minimum duration for bands.
+    """
+
+    def evaluate(self, params: dict[str, Float], data: dict) -> Float:
+        """Evaluate the phase-marginalized log-likelihood for given parameters.
+
+        Parameters
+        ----------
+        params : dict[str, Float]
+            Dictionary of model parameters.
+        data : dict
+            Data dictionary (not used, data stored in detectors).
+
+        Returns
+        -------
+        Float
+            Phase-marginalized log-likelihood value.
+        """
+        params = params.copy()
+        params.update(self.fixed_parameters)
+        params["phase_c"] = 0.0  # Fix phase to 0 for phase marginalization
+        params["trigger_time"] = self.trigger_time
+        params["gmst"] = self.gmst
+        return self._likelihood(params, data)
+
+    def _likelihood(self, params: dict[str, Float], data: dict) -> Float:
+        """Core phase-marginalized likelihood evaluation using multi-banding.
+
+        Parameters
+        ----------
+        params : dict[str, Float]
+            Dictionary of model parameters.
+        data : dict
+            Data dictionary (not used).
+
+        Returns
+        -------
+        Float
+            Phase-marginalized log-likelihood value.
+        """
+        # Generate waveform at unique frequencies
+        waveform_sky = self.waveform(self.unique_frequencies, params)
+
+        log_likelihood = 0.0
+        complex_d_inner_h = 0.0 + 0.0j
+
+        for detector in self.detectors:
+            # Get detector response at banded frequencies
+            # First evaluate at unique frequencies, then map to banded
+            h_det_unique = detector.fd_response(
+                self.unique_frequencies, waveform_sky, params
+            )
+
+            # Map from unique to banded frequency points
+            strain = h_det_unique[self.unique_to_original]
+
+            # Compute complex (d|h) using pre-computed linear coefficients
+            # Note: linear_coeffs already contains the conjugated data
+            complex_d_inner_h += jnp.sum(strain * self.linear_coeffs[detector.name])
+
+            # Compute (h|h) using pre-computed quadratic coefficients and linear interpolation
+            h_inner_h = jnp.sum(
+                jnp.real(strain * jnp.conj(strain))
+                * self.quadratic_coeffs[detector.name]
+            )
+
+            # Accumulate -(h|h)/2 part
+            log_likelihood += -h_inner_h / 2
+
+        # Add phase marginalization term using modified Bessel function
+        log_likelihood += log_i0(jnp.absolute(complex_d_inner_h))
 
         return log_likelihood
 
@@ -1451,4 +1569,5 @@ likelihood_presets = {
     "HeterodynedTransientLikelihoodFD": HeterodynedTransientLikelihoodFD,
     "PhaseMarginalizedHeterodynedLikelihoodFD": HeterodynedPhaseMarginalizedLikelihoodFD,
     "MultibandedTransientLikelihoodFD": MultibandedTransientLikelihoodFD,
+    "PhaseMarginalizedMultibandedTransientLikelihoodFD": PhaseMarginalizedMultibandedTransientLikelihoodFD,
 }
