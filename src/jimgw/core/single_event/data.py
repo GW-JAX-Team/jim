@@ -347,13 +347,13 @@ class Data(ABC):
         Args:
             path (str): Path to the .npz file containing the data.
         """
-        data = jnp.load(path, allow_pickle=True)
+        data = np.load(path, allow_pickle=True)
         if "td" not in data or "dt" not in data or "epoch" not in data:
             raise ValueError("The file must contain 'td', 'dt', and 'epoch' keys.")
-        td = data["td"]
+        td = jnp.array(data["td"])
         dt = float(data["dt"])
         epoch = float(data["epoch"])
-        name = str(data["name"])
+        name = str(data.get("name", ""))
         return cls(td, dt, epoch, name)
 
     def to_file(self, path: str):
@@ -543,8 +543,8 @@ class PowerSpectrum(ABC):
         data = np.load(path, allow_pickle=True)
         if "values" not in data or "frequencies" not in data:
             raise ValueError("The file must contain 'values' and 'frequencies' keys.")
-        values = data["values"]
-        frequencies = data["frequencies"]
+        values = jnp.array(data["values"])
+        frequencies = jnp.array(data["frequencies"])
         name = str(data.get("name", ""))
         return cls(values, frequencies, name)
 
