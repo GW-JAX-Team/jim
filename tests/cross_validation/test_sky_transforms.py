@@ -312,7 +312,7 @@ class TestGMST:
 
     def test_gmst(self):
         """Compare Jim's GMST with bilby_cython's implementation."""
-        from jimgw.gps_times import greenwich_mean_sidereal_time as jim_gmst
+        from jimgw.core.single_event.gps_times import greenwich_mean_sidereal_time as jim_gmst
         from bilby_cython.time import greenwich_mean_sidereal_time
 
         tol_diff = 0
