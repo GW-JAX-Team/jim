@@ -466,17 +466,25 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
         n_bins: int = 100,
         popsize: int = 100,
         n_steps: int = 2000,
-        reference_parameters: dict = {},
+        reference_parameters: Optional[dict] = None,
         reference_waveform: Optional[Waveform] = None,
         prior: Optional[Prior] = None,
-        sample_transforms: list[BijectiveTransform] = [],
-        likelihood_transforms: list[NtoMTransform] = [],
+        sample_transforms: Optional[list[BijectiveTransform]] = None,
+        likelihood_transforms: Optional[list[NtoMTransform]] = None,
     ):
         super().__init__(
             detectors, waveform, fixed_parameters, f_min, f_max, trigger_time
         )
 
         logger.info("Initializing heterodyned likelihood..")
+
+        # Initialize mutable default arguments
+        if reference_parameters is None:
+            reference_parameters = {}
+        if sample_transforms is None:
+            sample_transforms = []
+        if likelihood_transforms is None:
+            likelihood_transforms = []
 
         # Can use another waveform to use as reference waveform, but if not provided, use the same waveform
         if reference_waveform is None:
