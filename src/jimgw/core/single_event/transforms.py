@@ -60,6 +60,7 @@ class SpinAnglesToCartesianSpinTransform(ConditionalBijectiveTransform):
         self.freq_ref = freq_ref
 
         if fixed_phase:
+
             def named_transform(x):
                 iota, s1x, s1y, s1z, s2x, s2y, s2z = spin_angles_to_cartesian_spin(
                     x["theta_jn"],
@@ -84,6 +85,7 @@ class SpinAnglesToCartesianSpinTransform(ConditionalBijectiveTransform):
                     "s2_z": s2z,
                 }
         else:
+
             def named_transform(x):
                 iota, s1x, s1y, s1z, s2x, s2y, s2z = spin_angles_to_cartesian_spin(
                     x["theta_jn"],
