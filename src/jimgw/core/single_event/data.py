@@ -347,7 +347,7 @@ class Data(ABC):
         Args:
             path (str): Path to the .npz file containing the data.
         """
-        data = np.load(path, allow_pickle=True)
+        data = np.load(path)
         if "td" not in data or "dt" not in data or "epoch" not in data:
             raise ValueError("The file must contain 'td', 'dt', and 'epoch' keys.")
         td = jnp.array(data["td"])
@@ -540,7 +540,7 @@ class PowerSpectrum(ABC):
         Args:
             path (str): Path to the .npz file containing the data.
         """
-        data = np.load(path, allow_pickle=True)
+        data = np.load(path)
         if "values" not in data or "frequencies" not in data:
             raise ValueError("The file must contain 'values' and 'frequencies' keys.")
         values = jnp.array(data["values"])
