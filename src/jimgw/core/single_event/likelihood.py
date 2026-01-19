@@ -158,8 +158,8 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         self.df = _frequencies[0][1] - _frequencies[0][0]
         self.frequencies = jnp.unique(jnp.concatenate(_frequencies))
 
-        # Check that all frequency arrays are the same for child classes
-        if type(self) is not BaseTransientLikelihoodFD:
+        # Check that all detectors have the same frequency array, unless using specialized likelihoods
+        if type(self) not in [BaseTransientLikelihoodFD, PhaseMarginalizedLikelihoodFD]:
             assert all(
                 jnp.array_equal(_frequencies[0], freq) for freq in _frequencies
             ), (
@@ -196,9 +196,11 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
     def _likelihood(self, params: dict[str, Float], data: dict) -> Float:
         """Core likelihood evaluation method for frequency-domain transient events."""
         waveform_sky = self.waveform(self.frequencies, params)
+
         log_likelihood = 0.0
         for i, ifo in enumerate(self.detectors):
             psd = ifo.sliced_psd
+
             waveform_sky_ifo = {
                 key: waveform_sky[key][self.frequency_masks[i]] for key in waveform_sky
             }
@@ -356,23 +358,21 @@ class PhaseMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
         return log_likelihood
 
     def _likelihood(self, params: dict[str, Float], data: dict) -> Float:
+        waveform_sky = self.waveform(self.frequencies, params)
+
         log_likelihood = 0.0
         complex_d_inner_h = 0.0 + 0.0j
+        for i, ifo in enumerate(self.detectors):
+            psd = ifo.sliced_psd
 
-        waveform_sky = self.waveform(self.frequencies, params)
-        df = (
-            self.detectors[0].sliced_frequencies[1]
-            - self.detectors[0].sliced_frequencies[0]
-        )
-        for ifo in self.detectors:
-            freqs, ifo_data, psd = (
-                ifo.sliced_frequencies,
-                ifo.sliced_fd_data,
-                ifo.sliced_psd,
+            waveform_sky_ifo = {
+                key: waveform_sky[key][self.frequency_masks[i]] for key in waveform_sky
+            }
+            h_dec = ifo.fd_response(ifo.sliced_frequencies, waveform_sky_ifo, params)
+            complex_d_inner_h += complex_inner_product(
+                h_dec, ifo.sliced_fd_data, psd, self.df
             )
-            h_dec = ifo.fd_response(freqs, waveform_sky, params)
-            complex_d_inner_h += complex_inner_product(h_dec, ifo_data, psd, df)
-            optimal_SNR = inner_product(h_dec, h_dec, psd, df)
+            optimal_SNR = inner_product(h_dec, h_dec, psd, self.df)
             log_likelihood += -optimal_SNR / 2
 
         log_likelihood += log_i0(jnp.absolute(complex_d_inner_h))
