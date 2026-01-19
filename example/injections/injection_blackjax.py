@@ -25,7 +25,6 @@ from jimgw.core.prior import (
     PowerLawPrior,
     SinePrior,
     UniformPrior,
-    UniformSpherePrior,
 )
 from jimgw.core.single_event.data import PowerSpectrum
 from jimgw.core.single_event.detector import get_H1, get_L1, get_V1
@@ -35,16 +34,15 @@ from jimgw.core.single_event.likelihood import (
     MultibandedTransientLikelihoodFD,
 )
 from jimgw.core.single_event.transforms import (
-    DistanceToSNRWeightedDistanceTransform,
-    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform,
-    GeocentricArrivalTimeToDetectorArrivalTimeTransform,
     MassRatioToSymmetricMassRatioTransform,
+    DistanceToSNRWeightedDistanceTransform,
+    GeocentricArrivalTimeToDetectorArrivalTimeTransform,
+    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform,
     SkyFrameToDetectorFrameSkyPositionTransform,
-    SphereSpinToCartesianSpinTransform,
 )
+from jimgw.core.transforms import BoundToUnbound
 from jimgw.core.single_event.waveform import RippleIMRPhenomD_NRTidalv2
 from jimgw.core.single_event.utils import eta_to_q
-from jimgw.core.transforms import BoundToUnbound
 
 import utils
 
@@ -52,16 +50,12 @@ jax.config.update("jax_enable_x64", True)
 
 plt.rcParams.update(bundles.tmlr2023())
 
-# Parameterization aligned with the spherical-spin setup
+# Parameterization aligned with NRTidalV2_PhenomD (aligned spins)
 PARAMETER_NAMES = [
     "M_c",
     "q",
-    "s1_mag",
-    "s1_theta",
-    "s1_phi",
-    "s2_mag",
-    "s2_theta",
-    "s2_phi",
+    "s1_z",
+    "s2_z",
     "lambda_1",
     "lambda_2",
     "d_L",
@@ -73,19 +67,15 @@ PARAMETER_NAMES = [
     "dec",
 ]
 
-SPIN_MAG_MAX = 0.05
+SPIN_MAX = 0.05
 MC_TIGHT_WINDOW = 0.1
 DISTANCE_POWER_LAW = 2.0
 
 PARAMETER_RANGES = {
     "M_c": (0.8759659737275101, 2.6060030916165484),
     "q": (0.5, 1.0),
-    "s1_mag": (0.0, SPIN_MAG_MAX),
-    "s1_theta": (0.0, jnp.pi),
-    "s1_phi": (0.0, 2 * jnp.pi),
-    "s2_mag": (0.0, SPIN_MAG_MAX),
-    "s2_theta": (0.0, jnp.pi),
-    "s2_phi": (0.0, 2 * jnp.pi),
+    "s1_z": (-SPIN_MAX, SPIN_MAX),
+    "s2_z": (-SPIN_MAX, SPIN_MAX),
     "lambda_1": (0.0, 5000.0),
     "lambda_2": (0.0, 5000.0),
     "d_L": (30.0, 300.0),
@@ -98,21 +88,13 @@ PARAMETER_RANGES = {
 }
 
 
-def _sphere_to_cartesian(mag: float, theta: float, phi: float) -> tuple[float, float, float]:
-    sin_theta = np.sin(theta)
-    x = float(mag * sin_theta * np.cos(phi))
-    y = float(mag * sin_theta * np.sin(phi))
-    z = float(mag * np.cos(theta))
-    return x, y, z
-
-
 def build_injection_prior() -> CombinePrior:
     """Return the broad prior used to draw injection parameters."""
     priors = [
         UniformPrior(*PARAMETER_RANGES["M_c"], parameter_names=["M_c"]),
         UniformPrior(*PARAMETER_RANGES["q"], parameter_names=["q"]),
-        UniformSpherePrior(parameter_names=["s1"], max_mag=SPIN_MAG_MAX),
-        UniformSpherePrior(parameter_names=["s2"], max_mag=SPIN_MAG_MAX),
+        UniformPrior(*PARAMETER_RANGES["s1_z"], parameter_names=["s1_z"]),
+        UniformPrior(*PARAMETER_RANGES["s2_z"], parameter_names=["s2_z"]),
         UniformPrior(*PARAMETER_RANGES["lambda_1"], parameter_names=["lambda_1"]),
         UniformPrior(*PARAMETER_RANGES["lambda_2"], parameter_names=["lambda_2"]),
         PowerLawPrior(
@@ -143,17 +125,11 @@ def build_inference_prior(
     priors = [
         UniformPrior(bounds["M_c"][0], bounds["M_c"][1], parameter_names=["M_c"]),
         UniformPrior(*bounds["q"], parameter_names=["q"]),
-        UniformSpherePrior(parameter_names=["s1"], max_mag=SPIN_MAG_MAX),
-        UniformSpherePrior(parameter_names=["s2"], max_mag=SPIN_MAG_MAX),
+        UniformPrior(*bounds["s1_z"], parameter_names=["s1_z"]),
+        UniformPrior(*bounds["s2_z"], parameter_names=["s2_z"]),
         UniformPrior(*bounds["lambda_1"], parameter_names=["lambda_1"]),
         UniformPrior(*bounds["lambda_2"], parameter_names=["lambda_2"]),
-        # PowerLawPrior(
-        #     bounds["d_L"][0],
-        #     bounds["d_L"][1],
-        #     DISTANCE_POWER_LAW,
-        #     parameter_names=["d_L"],
-        # ),
-        UniformPrior(*bounds["d_L"], parameter_names=["d_L"]),        
+        UniformPrior(*bounds["d_L"], parameter_names=["d_L"]),
         UniformPrior(*bounds["t_c"], parameter_names=["t_c"]),
         UniformPrior(*bounds["phase_c"], parameter_names=["phase_c"]),
         SinePrior(parameter_names=["iota"]),
@@ -246,17 +222,11 @@ def body(args):
         print("Injecting signals . . .")
         waveform = ripple_waveform_fn(f_ref=config["fref"])
 
-        # convert injected mass ratio to eta and unpack angular parameters
+        # convert injected mass ratio to eta
         q = config["q"]
         eta = q / (1 + q) ** 2
         iota = config["iota"]
         dec = config["dec"]
-        s1_x, s1_y, s1_z = _sphere_to_cartesian(
-            config["s1_mag"], config["s1_theta"], config["s1_phi"]
-        )
-        s2_x, s2_y, s2_z = _sphere_to_cartesian(
-            config["s2_mag"], config["s2_theta"], config["s2_phi"]
-        )
         # Setup the timing setting for the injection
         epoch = config["duration"] - config["post_trigger_duration"]
         trigger_time = config["trigger_time"]
@@ -265,27 +235,15 @@ def body(args):
         true_param = {
             'M_c':           config["M_c"],           # chirp mass
             'eta':           eta,                     # symmetric mass ratio 0 < eta <= 0.25
-            'q':             q,
-            's1_mag':        config["s1_mag"],
-            's1_theta':      config["s1_theta"],
-            's1_phi':        config["s1_phi"],
-            's1_x':          s1_x,
-            's1_y':          s1_y,
-            's1_z':          s1_z,
-            's2_mag':        config["s2_mag"],
-            's2_theta':      config["s2_theta"],
-            's2_phi':        config["s2_phi"],
-            's2_x':          s2_x,
-            's2_y':          s2_y,
-            's2_z':          s2_z,
-            'lambda_1':      config["lambda_1"],      # tidal deformability of priminary component lambda_1.
-            'lambda_2':      config["lambda_2"],      # tidal deformability of secondary component lambda_2.
+            's1_z':          config["s1_z"],          # aligned spin of primary component
+            's2_z':          config["s2_z"],          # aligned spin of secondary component
+            'lambda_1':      config["lambda_1"],      # tidal deformability of primary component
+            'lambda_2':      config["lambda_2"],      # tidal deformability of secondary component
             'd_L':           config["d_L"],           # luminosity distance
             't_c':           config["t_c"],           # timeshift w.r.t. trigger time
             'phase_c':       config["phase_c"],       # merging phase
             'iota':          iota,                    # inclination angle
             'psi':           config["psi"],           # polarization angle
-            # "psi":  jnp.array([jnp.pi/4]),
             'ra':            config["ra"],            # right ascension
             'dec':           dec,                     # declination
             'gmst':          gmst,                    # Greenwich mean sidereal time
@@ -405,72 +363,72 @@ def body(args):
     # Save the ref params
     utils.save_relative_binning_ref_params(likelihood, outdir)
 
-    # Define transforms
-    gps_time = config["trigger_time"]
-    mc_min, mc_max = inference_bounds["M_c"]
-    q_min, q_max = PARAMETER_RANGES["q"]
-    spin_theta_bounds = (0.0, jnp.pi)
-    spin_phi_bounds = (0.0, 2 * jnp.pi)
-    spin_mag_bounds = (0.0, SPIN_MAG_MAX)
+    # Define transforms for aligned spin parameterization (PhenomD)
+    # Physical reparameterizations for better sampling
     sample_transforms = [
-        DistanceToSNRWeightedDistanceTransform(gps_time=gps_time, ifos=ifos),
-        GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(gps_time=gps_time, ifo=ifos[0]),
-        GeocentricArrivalTimeToDetectorArrivalTimeTransform(gps_time=gps_time, ifo=ifos[0]),
-        SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps_time, ifos=ifos),
+        # Physical reparameterizations
+        DistanceToSNRWeightedDistanceTransform(
+            gps_time=config["trigger_time"], ifos=ifos,
+        ),
+        GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+            gps_time=config["trigger_time"], ifo=ifos[0],
+        ),
+        GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+            gps_time=config["trigger_time"], ifo=ifos[0],
+        ),
+        SkyFrameToDetectorFrameSkyPositionTransform(
+            gps_time=config["trigger_time"], ifos=ifos,
+        ),
+        # Bound to unbound transforms for all bounded parameters
         BoundToUnbound(
             name_mapping=(["M_c"], ["M_c_unbounded"]),
-            original_lower_bound=mc_min,
-            original_upper_bound=mc_max,
+            original_lower_bound=inference_bounds["M_c"][0],
+            original_upper_bound=inference_bounds["M_c"][1],
         ),
         BoundToUnbound(
             name_mapping=(["q"], ["q_unbounded"]),
-            original_lower_bound=q_min,
-            original_upper_bound=q_max,
+            original_lower_bound=inference_bounds["q"][0],
+            original_upper_bound=inference_bounds["q"][1],
         ),
         BoundToUnbound(
-            name_mapping=(["s1_phi"], ["s1_phi_unbounded"]),
-            original_lower_bound=spin_phi_bounds[0],
-            original_upper_bound=spin_phi_bounds[1],
+            name_mapping=(["s1_z"], ["s1_z_unbounded"]),
+            original_lower_bound=inference_bounds["s1_z"][0],
+            original_upper_bound=inference_bounds["s1_z"][1],
         ),
         BoundToUnbound(
-            name_mapping=(["s2_phi"], ["s2_phi_unbounded"]),
-            original_lower_bound=spin_phi_bounds[0],
-            original_upper_bound=spin_phi_bounds[1],
+            name_mapping=(["s2_z"], ["s2_z_unbounded"]),
+            original_lower_bound=inference_bounds["s2_z"][0],
+            original_upper_bound=inference_bounds["s2_z"][1],
+        ),
+        BoundToUnbound(
+            name_mapping=(["lambda_1"], ["lambda_1_unbounded"]),
+            original_lower_bound=inference_bounds["lambda_1"][0],
+            original_upper_bound=inference_bounds["lambda_1"][1],
+        ),
+        BoundToUnbound(
+            name_mapping=(["lambda_2"], ["lambda_2_unbounded"]),
+            original_lower_bound=inference_bounds["lambda_2"][0],
+            original_upper_bound=inference_bounds["lambda_2"][1],
         ),
         BoundToUnbound(
             name_mapping=(["iota"], ["iota_unbounded"]),
-            original_lower_bound=PARAMETER_RANGES["iota"][0],
-            original_upper_bound=PARAMETER_RANGES["iota"][1],
+            original_lower_bound=0.0,
+            original_upper_bound=jnp.pi,
         ),
         BoundToUnbound(
-            name_mapping=(["s1_theta"], ["s1_theta_unbounded"]),
-            original_lower_bound=spin_theta_bounds[0],
-            original_upper_bound=spin_theta_bounds[1],
+            name_mapping=(["psi"], ["psi_unbounded"]),
+            original_lower_bound=inference_bounds["psi"][0],
+            original_upper_bound=inference_bounds["psi"][1],
         ),
         BoundToUnbound(
-            name_mapping=(["s2_theta"], ["s2_theta_unbounded"]),
-            original_lower_bound=spin_theta_bounds[0],
-            original_upper_bound=spin_theta_bounds[1],
-        ),
-        BoundToUnbound(
-            name_mapping=(["s1_mag"], ["s1_mag_unbounded"]),
-            original_lower_bound=spin_mag_bounds[0],
-            original_upper_bound=spin_mag_bounds[1],
-        ),
-        BoundToUnbound(
-            name_mapping=(["s2_mag"], ["s2_mag_unbounded"]),
-            original_lower_bound=spin_mag_bounds[0],
-            original_upper_bound=spin_mag_bounds[1],
+            name_mapping=(["t_det"], ["t_det_unbounded"]),
+            original_lower_bound=inference_bounds["t_c"][0],
+            original_upper_bound=inference_bounds["t_c"][1],
         ),
         BoundToUnbound(
             name_mapping=(["phase_det"], ["phase_det_unbounded"]),
             original_lower_bound=0.0,
             original_upper_bound=2 * jnp.pi,
-        ),
-        BoundToUnbound(
-            name_mapping=(["psi"], ["psi_unbounded"]),
-            original_lower_bound=PARAMETER_RANGES["psi"][0],
-            original_upper_bound=PARAMETER_RANGES["psi"][1],
         ),
         BoundToUnbound(
             name_mapping=(["zenith"], ["zenith_unbounded"]),
@@ -483,11 +441,7 @@ def body(args):
             original_upper_bound=2 * jnp.pi,
         ),
     ]
-    likelihood_transforms = [
-        MassRatioToSymmetricMassRatioTransform,
-        SphereSpinToCartesianSpinTransform("s1"),
-        SphereSpinToCartesianSpinTransform("s2"),
-    ]
+    likelihood_transforms = [MassRatioToSymmetricMassRatioTransform]
 
     def loglikelihood(x, target_likelihood):
         for transform in reversed(sample_transforms):
@@ -528,15 +482,11 @@ def body(args):
 
     # | Initialize the Nested Sampling algorithm
     labels = {
-    "M_c": r"$M_c$",
-    "q": r"$q$",
-    "eta": r"$\eta$",
-    "s1_mag": r"$|\chi_1|$",
-    "s1_theta": r"$\theta_1$",
-    "s1_phi": r"$\phi_1$",
-        "s2_mag": r"$|\chi_2|$",
-        "s2_theta": r"$\theta_2$",
-        "s2_phi": r"$\phi_2$",
+        "M_c": r"$M_c$",
+        "q": r"$q$",
+        "eta": r"$\eta$",
+        "s1_z": r"$\chi_{1z}$",
+        "s2_z": r"$\chi_{2z}$",
         "iota": r"$\iota$",
         "d_L": r"$d_L$",
         "t_c": r"$t_c$",
@@ -609,26 +559,17 @@ def body(args):
         return posterior_df, dataframe, sampling_elapsed, rng_key
 
     rng_key = jax.random.PRNGKey(0)
-    posterior_df, dataframe, sampling_elapsed, rng_key = run_nested_sampling(
-        likelihood,
-        label="Heterodyned",
-        rng_key=rng_key,
-        progress_desc="Dead points (heterodyned)",
-    )
 
-    # Multiband follow-up run
+    # Multiband run
     mb_likelihood = MultibandedTransientLikelihoodFD(
         ifos,
         waveform=waveform,
         reference_chirp_mass=inference_bounds["M_c"][0],
-        trigger_time=config["trigger_time"],
         f_min=fmin,
         f_max=fmax,
     )
     mb_bands = mb_likelihood.number_of_bands
     print(f"Multiband setup uses {mb_bands} bands.")
-    if mb_bands <= 1:
-        print("WARNING: Multiband default settings yielded <=1 band.")
 
     mb_posterior_df, mb_dataframe, mb_sampling_elapsed, rng_key = run_nested_sampling(
         mb_likelihood,
@@ -637,15 +578,20 @@ def body(args):
         progress_desc="Dead points (multiband)",
     )
 
+    # Heterodyned run
+    print("Running heterodyned likelihood...")
+    het_posterior_df, het_dataframe, het_sampling_elapsed, rng_key = run_nested_sampling(
+        likelihood,
+        label="Heterodyned",
+        rng_key=rng_key,
+        progress_desc="Dead points (heterodyned)",
+    )
+
     plot_params = [
         "M_c",
         "q",
-        "s1_mag",
-        "s1_theta",
-        "s1_phi",
-        "s2_mag",
-        "s2_theta",
-        "s2_phi",
+        "s1_z",
+        "s2_z",
         "lambda_1",
         "lambda_2",
         "d_L",
@@ -657,19 +603,24 @@ def body(args):
         "dec",
     ]
     f, a = anesthetic.make_2d_axes(plot_params, upper=False, figsize=(14, 12))
-    posterior_df.plot_2d(
-        a,
-        kinds=dict(diagonal="kde_1d", lower="scatter_2d"),
-        label="heterodyned",
-        color="C0",
-    )
+
+    # Plot multiband posterior
     mb_posterior_df.plot_2d(
         a,
         kinds=dict(diagonal="kde_1d", lower="scatter_2d"),
         label="multiband",
+        color="C0",
+    )
+
+    # Plot heterodyned posterior on the same axes
+    het_posterior_df.plot_2d(
+        a,
+        kinds=dict(diagonal="kde_1d", lower="scatter_2d"),
+        label="heterodyned",
         color="C1",
     )
-    a.iloc[-1, 0].legend(loc="upper right", labels=["heterodyned", "multiband"])
+
+    a.iloc[-1, 0].legend(loc="upper right", labels=["multiband", "heterodyned"])
 
     reduced_corner_params = ["M_c", "q", "d_L", "iota", "lambda_1", "lambda_2", "ra", "dec"]
     # dataframe.plot_2d(["M_c", "d_L", "iota", "ra", "dec"])
@@ -681,31 +632,33 @@ def body(args):
         print(true_param)
     f.tight_layout()
 
-    figure_path = os.path.join(outdir, "nested_corner.png")
+    figure_path = os.path.join(outdir, "nested_corner_comparison.png")
     f.savefig(figure_path)
-    print(f"Saved diagnostic corner plot to {figure_path}")
+    print(f"Saved comparison corner plot to {figure_path}")
+    print(f"Multiband sampling time: {mb_sampling_elapsed:.1f}s")
+    print(f"Heterodyned sampling time: {het_sampling_elapsed:.1f}s")
 
-    prior_df = dataframe.set_beta(0.0).compress(1000)
-    f_prior, a_prior = anesthetic.make_2d_axes(reduced_corner_params, upper=False, figsize=(8, 6))
-    prior_df.plot_2d(a_prior, kinds=dict(diagonal="kde_1d", lower="scatter_2d"), label="prior")
-    posterior_df.plot_2d(a_prior, kinds=dict(diagonal="kde_1d", lower="scatter_2d"), label="posterior")
-    if true_param is not None:
-        a_prior.axlines(true_param, ls=':', c='k', alpha=0.5)
-        a_prior.scatter(true_param, marker='*', c='k', label="truth")
-    a_prior.iloc[-1, 0].legend(
-        loc="lower center",
-        bbox_to_anchor=(len(a_prior) / 2, len(a_prior)),
-        frameon=False,
-    )
+    # prior_df = dataframe.set_beta(0.0).compress(1000)
+    # f_prior, a_prior = anesthetic.make_2d_axes(reduced_corner_params, upper=False, figsize=(8, 6))
+    # prior_df.plot_2d(a_prior, kinds=dict(diagonal="kde_1d", lower="scatter_2d"), label="prior")
+    # posterior_df.plot_2d(a_prior, kinds=dict(diagonal="kde_1d", lower="scatter_2d"), label="posterior")
+    # if true_param is not None:
+    #     a_prior.axlines(true_param, ls=':', c='k', alpha=0.5)
+    #     a_prior.scatter(true_param, marker='*', c='k', label="truth")
+    # a_prior.iloc[-1, 0].legend(
+    #     loc="lower center",
+    #     bbox_to_anchor=(len(a_prior) / 2, len(a_prior)),
+    #     frameon=False,
+    # )
 
-    prior_figure_path = os.path.join(outdir, "nested_corner_prior_posterior.png")
-    f_prior.savefig(prior_figure_path)
-    f_prior.savefig(os.path.join(outdir, "nested_corner_prior_posterior.pdf"))
-    print(f"Saved prior/posterior corner plot to {prior_figure_path}")
+    # prior_figure_path = os.path.join(outdir, "nested_corner_prior_posterior.png")
+    # f_prior.savefig(prior_figure_path)
+    # f_prior.savefig(os.path.join(outdir, "nested_corner_prior_posterior.pdf"))
+    # print(f"Saved prior/posterior corner plot to {prior_figure_path}")
 
-    combined_figure_path = os.path.join(outdir, "nested_corner_combined.png")
-    f.savefig(combined_figure_path)
-    print(f"Saved combined corner plot to {combined_figure_path}")
+    # combined_figure_path = os.path.join(outdir, "nested_corner_combined.png")
+    # f.savefig(combined_figure_path)
+    # print(f"Saved combined corner plot to {combined_figure_path}")
 
 ############
 ### MAIN ###
