@@ -209,7 +209,7 @@ class TestThetaPhiToRaDec:
             key, subkey = jax.random.split(key)
             subkeys = jax.random.split(subkey, 3)
             theta = jax.random.uniform(subkeys[0], (1,), minval=0, maxval=jnp.pi)
-            phi = jax.random.uniform(subkeys[1], (1,), minval=0, maxval=jnp.pi)
+            phi = jax.random.uniform(subkeys[1], (1,), minval=0, maxval=2 * jnp.pi)
             gmst = jax.random.uniform(subkeys[2], (1,), minval=0, maxval=2 * jnp.pi)
 
             jim_ra, jim_dec = jim_theta_phi_to_ra_dec(theta, phi, gmst)
