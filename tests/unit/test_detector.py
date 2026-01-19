@@ -4,6 +4,7 @@ jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
 from copy import deepcopy
+from pathlib import Path
 from scipy.signal import welch
 from jimgw.core.single_event.data import Data, PowerSpectrum
 from jimgw.core.single_event.detector import get_H1
@@ -11,6 +12,8 @@ from jimgw.core.single_event.waveform import RippleIMRPhenomD
 from jimgw.core.single_event.gps_times import (
     greenwich_mean_sidereal_time as compute_gmst,
 )
+
+FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
 
 class TestDataInterface:
@@ -124,8 +127,9 @@ class TestDataInterface:
         # Set up detector
         detector = get_H1()
 
-        # Load default PSD (this is a known working setup)
-        detector.load_and_set_psd()
+        # Load PSD from local fixture instead of fetching from internet
+        psd = PowerSpectrum.from_file(str(FIXTURES_DIR / "GW150914_psd_H1.npz"))
+        detector.set_psd(psd)
 
         # Set up observation parameters
         duration = 6.0
@@ -180,7 +184,8 @@ class TestDataInterface:
 
         # Test injection with noise
         detector_with_noise = get_H1()
-        detector_with_noise.load_and_set_psd()
+        psd_with_noise = PowerSpectrum.from_file(str(FIXTURES_DIR / "GW150914_psd_H1.npz"))
+        detector_with_noise.set_psd(psd_with_noise)
         detector_with_noise.frequency_bounds = (f_min, f_max)
 
         detector_with_noise.inject_signal(
