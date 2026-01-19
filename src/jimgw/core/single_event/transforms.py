@@ -54,7 +54,7 @@ class SpinAnglesToCartesianSpinTransform(ConditionalBijectiveTransform):
             ["iota", "s1_x", "s1_y", "s1_z", "s2_x", "s2_y", "s2_z"],
         )
 
-        conditional_names = ["M_c", "q", "phase_c"]
+        conditional_names = ["M_c", "q"] if fixed_phase else ["M_c", "q", "phase_c"]
         super().__init__(name_mapping, conditional_names)
 
         self.freq_ref = freq_ref
