@@ -30,14 +30,12 @@ from jimgw.core.single_event.data import PowerSpectrum
 from jimgw.core.single_event.detector import get_H1, get_L1, get_V1
 from jimgw.core.single_event.likelihood import (
     HeterodynedPhaseMarginalizedLikelihoodFD,
-    HeterodynedTransientLikelihoodFD,
-    MultibandedTransientLikelihoodFD,
+    PhaseMarginalizedMultibandedTransientLikelihoodFD,
 )
 from jimgw.core.single_event.transforms import (
     MassRatioToSymmetricMassRatioTransform,
     DistanceToSNRWeightedDistanceTransform,
     GeocentricArrivalTimeToDetectorArrivalTimeTransform,
-    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform,
     SkyFrameToDetectorFrameSkyPositionTransform,
 )
 from jimgw.core.transforms import BoundToUnbound
@@ -51,6 +49,7 @@ jax.config.update("jax_enable_x64", True)
 plt.rcParams.update(bundles.tmlr2023())
 
 # Parameterization aligned with NRTidalV2_PhenomD (aligned spins)
+# Note: phase_c is not included because we use phase-marginalized likelihoods
 PARAMETER_NAMES = [
     "M_c",
     "q",
@@ -60,7 +59,6 @@ PARAMETER_NAMES = [
     "lambda_2",
     "d_L",
     "t_c",
-    "phase_c",
     "iota",
     "psi",
     "ra",
@@ -80,7 +78,6 @@ PARAMETER_RANGES = {
     "lambda_2": (0.0, 5000.0),
     "d_L": (30.0, 300.0),
     "t_c": (-0.1, 0.1),
-    "phase_c": (0.0, 2 * jnp.pi),
     "iota": (0.0, jnp.pi),
     "psi": (0.0, jnp.pi),
     "ra": (0.0, 2 * jnp.pi),
@@ -89,7 +86,11 @@ PARAMETER_RANGES = {
 
 
 def build_injection_prior() -> CombinePrior:
-    """Return the broad prior used to draw injection parameters."""
+    """Return the broad prior used to draw injection parameters.
+
+    Note: phase_c is not included as we use phase-marginalized likelihoods.
+    For injection, phase_c is drawn separately.
+    """
     priors = [
         UniformPrior(*PARAMETER_RANGES["M_c"], parameter_names=["M_c"]),
         UniformPrior(*PARAMETER_RANGES["q"], parameter_names=["q"]),
@@ -104,7 +105,6 @@ def build_injection_prior() -> CombinePrior:
             parameter_names=["d_L"],
         ),
         UniformPrior(*PARAMETER_RANGES["t_c"], parameter_names=["t_c"]),
-        UniformPrior(*PARAMETER_RANGES["phase_c"], parameter_names=["phase_c"]),
         SinePrior(parameter_names=["iota"]),
         UniformPrior(*PARAMETER_RANGES["psi"], parameter_names=["psi"]),
         UniformPrior(*PARAMETER_RANGES["ra"], parameter_names=["ra"]),
@@ -116,7 +116,10 @@ def build_injection_prior() -> CombinePrior:
 def build_inference_prior(
     true_mc: float, mc_window: float = MC_TIGHT_WINDOW
 ) -> tuple[CombinePrior, dict[str, tuple[float, float]]]:
-    """Return the inference prior with a tight chirp-mass window plus the bounds used."""
+    """Return the inference prior with a tight chirp-mass window plus the bounds used.
+
+    Note: phase_c is not included as we use phase-marginalized likelihoods.
+    """
     bounds = {name: tuple(map(float, PARAMETER_RANGES[name])) for name in PARAMETER_NAMES}
     mc_lower = max(bounds["M_c"][0], true_mc - mc_window)
     mc_upper = min(bounds["M_c"][1], true_mc + mc_window)
@@ -131,7 +134,6 @@ def build_inference_prior(
         UniformPrior(*bounds["lambda_2"], parameter_names=["lambda_2"]),
         UniformPrior(*bounds["d_L"], parameter_names=["d_L"]),
         UniformPrior(*bounds["t_c"], parameter_names=["t_c"]),
-        UniformPrior(*bounds["phase_c"], parameter_names=["phase_c"]),
         SinePrior(parameter_names=["iota"]),
         UniformPrior(*bounds["psi"], parameter_names=["psi"]),
         UniformPrior(*bounds["ra"], parameter_names=["ra"]),
@@ -179,6 +181,9 @@ def body(args):
                 name: float(np.asarray(value)[0])
                 for name, value in sampled_params.items()
             }
+            # Draw phase_c separately for injection (not sampled, but needed for injection)
+            sampling_rng, phase_key = jax.random.split(sampling_rng)
+            params_dict["phase_c"] = float(jax.random.uniform(phase_key, minval=0.0, maxval=2 * jnp.pi))
 
             # Build config dictionary from argparse arguments
             config = {
@@ -365,13 +370,11 @@ def body(args):
 
     # Define transforms for aligned spin parameterization (PhenomD)
     # Physical reparameterizations for better sampling
+    # Note: No phase transform since we use phase-marginalized likelihoods
     sample_transforms = [
         # Physical reparameterizations
         DistanceToSNRWeightedDistanceTransform(
             gps_time=config["trigger_time"], ifos=ifos,
-        ),
-        GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
-            gps_time=config["trigger_time"], ifo=ifos[0],
         ),
         GeocentricArrivalTimeToDetectorArrivalTimeTransform(
             gps_time=config["trigger_time"], ifo=ifos[0],
@@ -424,11 +427,6 @@ def body(args):
             name_mapping=(["t_det"], ["t_det_unbounded"]),
             original_lower_bound=inference_bounds["t_c"][0],
             original_upper_bound=inference_bounds["t_c"][1],
-        ),
-        BoundToUnbound(
-            name_mapping=(["phase_det"], ["phase_det_unbounded"]),
-            original_lower_bound=0.0,
-            original_upper_bound=2 * jnp.pi,
         ),
         BoundToUnbound(
             name_mapping=(["zenith"], ["zenith_unbounded"]),
@@ -490,7 +488,6 @@ def body(args):
         "iota": r"$\iota$",
         "d_L": r"$d_L$",
         "t_c": r"$t_c$",
-        "phase_c": r"$\phi_c$",
         "psi": r"$\psi$",
         "ra": r"$\alpha$",
         "dec": r"$\delta$",
@@ -560,31 +557,32 @@ def body(args):
 
     rng_key = jax.random.PRNGKey(0)
 
-    # Multiband run
-    mb_likelihood = MultibandedTransientLikelihoodFD(
+    # Multiband run with phase marginalization
+    mb_likelihood = PhaseMarginalizedMultibandedTransientLikelihoodFD(
         ifos,
         waveform=waveform,
+        trigger_time=config["trigger_time"],
         reference_chirp_mass=inference_bounds["M_c"][0],
         f_min=fmin,
         f_max=fmax,
     )
     mb_bands = mb_likelihood.number_of_bands
-    print(f"Multiband setup uses {mb_bands} bands.")
+    print(f"Multiband (phase-marginalized) setup uses {mb_bands} bands.")
 
     mb_posterior_df, mb_dataframe, mb_sampling_elapsed, rng_key = run_nested_sampling(
         mb_likelihood,
-        label="Multiband",
+        label="Multiband (phase-marg)",
         rng_key=rng_key,
-        progress_desc="Dead points (multiband)",
+        progress_desc="Dead points (multiband phase-marg)",
     )
 
     # Heterodyned run
-    print("Running heterodyned likelihood...")
+    print("Running heterodyned phase-marginalized likelihood...")
     het_posterior_df, het_dataframe, het_sampling_elapsed, rng_key = run_nested_sampling(
         likelihood,
-        label="Heterodyned",
+        label="Heterodyned (phase-marg)",
         rng_key=rng_key,
-        progress_desc="Dead points (heterodyned)",
+        progress_desc="Dead points (heterodyned phase-marg)",
     )
 
     plot_params = [
@@ -596,7 +594,6 @@ def body(args):
         "lambda_2",
         "d_L",
         "t_c",
-        "phase_c",
         "iota",
         "psi",
         "ra",
@@ -608,7 +605,7 @@ def body(args):
     mb_posterior_df.plot_2d(
         a,
         kinds=dict(diagonal="kde_1d", lower="scatter_2d"),
-        label="multiband",
+        label="multiband (phase-marg)",
         color="C0",
     )
 
@@ -616,11 +613,11 @@ def body(args):
     het_posterior_df.plot_2d(
         a,
         kinds=dict(diagonal="kde_1d", lower="scatter_2d"),
-        label="heterodyned",
+        label="heterodyned (phase-marg)",
         color="C1",
     )
 
-    a.iloc[-1, 0].legend(loc="upper right", labels=["multiband", "heterodyned"])
+    a.iloc[-1, 0].legend(loc="upper right", labels=["multiband (phase-marg)", "heterodyned (phase-marg)"])
 
     reduced_corner_params = ["M_c", "q", "d_L", "iota", "lambda_1", "lambda_2", "ra", "dec"]
     # dataframe.plot_2d(["M_c", "d_L", "iota", "ra", "dec"])
