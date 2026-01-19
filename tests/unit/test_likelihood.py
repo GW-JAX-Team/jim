@@ -9,6 +9,10 @@ from jimgw.core.single_event.likelihood import (
     # PhaseTimeMarginalizedLikelihoodFD,
     HeterodynedTransientLikelihoodFD,
     # HeterodynedPhaseMarginalizedLikelihoodFD,
+    # Multibanded likelihoods
+    MultibandedTransientLikelihoodFD,
+    PhaseMarginalizedMultibandedTransientLikelihoodFD,
+    MultibandedGridPhaseMarginalizedTransientLikelihoodFD,
 )
 from jimgw.core.single_event.detector import get_H1, get_L1
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
@@ -279,3 +283,72 @@ class TestHeterodynedTransientLikelihoodFD:
 #         params = example_params(likelihood.gmst)
 #         result = likelihood.evaluate(params, {})
 #         assert np.isfinite(result)
+
+
+class TestMultibandedTransientLikelihoodFD:
+    def test_initialization_and_evaluation(self, detectors_and_waveform):
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        # Multibanded requires reference_chirp_mass for band construction
+        reference_chirp_mass = 25.0
+        likelihood = MultibandedTransientLikelihoodFD(
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
+            trigger_time=gps, reference_chirp_mass=reference_chirp_mass
+        )
+        assert isinstance(likelihood, MultibandedTransientLikelihoodFD)
+        params = example_params(likelihood.gmst)
+        result = likelihood.evaluate(params, {})
+        assert np.isfinite(result), "Multibanded likelihood should be finite"
+
+
+class TestPhaseMarginalizedMultibandedTransientLikelihoodFD:
+    def test_initialization_and_evaluation(self, detectors_and_waveform):
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        reference_chirp_mass = 25.0
+        likelihood = PhaseMarginalizedMultibandedTransientLikelihoodFD(
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
+            trigger_time=gps, reference_chirp_mass=reference_chirp_mass
+        )
+        assert isinstance(likelihood, PhaseMarginalizedMultibandedTransientLikelihoodFD)
+        params = example_params(likelihood.gmst)
+        result = likelihood.evaluate(params, {})
+        assert np.isfinite(result), "Phase marginalized multibanded likelihood should be finite"
+
+
+class TestMultibandedGridPhaseMarginalizedTransientLikelihoodFD:
+    def test_initialization_and_evaluation(self, detectors_and_waveform):
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        reference_chirp_mass = 25.0
+        likelihood = MultibandedGridPhaseMarginalizedTransientLikelihoodFD(
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
+            trigger_time=gps, reference_chirp_mass=reference_chirp_mass, n_phase_points=1001
+        )
+        assert isinstance(likelihood, MultibandedGridPhaseMarginalizedTransientLikelihoodFD)
+        assert likelihood.n_phase_points == 1001
+        params = example_params(likelihood.gmst)
+        result = likelihood.evaluate(params, {})
+        assert np.isfinite(result), "Multibanded grid phase marginalized likelihood should be finite"
+
+    def test_grid_vs_bessel_comparison(self, detectors_and_waveform):
+        """Test that multibanded grid marginalization gives similar results to Bessel function."""
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        reference_chirp_mass = 25.0
+
+        # Create both likelihoods
+        bessel_likelihood = PhaseMarginalizedMultibandedTransientLikelihoodFD(
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
+            trigger_time=gps, reference_chirp_mass=reference_chirp_mass
+        )
+        grid_likelihood = MultibandedGridPhaseMarginalizedTransientLikelihoodFD(
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
+            trigger_time=gps, reference_chirp_mass=reference_chirp_mass, n_phase_points=5001
+        )
+
+        params = example_params(bessel_likelihood.gmst)
+
+        bessel_result = bessel_likelihood.evaluate(params, {})
+        grid_result = grid_likelihood.evaluate(params, {})
+
+        # For (2,2) mode dominated waveforms, these should be very close
+        assert np.isclose(bessel_result, grid_result, rtol=0.01), (
+            f"Multibanded grid ({grid_result}) and Bessel ({bessel_result}) should give similar results"
+        )

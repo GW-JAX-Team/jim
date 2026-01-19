@@ -1555,6 +1555,142 @@ class PhaseMarginalizedMultibandedTransientLikelihoodFD(MultibandedTransientLike
         return log_likelihood
 
 
+class MultibandedGridPhaseMarginalizedTransientLikelihoodFD(
+    MultibandedTransientLikelihoodFD
+):
+    """Grid phase-marginalized multi-banded likelihood using (2,2) mode approximation.
+
+    This class performs phase marginalization by evaluating the likelihood on a grid
+    of phase values and marginalizing using logsumexp. It uses the (2,2) mode
+    approximation where the phase transformation is h(ϕc) = h(0) * exp(2i*ϕc).
+
+    This allows efficient grid evaluation without recomputing the waveform at each
+    grid point, as described in the DINGO paper (Dax et al.).
+
+    Attributes:
+        n_phase_points (int): Number of grid points for phase marginalization.
+        phase_grid (Array): Grid of phase values from 0 to 2π.
+
+    Args:
+        detectors: List of detector objects.
+        waveform: Waveform model to evaluate.
+        reference_chirp_mass: Reference chirp mass for band construction.
+        n_phase_points: Number of phase grid points (default 1001).
+        **kwargs: Additional arguments passed to MultibandedTransientLikelihoodFD.
+
+    Example:
+        >>> likelihood = MultibandedGridPhaseMarginalizedTransientLikelihoodFD(
+        ...     detectors=ifos,
+        ...     waveform=waveform,
+        ...     reference_chirp_mass=1.2,
+        ...     trigger_time=trigger_time,
+        ...     f_min=20.0,
+        ...     f_max=2048.0,
+        ...     n_phase_points=1001,
+        ... )
+    """
+
+    n_phase_points: int
+    phase_grid: Float[Array, " n_phase_points"]
+
+    def __init__(
+        self,
+        detectors: Sequence[Detector],
+        waveform: Waveform,
+        reference_chirp_mass: Float,
+        n_phase_points: int = 1001,
+        **kwargs,
+    ):
+        super().__init__(
+            detectors=detectors,
+            waveform=waveform,
+            reference_chirp_mass=reference_chirp_mass,
+            **kwargs,
+        )
+        self.n_phase_points = n_phase_points
+        self.phase_grid = jnp.linspace(0, 2 * jnp.pi, n_phase_points, endpoint=False)
+
+    def evaluate(self, params: dict[str, Float], data: dict) -> Float:
+        """Evaluate the grid phase-marginalized log-likelihood for given parameters.
+
+        Parameters
+        ----------
+        params : dict[str, Float]
+            Dictionary of model parameters.
+        data : dict
+            Data dictionary (not used, data stored in detectors).
+
+        Returns
+        -------
+        Float
+            Grid phase-marginalized log-likelihood value.
+        """
+        params = params.copy()
+        params.update(self.fixed_parameters)
+        params["phase_c"] = 0.0  # Fix phase to 0 for grid marginalization
+        params["trigger_time"] = self.trigger_time
+        params["gmst"] = self.gmst
+        return self._likelihood(params, data)
+
+    def _likelihood(
+        self, params: dict[str, Float], data: dict | None
+    ) -> Float:
+        """Evaluate grid phase-marginalized likelihood using (2,2) mode approximation.
+
+        Uses the fact that for (2,2) mode dominated waveforms:
+            h(ϕc) = h(0) * exp(2i*ϕc)
+
+        This means:
+            Re(<d|h(ϕc)>) = |<d|h(0)>| * cos(arg(<d|h(0)>) + 2*ϕc)
+
+        We evaluate this on a grid and marginalize using logsumexp.
+        """
+        # Generate waveform at unique frequencies
+        waveform_sky = self.waveform(self.unique_frequencies, params)
+
+        complex_d_inner_h = 0.0 + 0.0j
+        optimal_SNR_total = 0.0
+
+        for detector in self.detectors:
+            # Get detector response at unique frequencies, then map to banded
+            h_det_unique = detector.fd_response(
+                self.unique_frequencies, waveform_sky, params
+            )
+
+            # Map from unique to banded frequency points
+            strain = h_det_unique[self.unique_to_original]
+
+            # Compute complex <d|h> using pre-computed linear coefficients
+            complex_d_inner_h += jnp.sum(strain * self.linear_coeffs[detector.name])
+
+            # Compute (h|h) using pre-computed quadratic coefficients
+            h_inner_h = jnp.sum(
+                jnp.real(strain * jnp.conj(strain))
+                * self.quadratic_coeffs[detector.name]
+            )
+            optimal_SNR_total += h_inner_h
+
+        # Grid phase marginalization using (2,2) mode approximation
+        # For (2,2) mode: h(ϕc) = h(0) * exp(2i*ϕc)
+        # So <d|h(ϕc)> = <d|h(0)> * exp(2i*ϕc)
+        # Re(<d|h(ϕc)>) = |<d|h(0)>| * cos(arg(<d|h(0)>) + 2*ϕc)
+        abs_d_inner_h = jnp.absolute(complex_d_inner_h)
+        arg_d_inner_h = jnp.angle(complex_d_inner_h)
+
+        # Evaluate match filter SNR on phase grid
+        match_filter_snr_grid = abs_d_inner_h * jnp.cos(
+            arg_d_inner_h + 2 * self.phase_grid
+        )
+
+        # Log-likelihood at each phase point: <d|h> - (h|h)/2
+        log_likelihood_grid = match_filter_snr_grid - optimal_SNR_total / 2
+
+        # Marginalize over phase using logsumexp
+        log_likelihood = logsumexp(log_likelihood_grid) - jnp.log(self.n_phase_points)
+
+        return log_likelihood
+
+
 likelihood_presets = {
     "BaseTransientLikelihoodFD": BaseTransientLikelihoodFD,
     "TimeMarginalizedLikelihoodFD": TimeMarginalizedLikelihoodFD,
@@ -1564,4 +1700,5 @@ likelihood_presets = {
     "PhaseMarginalizedHeterodynedLikelihoodFD": HeterodynedPhaseMarginalizedLikelihoodFD,
     "MultibandedTransientLikelihoodFD": MultibandedTransientLikelihoodFD,
     "PhaseMarginalizedMultibandedTransientLikelihoodFD": PhaseMarginalizedMultibandedTransientLikelihoodFD,
+    "MultibandedGridPhaseMarginalizedTransientLikelihoodFD": MultibandedGridPhaseMarginalizedTransientLikelihoodFD,
 }
