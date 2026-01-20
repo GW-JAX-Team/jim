@@ -542,7 +542,9 @@ class PowerSpectrum(ABC):
         """
         with np.load(path) as data:
             if "values" not in data or "frequencies" not in data:
-                raise ValueError("The file must contain 'values' and 'frequencies' keys.")
+                raise ValueError(
+                    "The file must contain 'values' and 'frequencies' keys."
+                )
             values = jnp.array(data["values"])
             frequencies = jnp.array(data["frequencies"])
             name = str(data.get("name", ""))
