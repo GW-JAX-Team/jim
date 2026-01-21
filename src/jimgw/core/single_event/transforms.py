@@ -505,3 +505,72 @@ ChirpMassSymmetricMassRatioToComponentMassesTransform = reverse_bijective_transf
 SymmetricMassRatioToMassRatioTransform = reverse_bijective_transform(
     MassRatioToSymmetricMassRatioTransform
 )
+
+
+@jaxtyped(typechecker=typechecker)
+class SourceToDetectorFrameChirpMassTransform(ConditionalBijectiveTransform):
+    """
+    Transform chirp mass from source frame to detector frame using redshift.
+
+    M_c_detector = M_c_source * (1 + z), where z = H0 * d_L / c
+
+    This is useful when the prior samples in source-frame masses but the
+    likelihood requires detector-frame masses.
+
+    Parameters
+    ----------
+    H0 : float
+        Hubble constant in km/s/Mpc (default: 67.4)
+    name_mapping : tuple[list[str], list[str]]
+        The name mapping for input/output (default: (["M_c"], ["M_c"]))
+    """
+
+    H0: Float
+    c: Float  # speed of light in km/s
+
+    def __repr__(self):
+        return f"SourceToDetectorFrameChirpMassTransform(H0={self.H0})"
+
+    def __init__(
+        self,
+        H0: Float = 67.4,
+        name_mapping: tuple[list[str], list[str]] = (["M_c"], ["M_c"]),
+    ):
+        conditional_names = ["d_L"]
+        super().__init__(name_mapping, conditional_names)
+
+        self.H0 = H0
+        self.c = 2.998e5  # speed of light in km/s
+
+        assert "M_c" in name_mapping[0] and "M_c" in name_mapping[1]
+        assert "d_L" in conditional_names
+
+        def named_transform(x):
+            """Transform from source to detector frame."""
+            M_c_source = x["M_c"]
+            d_L = x["d_L"]
+
+            # Compute redshift z = H0 * d_L / c
+            z = self.H0 * d_L / self.c
+
+            # Transform to detector frame: M_c_detector = M_c_source * (1 + z)
+            M_c_detector = M_c_source * (1.0 + z)
+
+            return {"M_c": M_c_detector}
+
+        self.transform_func = named_transform
+
+        def named_inverse_transform(x):
+            """Transform from detector to source frame."""
+            M_c_detector = x["M_c"]
+            d_L = x["d_L"]
+
+            # Compute redshift z = H0 * d_L / c
+            z = self.H0 * d_L / self.c
+
+            # Transform to source frame: M_c_source = M_c_detector / (1 + z)
+            M_c_source = M_c_detector / (1.0 + z)
+
+            return {"M_c": M_c_source}
+
+        self.inverse_transform_func = named_inverse_transform
