@@ -1,14 +1,21 @@
-files: src/
 repos:
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.9.26
+    hooks:
+      - id: uv-lock
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.6
     hooks:
       - id: ruff-check
         args: ["--fix"]
+        files: src/
       - id: ruff-format
+        files: src/
   
   - repo: https://github.com/RobertCraigie/pyright-python
     rev: v1.1.402
     hooks:
     - id: pyright
+      files: src/
       additional_dependencies: [beartype, jax, jaxtyping, pytest, typing_extensions, flowMC, ripplegw, gwpy, astropy, dagster, corner]

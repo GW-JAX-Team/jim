@@ -347,13 +347,13 @@ class Data(ABC):
         Args:
             path (str): Path to the .npz file containing the data.
         """
-        data = jnp.load(path, allow_pickle=True)
-        if "td" not in data or "dt" not in data or "epoch" not in data:
-            raise ValueError("The file must contain 'td', 'dt', and 'epoch' keys.")
-        td = data["td"]
-        dt = float(data["dt"])
-        epoch = float(data["epoch"])
-        assert isinstance(name := data["name"], str), "Name must be a string"
+        with np.load(path) as data:
+            if "td" not in data or "dt" not in data or "epoch" not in data:
+                raise ValueError("The file must contain 'td', 'dt', and 'epoch' keys.")
+            td = jnp.array(data["td"])
+            dt = float(data["dt"])
+            epoch = float(data["epoch"])
+            name = str(data.get("name", ""))
         return cls(td, dt, epoch, name)
 
     def to_file(self, path: str):
@@ -531,7 +531,6 @@ class PowerSpectrum(ABC):
         noise_imag = jax.random.normal(subkey, shape=var.shape) * jnp.sqrt(var)
         return noise_real + 1j * noise_imag
 
-    # TODO: Add function to save to file and load data from file.
     @classmethod
     def from_file(cls, path: str) -> Self:
         """Load power spectrum from a file. This assumes the data to be in .npz format.
@@ -541,12 +540,14 @@ class PowerSpectrum(ABC):
         Args:
             path (str): Path to the .npz file containing the data.
         """
-        data = np.load(path, allow_pickle=True)
-        if "values" not in data or "frequencies" not in data:
-            raise ValueError("The file must contain 'values' and 'frequencies' keys.")
-        values = data["values"]
-        frequencies = data["frequencies"]
-        name = data.get("name", "")
+        with np.load(path) as data:
+            if "values" not in data or "frequencies" not in data:
+                raise ValueError(
+                    "The file must contain 'values' and 'frequencies' keys."
+                )
+            values = jnp.array(data["values"])
+            frequencies = jnp.array(data["frequencies"])
+            name = str(data.get("name", ""))
         return cls(values, frequencies, name)
 
     def to_file(self, path: str):

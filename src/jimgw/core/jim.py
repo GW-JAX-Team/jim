@@ -2,6 +2,7 @@ from typing import Sequence, Optional
 import logging
 import jax
 import jax.numpy as jnp
+import numpy as np
 from flowMC.resource_strategy_bundle.RQSpline_MALA_PT import RQSpline_MALA_PT_Bundle
 from flowMC.resource.buffers import Buffer
 from flowMC.Sampler import Sampler
@@ -216,28 +217,33 @@ class Jim(object):
 
     def get_samples(
         self,
-        training: bool = False,
-        rng_key: PRNGKeyArray = jax.random.PRNGKey(0),
         n_samples: int = 0,
-    ) -> dict[str, Float[Array, " n_chains n_dims"]]:
+        rng_key: PRNGKeyArray = jax.random.PRNGKey(21),
+        training: bool = False,
+    ) -> dict[str, np.ndarray]:
         """
-        Get the samples from the sampler.
+        Get the samples from the sampler, with optional uniform downsampling.
+
+        When `n_samples` > 0, performs uniform random downsampling to return a subset
+        of the total samples. This is useful for reducing memory usage when plotting
+        or analyzing large sample sets.
 
         Parameters
         ----------
+        n_samples : int, optional
+            Number of samples to return via uniform random downsampling. If 0, return all samples
+            with transforms applied, by default 0
+        rng_key : PRNGKeyArray, optional
+            RNG key for downsampling, by default jax.random.PRNGKey(21)
         training : bool, optional
             Whether to get the training samples or the production samples, by default False
-        rng_key : PRNGKeyArray, optional
-            Random key for downsampling, by default jax.random.PRNGKey(0).
-        n_samples : int, optional
-            Number of samples to return after downsampling. If 0 (default), returns all samples.
-            If the requested number exceeds available samples, a warning is logged and all
-            available samples are returned.
 
         Returns
         -------
-        dict
-            Dictionary of samples
+        dict[str, np.ndarray]
+            Dictionary of samples with parameter names as keys and numpy array values.
+            All sample transforms are reversed to return samples in the prior parameter space.
+            Returns numpy arrays for compatibility with plotting libraries and easy serialization.
 
         """
         if training:
@@ -253,16 +259,16 @@ class Jim(object):
 
         chains = chains.reshape(-1, self.prior.n_dims)
 
-        # Downsample to requested number of samples
+        # Downsample to requested number of samples (uniform random sampling)
         n_available = chains.shape[0]
         if n_samples > 0:
             if n_samples > n_available:
                 logger.warning(
-                    f"Requested {n_samples} samples but only {n_available} available "
-                    f"after rejection sampling. Returning all available samples."
+                    f"Requested {n_samples} samples but only {n_available} available. "
+                    f"Returning all available samples."
                 )
             else:
-                # Randomly select n_samples from the accepted chains
+                # Uniformly randomly select n_samples from the chains
                 rng_key, subkey = jax.random.split(rng_key)
                 indices = jax.random.choice(
                     subkey, n_available, shape=(n_samples,), replace=False
@@ -272,4 +278,8 @@ class Jim(object):
         chains = jax.vmap(self.add_name)(chains)
         for sample_transform in reversed(self.sample_transforms):
             chains = jax.vmap(sample_transform.backward)(chains)
+
+        # Convert to numpy arrays for compatibility with plotting and serialization
+        chains = {key: np.array(val) for key, val in chains.items()}
+
         return chains

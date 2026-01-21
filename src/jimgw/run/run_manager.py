@@ -23,8 +23,6 @@ class RunManager:
             self.run = run
         elif isinstance(run, str):
             self.run = RunDefinition.from_file(run)
-        else:
-            logger.error("Run object or path not given.")
 
         assert isinstance(run, RunDefinition), (
             "Run object or path not given. Please provide a Run object or a path to a serialized Run object."
@@ -51,11 +49,11 @@ class RunManager:
 
     ### Data-fetching functions ###
 
-    def get_chain_samples(
-        self, training: bool = False
-    ) -> dict[str, Float[Array, "n_chains n_dims"]]:
+    def get_chain_samples(self, training: bool = False) -> dict[str, np.ndarray]:
         """
         Fetch the samples from the sampler.
+
+        Returns numpy arrays (can be saved directly with np.savez).
         """
         return self.jim.get_samples(training=training)
 

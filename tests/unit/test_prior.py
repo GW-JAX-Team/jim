@@ -16,17 +16,9 @@ from jimgw.core.prior import (
     BoundedMixin,
     SequentialTransformPrior,
 )
+from tests.utils import assert_all_finite, assert_all_in_range
 
 jax.config.update("jax_enable_x64", True)
-
-
-def assert_all_finite(arr):
-    """Assert all values in the array are finite."""
-    assert jnp.all(jnp.isfinite(arr)), "Array contains non-finite values."
-
-
-def assert_all_in_range(arr, low, high):
-    assert jnp.all((arr >= low) & (arr <= high)), f"Values not in [{low}, {high}]"
 
 
 class TestUnivariatePrior:
