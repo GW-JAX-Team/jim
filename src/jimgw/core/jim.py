@@ -57,6 +57,7 @@ class Jim(object):
         n_tempered_steps: int = 5,
         verbose: bool = False,
         pretrain_flow_path: str | None = None,
+        early_stopping_acceptance_criterion: float | None = 1.0,
     ):
         # Debug logging: Log all initialization parameters
         logger.debug("="*80)
@@ -88,6 +89,7 @@ class Jim(object):
         logger.debug(f"  n_tempered_steps: {n_tempered_steps}")
         logger.debug(f"  verbose: {verbose}")
         logger.debug(f"  pretrain_flow_path: {pretrain_flow_path}")
+        logger.debug(f"  early_stopping_acceptance_criterion: {early_stopping_acceptance_criterion}")
         logger.debug(f"  sample_transforms: {[type(t).__name__ for t in sample_transforms]}")
         logger.debug(f"  likelihood_transforms: {[type(t).__name__ for t in likelihood_transforms]}")
         logger.debug("="*80)
@@ -153,6 +155,7 @@ class Jim(object):
             logprior=self.evaluate_prior,
             verbose=verbose,
             pretrain_flow_path=pretrain_flow_path,
+            early_stopping_acceptance_criterion=early_stopping_acceptance_criterion,
         )
 
         if n_temperatures == 0:
