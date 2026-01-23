@@ -56,6 +56,7 @@ class Jim(object):
         max_temperature: float = 10.0,
         n_tempered_steps: int = 5,
         verbose: bool = False,
+        pretrain_flow_path: str | None = None,
     ):
         # Debug logging: Log all initialization parameters
         logger.debug("="*80)
@@ -86,6 +87,7 @@ class Jim(object):
         logger.debug(f"  max_temperature: {max_temperature}")
         logger.debug(f"  n_tempered_steps: {n_tempered_steps}")
         logger.debug(f"  verbose: {verbose}")
+        logger.debug(f"  pretrain_flow_path: {pretrain_flow_path}")
         logger.debug(f"  sample_transforms: {[type(t).__name__ for t in sample_transforms]}")
         logger.debug(f"  likelihood_transforms: {[type(t).__name__ for t in likelihood_transforms]}")
         logger.debug("="*80)
@@ -150,6 +152,7 @@ class Jim(object):
             n_tempered_steps=n_tempered_steps,
             logprior=self.evaluate_prior,
             verbose=verbose,
+            pretrain_flow_path=pretrain_flow_path,
         )
 
         if n_temperatures == 0:

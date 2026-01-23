@@ -54,6 +54,7 @@ class RunDefinition(ABC):
         n_temperatures: int = 5,
         max_temperature: float = 10.0,
         n_tempered_steps: int = 5,
+        pretrain_flow_path: str | None = None,
     ):
         self.working_dir = working_dir
         self.seed = seed
@@ -79,6 +80,7 @@ class RunDefinition(ABC):
             "n_temperatures": n_temperatures,
             "max_temperature": max_temperature,
             "n_tempered_steps": n_tempered_steps,
+            "pretrain_flow_path": pretrain_flow_path,
         }
 
     @abstractmethod
@@ -125,6 +127,7 @@ class RunDefinition(ABC):
             "n_temperatures": inputs.get("n_temperatures", 5),
             "max_temperature": inputs.get("max_temperature", 10.0),
             "n_tempered_steps": inputs.get("n_tempered_steps", 5),
+            "pretrain_flow_path": inputs.get("pretrain_flow_path", None),
         }
 
     @classmethod
