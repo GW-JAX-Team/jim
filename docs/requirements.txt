@@ -1,7 +1,7 @@
 jimgw
 mkdocs==1.6.1               # Main documentation generator.
 mkdocs-material==9.7.1     # Theme
-pymdown-extensions==10.20    # Markdown extensions e.g. to handle LaTeX.
+pymdown-extensions==10.20.1    # Markdown extensions e.g. to handle LaTeX.
 mkdocstrings[python]==1.0.2        # Autogenerate documentation from docstrings.
 mkdocs-jupyter==0.25.1       # Turn Jupyter Lab notebooks into webpages.
 mkdocs-gen-files==0.6.0
