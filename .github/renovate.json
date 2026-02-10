@@ -10,11 +10,19 @@
     "enabled": true,
     "schedule": ["before 9am on Monday"]
   },
+  "pip_requirements": {
+    "managerFilePatterns": ["(^|/)([\\w-]*)requirements\\.(txt|pip)$"]
+  },
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
       "commitMessagePrefix": "ci:",
       "groupName": "GitHub Actions"
+    },
+    {
+      "matchManagers": ["pre-commit"],
+      "commitMessagePrefix": "ci:",
+      "groupName": "Pre-commit hooks"
     },
     {
       "matchManagers": ["pip_requirements", "pep621"],
