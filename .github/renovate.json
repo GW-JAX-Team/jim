@@ -10,9 +10,6 @@
     "enabled": true,
     "schedule": ["before 9am on Monday"]
   },
-  "pip_requirements": {
-    "fileMatch": ["(^|/)([\\w-]*)requirements\\.(txt|pip)$", "(^|/)pyproject\\.toml$"]
-  },
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
@@ -25,7 +22,7 @@
       "groupName": "Python dependencies"
     },
     {
-      "matchDepTypes": ["devDependencies"],
+      "matchDepTypes": ["dependency-groups"],
       "commitMessagePrefix": "deps:",
       "groupName": "Python dev dependencies"
     }
