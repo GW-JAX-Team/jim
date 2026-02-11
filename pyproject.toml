@@ -53,13 +53,13 @@ dagster = [
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.2.0",
-    "coverage>=7.7.0",
-    "coveralls>=4.0.1",
-    "pytest>=8.3.3",
-    "pytest-cov>=6.0.0",
-    "ruff>=0.12.2",
-    "pyright>=1.1.402",
+    "pre-commit>=4.5.1",
+    "coverage>=7.13.4",
+    "coveralls>=4.0.2",
+    "pytest>=8.4.2",
+    "pytest-cov>=6.3.0",
+    "ruff>=0.15.0",
+    "pyright>=1.1.408",
 ]
 
 [tool.uv.sources]
