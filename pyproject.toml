@@ -3,7 +3,7 @@ name = "jimgw"
 version = "0.3.0"
 description = "Gravitatioanl wave data analysis tool in Jax"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14.3"
 authors = [
 	{name = "Kaze W. K. Wong", email = "kazewong.physics@gmail.com"},
 ]
@@ -18,19 +18,19 @@ classifiers = [
 ]
 
 dependencies = [
-    "astropy>=7.0.1",
-    "beartype>=0.19.0",
+    "astropy>=7.2.0",
+    "beartype>=0.22.9",
     "flowmc>=0.4.5",
-    "gwpy>=3.0.12",
-    "jax>=0.8.2",
-    "jaxtyping>=0.3.3",
+    "gwpy>=3.0.14",
+    "jax>=0.9.0.1",
+    "jaxtyping>=0.3.7",
     "ripplegw>=0.0.9",
 ]
 
 [project.optional-dependencies]
 visualize = [
     "corner>=2.2.3",
-    "matplotlib>=3.10.7",
+    "matplotlib>=3.10.8",
 ]
 docs = [
     "mkdocs-gen-files==0.6.0",
@@ -42,13 +42,13 @@ docs = [
     "pymdown-extensions==10.20.1",
 ]
 cuda = [
-    "jax[cuda]>=0.8.2",
+    "jax[cuda]>=0.9.0.1",
 ]
 dagster = [
-    "dagster>=1.11.1",
-    "dagster-dg-cli>=1.11.1",
-    "dagster-pipes>=1.11.1",
-    "dagster-webserver>=1.11.1",
+    "dagster>=1.12.14",
+    "dagster-dg-cli>=1.12.14",
+    "dagster-pipes>=1.12.14",
+    "dagster-webserver>=1.12.14",
 ]
 
 [dependency-groups]
