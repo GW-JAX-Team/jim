@@ -3,34 +3,51 @@
   "extends": [
     "config:recommended"
   ],
-  "baseBranches": ["jim-dev"],
-  "schedule": ["before 9am on Monday"],
+  "baseBranchPatterns": [
+    "jim-dev"
+  ],
+  "schedule": [
+    "before 9am on Monday"
+  ],
   "timezone": "Europe/Amsterdam",
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["before 9am on Monday"]
+    "schedule": [
+      "before 9am on Monday"
+    ]
   },
   "pip_requirements": {
-    "managerFilePatterns": ["(^|/)([\\w-]*)requirements\\.(txt|pip)$"]
+    "managerFilePatterns": [
+      "(^|/)([\\w-]*)requirements\\.(txt|pip)$"
+    ]
   },
   "packageRules": [
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "commitMessagePrefix": "ci:",
       "groupName": "GitHub Actions"
     },
     {
-      "matchManagers": ["pre-commit"],
+      "matchManagers": [
+        "pre-commit"
+      ],
       "commitMessagePrefix": "ci:",
       "groupName": "Pre-commit hooks"
     },
     {
-      "matchManagers": ["pip_requirements", "pep621"],
+      "matchManagers": [
+        "pip_requirements",
+        "pep621"
+      ],
       "commitMessagePrefix": "deps:",
       "groupName": "Python dependencies"
     },
     {
-      "matchDepTypes": ["dependency-groups"],
+      "matchDepTypes": [
+        "dependency-groups"
+      ],
       "commitMessagePrefix": "deps:",
       "groupName": "Python dev dependencies"
     }
