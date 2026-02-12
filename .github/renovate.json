@@ -50,7 +50,11 @@
       ],
       "commitMessagePrefix": "deps:",
       "groupName": "Python dev dependencies"
+    },
+    {
+      "matchPackageNames": ["python"],
+      "enabled": false
     }
   ],
-  "rangeStrategy": "bump"
+  "rangeStrategy": "widen"
 }
