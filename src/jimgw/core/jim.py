@@ -131,6 +131,9 @@ class Jim(object):
                 if strat != "parallel_tempering"
             ]
 
+        assert isinstance(rng_key, PRNGKeyArray), (
+            "rng_key must be a JAX PRNGKeyArray. Got type %s." % type(rng_key)
+        )
         rng_key, subkey = jax.random.split(rng_key)
         self.sampler = Sampler(
             self.prior.n_dims,
