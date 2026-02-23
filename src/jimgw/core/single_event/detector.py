@@ -4,7 +4,7 @@ import logging
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Complex, PRNGKeyArray, jaxtyped, Bool
+from jaxtyping import Array, Float, Complex, Key, jaxtyped, Bool
 from numpy import loadtxt
 import requests
 from beartype import beartype as typechecker
@@ -586,7 +586,7 @@ class GroundBased2G(Detector):
         waveform_model,
         parameters: dict[str, float],
         is_zero_noise: bool = False,
-        rng_key: PRNGKeyArray = jax.random.PRNGKey(0),
+        rng_key: Key = jax.random.key(0),
     ) -> None:
         """Inject a signal into the detector data.
 

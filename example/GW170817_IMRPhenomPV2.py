@@ -253,4 +253,4 @@ jim = Jim(
 )
 
 
-jim.sample(jax.random.PRNGKey(42))
+jim.sample(jax.random.key(42))

@@ -62,7 +62,7 @@ class TestSkyFrameToDetectorFrameHighLevel:
 
         n_samples = 50
         gps_times = [1126259462.4, 1242442967.4]
-        key = jax.random.PRNGKey(42)
+        key = jax.random.key(42)
 
         for ifo_pair in combinations(ifos, 2):
             ifo_names = [ifo.name for ifo in ifo_pair]
@@ -137,7 +137,7 @@ class TestSkyFrameToDetectorFrameHighLevel:
 
         n_samples = 50
         gps_times = [1126259462.4, 1242442967.4]
-        key = jax.random.PRNGKey(123)
+        key = jax.random.key(123)
 
         for ifo_pair in combinations(ifos, 2):
             ifo_names = [ifo.name for ifo in ifo_pair]
@@ -200,7 +200,7 @@ class TestThetaPhiToRaDec:
         )
         from bilby.core.utils import theta_phi_to_ra_dec as bilby_theta_phi_to_ra_dec
 
-        key = jax.random.PRNGKey(42)
+        key = jax.random.key(42)
 
         tol_diff_ra = 0
         tol_diff_dec = 0
@@ -317,7 +317,7 @@ class TestGMST:
 
         tol_diff = 0
         gps_times = jax.random.uniform(
-            jax.random.PRNGKey(42), N_SAMPLES, minval=1, maxval=2e9 + 1234.5678
+            jax.random.key(42), N_SAMPLES, minval=1, maxval=2e9 + 1234.5678
         )
 
         for time in gps_times:
@@ -344,7 +344,7 @@ class TestFullTransform:
         )
         from bilby.gw.detector import InterferometerList
 
-        key = jax.random.PRNGKey(42)
+        key = jax.random.key(42)
         gps_time = 1126259642.413
 
         detector_preset = get_detector_preset()
@@ -391,7 +391,7 @@ class TestAngleRotationEquivalence:
         """Ensure new and old angle rotation implementations are equivalent."""
         from jimgw.core.single_event.utils import euler_rotation
 
-        key = jax.random.PRNGKey(123)
+        key = jax.random.key(123)
         key, subkey = jax.random.split(key)
         zenith, azimuth = jax.random.uniform(
             key, (2, N_SAMPLES), minval=0, maxval=jnp.pi

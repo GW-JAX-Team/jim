@@ -766,7 +766,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
             logpdf=y, n_steps=n_steps, learning_rate=0.001, noise_level=1
         )
 
-        initial_position = prior.sample(jax.random.PRNGKey(0), popsize)
+        initial_position = prior.sample(jax.random.key(0), popsize)
         for transform in sample_transforms:
             initial_position = jax.vmap(transform.forward)(initial_position)
         initial_position = jnp.array(
@@ -779,7 +779,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
                 "Check your priors and transforms for validity."
             )
         _, best_fit, log_prob = optimizer.optimize(
-            jax.random.PRNGKey(12094), y, initial_position, {}
+            jax.random.key(12094), y, initial_position, {}
         )
 
         named_params = dict(zip(parameter_names, best_fit[jnp.argmin(log_prob)]))

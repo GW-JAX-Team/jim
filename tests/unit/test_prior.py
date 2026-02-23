@@ -27,7 +27,7 @@ class TestUnivariatePrior:
         p = LogisticDistribution(["x"])
 
         # Draw samples and check they are finite
-        samples = p.sample(jax.random.PRNGKey(0), 10000)
+        samples = p.sample(jax.random.key(0), 10000)
         assert_all_finite(samples["x"])
 
         # Check log_prob is finite for samples
@@ -51,7 +51,7 @@ class TestUnivariatePrior:
         p = StandardNormalDistribution(["x"])
 
         # Draw samples and check they are finite
-        samples = p.sample(jax.random.PRNGKey(0), 10000)
+        samples = p.sample(jax.random.key(0), 10000)
         assert_all_finite(samples["x"])
 
         # Check log_prob is finite for samples
@@ -76,7 +76,7 @@ class TestUnivariatePrior:
         xmin, xmax = p.xmin, p.xmax  # 0.0, 1.0
 
         # Draw samples and check they are finite and in range
-        samples = p.sample(jax.random.PRNGKey(0), 10000)
+        samples = p.sample(jax.random.key(0), 10000)
         assert_all_finite(samples["x"])
         assert_all_in_range(samples["x"], xmin, xmax)
 
@@ -107,7 +107,7 @@ class TestUnivariatePrior:
         p = UniformPrior(xmin, xmax, ["x"])
 
         # Draw samples and check they are finite and in range
-        samples = p.sample(jax.random.PRNGKey(0), 10000)
+        samples = p.sample(jax.random.key(0), 10000)
         assert_all_finite(samples["x"])
         assert_all_in_range(samples["x"], xmin, xmax)
 
@@ -136,7 +136,7 @@ class TestUnivariatePrior:
         p = SinePrior(["x"])
 
         # Draw samples and check they are finite and in range
-        samples = p.sample(jax.random.PRNGKey(0), 10000)
+        samples = p.sample(jax.random.key(0), 10000)
         assert_all_finite(samples["x"])
         assert_all_in_range(samples["x"], 0.0, jnp.pi)
 
@@ -167,7 +167,7 @@ class TestUnivariatePrior:
         p = CosinePrior(["x"])
 
         # Draw samples and check they are finite and in range
-        samples = p.sample(jax.random.PRNGKey(0), 10000)
+        samples = p.sample(jax.random.key(0), 10000)
         assert_all_finite(samples["x"])
         assert_all_in_range(samples["x"], -jnp.pi / 2.0, jnp.pi / 2.0)
 
@@ -204,7 +204,7 @@ class TestUnivariatePrior:
             p = PowerLawPrior(xmin, xmax, alpha, ["x"])
 
             # Draw samples and check they are finite and in range
-            samples = p.sample(jax.random.PRNGKey(0), 10000)
+            samples = p.sample(jax.random.key(0), 10000)
             assert_all_finite(samples["x"])
             assert_all_in_range(samples["x"], xmin, xmax)
 
@@ -251,7 +251,7 @@ class TestUnivariatePrior:
         p = GaussianPrior(mu, sigma, ["x"])
 
         # Draw samples and check they are finite
-        samples = p.sample(jax.random.PRNGKey(0), 10000)
+        samples = p.sample(jax.random.key(0), 10000)
         assert_all_finite(samples["x"])
 
         # Check log_prob is finite for samples
@@ -277,7 +277,7 @@ class TestUnivariatePrior:
         p = RayleighPrior(sigma, ["x"])
 
         # Draw samples and check they are finite and positive
-        samples = p.sample(jax.random.PRNGKey(0), 10000)
+        samples = p.sample(jax.random.key(0), 10000)
         assert_all_finite(samples["x"])
         assert jnp.all(samples["x"] > 0.0)
 
@@ -312,7 +312,7 @@ class TestMultivariatePrior:
         p = UniformSpherePrior(["x"])
 
         # Draw samples and check they are finite and in range
-        samples = p.sample(jax.random.PRNGKey(0), 10000)
+        samples = p.sample(jax.random.key(0), 10000)
         assert_all_finite(samples["x_mag"])
         assert_all_finite(samples["x_theta"])
         assert_all_finite(samples["x_phi"])

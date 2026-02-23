@@ -33,7 +33,7 @@ class RunDefinition(ABC):
         prior: Optional[Prior] = None,
         sample_transforms: Optional[Sequence[BijectiveTransform]] = None,
         likelihood_transforms: Optional[Sequence[NtoMTransform]] = None,
-        rng_key: jax.Array = jax.random.PRNGKey(0),
+        rng_key: jax.Array = jax.random.key(0),
         n_chains: int = 50,
         n_local_steps: int = 10,
         n_global_steps: int = 10,
@@ -103,7 +103,7 @@ class RunDefinition(ABC):
         """Load the flowMC parameters into the Run object."""
         self.working_dir = inputs.get("working_dir", self.working_dir)
         self.flowMC_params = {
-            "rng_key": jax.random.PRNGKey(inputs.get("seed", self.seed)),
+            "rng_key": jax.random.key(inputs.get("seed", self.seed)),
             "n_chains": inputs.get("n_chains", 50),
             "n_local_steps": inputs.get("n_local_steps", 10),
             "n_global_steps": inputs.get("n_global_steps", 10),

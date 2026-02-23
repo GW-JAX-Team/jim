@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Complex, PRNGKeyArray
+from jaxtyping import Array, Float, Complex, Key
 
 from gwpy.timeseries import TimeSeries
 from typing import Optional, Self
@@ -515,7 +515,7 @@ class PowerSpectrum(ABC):
 
     def simulate_data(
         self,
-        key: PRNGKeyArray,
+        key: Key,
     ) -> Complex[Array, " n_sample"]:
         """Simulate noise data based on the power spectrum.
 

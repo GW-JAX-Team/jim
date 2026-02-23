@@ -7,7 +7,7 @@ import numpy as np
 from flowMC.resource_strategy_bundle.RQSpline_MALA_PT import RQSpline_MALA_PT_Bundle
 from flowMC.resource.buffers import Buffer
 from flowMC.Sampler import Sampler
-from jaxtyping import Array, Float, PRNGKeyArray
+from jaxtyping import Array, Float, Key
 
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.prior import Prior
@@ -36,7 +36,7 @@ class Jim(object):
         prior: Prior,
         sample_transforms: Sequence[BijectiveTransform] = [],
         likelihood_transforms: Sequence[NtoMTransform] = [],
-        rng_key: Optional[PRNGKeyArray] = None,
+        rng_key: Optional[Key] = None,
         n_chains: int = 1000,
         n_local_steps: int = 100,
         n_global_steps: int = 1000,
@@ -99,8 +99,12 @@ class Jim(object):
 
         if rng_key is None:
             seed = int(time.time())
-            rng_key = jax.random.PRNGKey(seed)
-            logger.info("No rng_key provided. Using time-based key with seed=%d (key=%s).", seed, rng_key)
+            rng_key = jax.random.key(seed)
+            logger.info(
+                "No rng_key provided. Using time-based key with seed=%d (key=%s).",
+                seed,
+                rng_key,
+            )
 
         rng_key, subkey = jax.random.split(rng_key)
 
@@ -144,6 +148,7 @@ class Jim(object):
                 if strat != "parallel_tempering"
             ]
 
+        assert isinstance(rng_key, jax.Array)
         rng_key, subkey = jax.random.split(rng_key)
         self.sampler = Sampler(
             self.prior.n_dims,
@@ -238,7 +243,7 @@ class Jim(object):
     def get_samples(
         self,
         n_samples: int = 0,
-        rng_key: PRNGKeyArray = jax.random.PRNGKey(21),
+        rng_key: Key = jax.random.key(21),
         training: bool = False,
     ) -> dict[str, np.ndarray]:
         """
@@ -253,8 +258,8 @@ class Jim(object):
         n_samples : int, optional
             Number of samples to return via uniform random downsampling. If 0, return all samples
             with transforms applied, by default 0
-        rng_key : PRNGKeyArray, optional
-            RNG key for downsampling, by default jax.random.PRNGKey(21)
+        rng_key : Key, optional
+            RNG key for downsampling, by default jax.random.key(21)
         training : bool, optional
             Whether to get the training samples or the production samples, by default False
 
