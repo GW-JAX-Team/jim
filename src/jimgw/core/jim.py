@@ -1,5 +1,6 @@
 from typing import Sequence, Optional
 import logging
+import time
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -35,7 +36,7 @@ class Jim(object):
         prior: Prior,
         sample_transforms: Sequence[BijectiveTransform] = [],
         likelihood_transforms: Sequence[NtoMTransform] = [],
-        rng_key: PRNGKeyArray = jax.random.PRNGKey(0),
+        rng_key: Optional[PRNGKeyArray] = None,
         n_chains: int = 1000,
         n_local_steps: int = 100,
         n_global_steps: int = 1000,
@@ -96,8 +97,10 @@ class Jim(object):
                 "No likelihood transforms provided. Using prior parameters as likelihood parameters"
             )
 
-        if rng_key is jax.random.PRNGKey(0):
-            logger.info("No rng_key provided. Using default key with seed=0.")
+        if rng_key is None:
+            seed = int(time.time())
+            rng_key = jax.random.PRNGKey(seed)
+            logger.info("No rng_key provided. Using time-based key with seed=%d (key=%s).", seed, rng_key)
 
         rng_key, subkey = jax.random.split(rng_key)
 
