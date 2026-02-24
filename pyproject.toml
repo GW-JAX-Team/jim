@@ -7,6 +7,9 @@ requires-python = ">=3.11"
 authors = [
 	{name = "Kaze W. K. Wong", email = "kazewong.physics@gmail.com"},
 ]
+maintainers = [
+  {name = "Thomas Ng", email = "thomas.ng@nikhef.nl"}
+]
 license = {file = "LICENSE"}
 classifiers = [
     "Programming Language :: Python :: 3.11",
