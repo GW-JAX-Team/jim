@@ -159,7 +159,11 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
         self.frequencies = jnp.unique(jnp.concatenate(_frequencies))
 
         # Check that all detectors have the same frequency array, unless using specialized likelihoods
-        if type(self) not in [BaseTransientLikelihoodFD, PhaseMarginalizedLikelihoodFD, DistanceMarginalizedLikelihoodFD]:
+        if type(self) not in [
+            BaseTransientLikelihoodFD,
+            PhaseMarginalizedLikelihoodFD,
+            DistanceMarginalizedLikelihoodFD,
+        ]:
             assert all(
                 jnp.array_equal(_frequencies[0], freq) for freq in _frequencies
             ), (
