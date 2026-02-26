@@ -297,7 +297,7 @@ class TestDistanceMarginalizedLikelihoodFD:
         """A prior that contains no d_L sub-prior must raise ValueError."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         prior_no_d_L = UniformPrior(xmin=10.0, xmax=100.0, parameter_names=["M_c"])
-        with pytest.raises(ValueError, match="does not contain a sub-prior for 'd_L'"):
+        with pytest.raises(ValueError, match="must be a 1D prior with parameter_names="):
             DistanceMarginalizedLikelihoodFD(
                 detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
                 trigger_time=gps, dist_prior=prior_no_d_L,

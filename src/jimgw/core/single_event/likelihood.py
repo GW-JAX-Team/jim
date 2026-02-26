@@ -447,10 +447,10 @@ class DistanceMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
                 "Example: PowerLawPrior(xmin=100, xmax=5000, alpha=2.0, parameter_names=['d_L'])"
             )
 
-        if "d_L" not in dist_prior.parameter_names:
+        if list(dist_prior.parameter_names) != ["d_L"]:
             raise ValueError(
-                "The provided prior does not contain a sub-prior for 'd_L'. "
-                "Ensure your prior has parameter_names=['d_L']."
+                f"dist_prior must be a 1D prior with parameter_names=['d_L'], "
+                f"got parameter_names={list(dist_prior.parameter_names)}."
             )
 
         if not hasattr(dist_prior, "xmin") or not hasattr(dist_prior, "xmax"):
