@@ -6,7 +6,7 @@ from jaxtyping import Array, Float
 from typing import Optional
 from scipy.interpolate import interp1d
 from jimgw.core.utils import log_i0
-from jimgw.core.prior import Prior, CompositePrior
+from jimgw.core.prior import Prior
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.transforms import BijectiveTransform, NtoMTransform
 from jimgw.core.single_event.detector import Detector
@@ -410,10 +410,9 @@ class DistanceMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
         f_min: Minimum frequency for likelihood evaluation.
         f_max: Maximum frequency for likelihood evaluation.
         trigger_time: GPS time of the event trigger.
-        prior: A prior object (may contain multiple parameters). The `d_L`
-            sub-prior is extracted automatically. It must contain exactly one
-            1D prior with ``parameter_names == ('d_L',)`` that also has ``xmin``
-            and ``xmax`` attributes (e.g. ``PowerLawPrior`` or ``UniformPrior``).
+        dist_prior: A 1D prior over luminosity distance. Must have ``'d_L'`` in
+            ``parameter_names`` and ``xmin`` / ``xmax`` attributes defining the
+            integration bounds (e.g. ``PowerLawPrior`` or ``UniformPrior``).
         n_dist_points: Number of grid points for distance quadrature.
         ref_dist: Reference distance (Mpc). Defaults to midpoint of [dist_min, dist_max].
     """
@@ -430,7 +429,7 @@ class DistanceMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
         f_min: float | dict[str, float] = 0.0,
         f_max: float | dict[str, float] = float("inf"),
         trigger_time: Float = 0,
-        prior: Optional[Prior] = None,
+        dist_prior: Optional[Prior] = None,
         n_dist_points: int = 10000,
         ref_dist: Optional[float] = None,
     ) -> None:
@@ -441,29 +440,18 @@ class DistanceMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
         if "d_L" in self.fixed_parameters:
             raise ValueError("Cannot have d_L fixed while marginalising over d_L")
 
-        if prior is None:
+        # --- Validate the d_L prior ---
+        if dist_prior is None:
             raise ValueError(
-                "prior must be provided and must contain a d_L sub-prior. "
-                "Example: CombinePrior([..., PowerLawPrior(xmin=100, xmax=5000, alpha=2, parameter_names=['d_L'])])"
+                "dist_prior must be provided. "
+                "Example: PowerLawPrior(xmin=100, xmax=5000, alpha=2.0, parameter_names=['d_L'])"
             )
 
-        leaf_priors = (
-            prior.trace_prior_parent() if isinstance(prior, CompositePrior) else [prior]
-        )
-        dist_prior_candidates = [p for p in leaf_priors if "d_L" in p.parameter_names]
-
-        if len(dist_prior_candidates) == 0:
+        if "d_L" not in dist_prior.parameter_names:
             raise ValueError(
                 "The provided prior does not contain a sub-prior for 'd_L'. "
-                "Ensure your prior includes a 1D prior with parameter_names=['d_L']."
+                "Ensure your prior has parameter_names=['d_L']."
             )
-        if len(dist_prior_candidates) > 1:
-            raise ValueError(
-                "The provided prior contains more than one sub-prior for 'd_L'. "
-                "Ensure exactly one 1D prior covers 'd_L'."
-            )
-
-        dist_prior = dist_prior_candidates[0]
 
         if not hasattr(dist_prior, "xmin") or not hasattr(dist_prior, "xmax"):
             raise ValueError(
@@ -495,8 +483,7 @@ class DistanceMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
         delta_d = (dist_max - dist_min) / (n_dist_points - 1)
         self.scaling = self.ref_dist / distance_grid
 
-        param_name = dist_prior.parameter_names[0]
-        log_prob_fn = jax.vmap(lambda d: dist_prior.log_prob({param_name: d}))
+        log_prob_fn = jax.vmap(lambda d: dist_prior.log_prob({"d_L": d}))
         log_w = log_prob_fn(distance_grid) + jnp.log(delta_d)
         self.log_weights = log_w - logsumexp(log_w)
 
