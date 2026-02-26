@@ -269,9 +269,8 @@ class TimeMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
         super().__init__(
             detectors, waveform, fixed_parameters, f_min, f_max, trigger_time
         )
-        assert "t_c" not in self.fixed_parameters, (
-            "Cannot have t_c fixed while marginalizing over t_c"
-        )
+        if "t_c" in self.fixed_parameters:
+            raise ValueError("Cannot have t_c fixed while marginalizing over t_c")
         self.tc_range = tc_range
         fs = self.detectors[0].data.sampling_frequency
         duration = self.detectors[0].data.duration
@@ -349,6 +348,13 @@ class TimeMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
 class PhaseMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
     """This has not been tested by a human yet."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "phase_c" in self.fixed_parameters:
+            raise ValueError(
+                "Cannot have phase_c fixed while marginalizing over phase_c"
+            )
+
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params.update(self.fixed_parameters)
         params["phase_c"] = 0.0  # Fixing phase_c to 0 for phase marginalization
@@ -381,6 +387,13 @@ class PhaseMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
 
 class PhaseTimeMarginalizedLikelihoodFD(TimeMarginalizedLikelihoodFD):
     """This has not been tested by a human yet."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "phase_c" in self.fixed_parameters:
+            raise ValueError(
+                "Cannot have phase_c fixed while marginalizing over phase_c"
+            )
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params.update(self.fixed_parameters)
@@ -791,6 +804,13 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
 
 
 class HeterodynedPhaseMarginalizedLikelihoodFD(HeterodynedTransientLikelihoodFD):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "phase_c" in self.fixed_parameters:
+            raise ValueError(
+                "Cannot have phase_c fixed while marginalizing over phase_c"
+            )
+
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params.update(self.fixed_parameters)
         params["phase_c"] = 0.0
