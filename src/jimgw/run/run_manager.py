@@ -83,7 +83,7 @@ class RunManager:
         """
         nf_model = self.jim.sampler.resources["model"]
         assert isinstance(nf_model, NFModel), "NF model is not a normalizing flow model"
-        samples = nf_model.sample(jax.random.PRNGKey(0), n_samples)
+        samples = nf_model.sample(jax.random.key(0), n_samples)
         param_names = list(self.jim.get_samples().keys())
         samples = np.array(samples)
         return {name: samples[:, i] for i, name in enumerate(param_names)}
@@ -92,7 +92,7 @@ class RunManager:
         """
         Fetch samples from the prior distribution.
         """
-        samples = self.jim.prior.sample(jax.random.PRNGKey(0), n_samples)
+        samples = self.jim.prior.sample(jax.random.key(0), n_samples)
         return samples
 
     def get_acceptance_rates(self, training: bool = False):

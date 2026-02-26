@@ -54,7 +54,7 @@ def basic_jim(mock_likelihood, gw_prior):
     return Jim(
         likelihood=mock_likelihood,
         prior=gw_prior,
-        rng_key=jax.random.PRNGKey(42),
+        rng_key=jax.random.key(42),
         n_chains=5,
         n_local_steps=2,
         n_global_steps=2,
@@ -69,7 +69,7 @@ def jim_with_sample_transforms(mock_likelihood, gw_prior, bound_to_unbound_trans
         likelihood=mock_likelihood,
         prior=gw_prior,
         sample_transforms=[bound_to_unbound_transform],
-        rng_key=jax.random.PRNGKey(42),
+        rng_key=jax.random.key(42),
         n_chains=5,
         n_local_steps=2,
         n_global_steps=2,
@@ -118,7 +118,7 @@ def jim_sampler():
     jim = Jim(
         likelihood=likelihood,
         prior=prior,
-        rng_key=jax.random.PRNGKey(42),
+        rng_key=jax.random.key(42),
         n_chains=10,
         n_local_steps=5,
         n_global_steps=5,
@@ -197,7 +197,7 @@ class TestGetSamples:
 
     def test_get_samples_deterministic(self, jim_sampler):
         """Test that get_samples returns consistent results with same RNG key."""
-        rng_key = jax.random.PRNGKey(123)
+        rng_key = jax.random.key(123)
         n_samples = 10
 
         samples1 = jim_sampler.get_samples(n_samples=n_samples, rng_key=rng_key)
@@ -494,7 +494,7 @@ class TestJimUtilityMethods:
         jim = Jim(
             likelihood=mock_likelihood,
             prior=BadPrior(),
-            rng_key=jax.random.PRNGKey(42),
+            rng_key=jax.random.key(42),
             n_chains=5,
             n_local_steps=2,
             n_global_steps=2,

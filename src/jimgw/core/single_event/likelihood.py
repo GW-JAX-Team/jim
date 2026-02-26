@@ -273,9 +273,8 @@ class TimeMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
         super().__init__(
             detectors, waveform, fixed_parameters, f_min, f_max, trigger_time
         )
-        assert "t_c" not in self.fixed_parameters, (
-            "Cannot have t_c fixed while marginalizing over t_c"
-        )
+        if "t_c" in self.fixed_parameters:
+            raise ValueError("Cannot have t_c fixed while marginalizing over t_c")
         self.tc_range = tc_range
         fs = self.detectors[0].data.sampling_frequency
         duration = self.detectors[0].data.duration
@@ -352,6 +351,13 @@ class TimeMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
 
 class PhaseMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
     """This has not been tested by a human yet."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "phase_c" in self.fixed_parameters:
+            raise ValueError(
+                "Cannot have phase_c fixed while marginalizing over phase_c"
+            )
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params.update(self.fixed_parameters)
@@ -524,6 +530,13 @@ class DistanceMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
 
 class PhaseTimeMarginalizedLikelihoodFD(TimeMarginalizedLikelihoodFD):
     """This has not been tested by a human yet."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "phase_c" in self.fixed_parameters:
+            raise ValueError(
+                "Cannot have phase_c fixed while marginalizing over phase_c"
+            )
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params.update(self.fixed_parameters)
@@ -909,7 +922,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
             logpdf=y, n_steps=n_steps, learning_rate=0.001, noise_level=1
         )
 
-        initial_position = prior.sample(jax.random.PRNGKey(0), popsize)
+        initial_position = prior.sample(jax.random.key(0), popsize)
         for transform in sample_transforms:
             initial_position = jax.vmap(transform.forward)(initial_position)
         initial_position = jnp.array(
@@ -922,7 +935,7 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
                 "Check your priors and transforms for validity."
             )
         _, best_fit, log_prob = optimizer.optimize(
-            jax.random.PRNGKey(12094), y, initial_position, {}
+            jax.random.key(12094), y, initial_position, {}
         )
 
         named_params = dict(zip(parameter_names, best_fit[jnp.argmin(log_prob)]))
@@ -934,6 +947,13 @@ class HeterodynedTransientLikelihoodFD(BaseTransientLikelihoodFD):
 
 
 class HeterodynedPhaseMarginalizedLikelihoodFD(HeterodynedTransientLikelihoodFD):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "phase_c" in self.fixed_parameters:
+            raise ValueError(
+                "Cannot have phase_c fixed while marginalizing over phase_c"
+            )
+
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params.update(self.fixed_parameters)
         params["phase_c"] = 0.0

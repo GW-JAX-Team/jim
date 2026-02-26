@@ -61,7 +61,7 @@ def generate_fidiual_population(
     prior = CombinePrior(prior)
 
     samples = prior.sample(
-        jax.random.PRNGKey(seed),
+        jax.random.key(seed),
         n_events,
     )
 

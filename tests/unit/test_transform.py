@@ -377,7 +377,7 @@ class TestDistanceTransform:
         Test that the forward and inverse transformations are consistent
         """
 
-        key = jax.random.PRNGKey(42)
+        key = jax.random.key(42)
         key, *subkeys = jax.random.split(key, 7)
         dL = jax.random.uniform(subkeys[0], (10,), minval=1, maxval=2000)
         M_c = jax.random.uniform(subkeys[1], (10,), minval=1, maxval=100)
@@ -406,7 +406,7 @@ class TestDistanceTransform:
         """
 
         # Generate random sample
-        subkeys = jax.random.split(jax.random.PRNGKey(12), 6)
+        subkeys = jax.random.split(jax.random.key(12), 6)
         dL = jax.random.uniform(subkeys[0], (1,), minval=1, maxval=2000)
         M_c = jax.random.uniform(subkeys[1], (1,), minval=1, maxval=100)
         ra = jax.random.uniform(subkeys[2], (1,), minval=0, maxval=2 * jnp.pi)
@@ -451,7 +451,7 @@ class TestDistanceTransform:
         """
 
         # Generate random sample
-        subkeys = jax.random.split(jax.random.PRNGKey(123), 6)
+        subkeys = jax.random.split(jax.random.key(123), 6)
         d_hat = jax.random.uniform(subkeys[0], (1,), minval=1, maxval=100000)
         M_c = jax.random.uniform(subkeys[1], (1,), minval=1, maxval=100)
         ra = jax.random.uniform(subkeys[2], (1,), minval=0, maxval=2 * jnp.pi)
@@ -531,7 +531,7 @@ class TestSphereSpinToCartesianSpinTransform:
         Test that the forward and inverse transformations are consistent
         """
 
-        key = jax.random.PRNGKey(42)
+        key = jax.random.key(42)
         key, *subkeys = jax.random.split(key, 4)
         s1_mag = jax.random.uniform(subkeys[0], (10,), minval=1e-3, maxval=1.0)
         s1_theta = jax.random.uniform(subkeys[1], (10,), minval=0, maxval=jnp.pi)
@@ -553,7 +553,7 @@ class TestSphereSpinToCartesianSpinTransform:
         """
 
         # Generate random sample
-        subkeys = jax.random.split(jax.random.PRNGKey(12), 3)
+        subkeys = jax.random.split(jax.random.key(12), 3)
         s1_mag = jax.random.uniform(subkeys[0], (1,), minval=1e-3, maxval=1.0)
         s1_theta = jax.random.uniform(subkeys[1], (1,), minval=0, maxval=jnp.pi)
         s1_phi = jax.random.uniform(
@@ -586,7 +586,7 @@ class TestSphereSpinToCartesianSpinTransform:
         """
 
         # Generate random sample
-        keys = jax.random.split(jax.random.PRNGKey(123), 2)
+        keys = jax.random.split(jax.random.key(123), 2)
         S1 = jax.random.uniform(keys[0], (3,), minval=-1, maxval=1)
         a1 = jax.random.uniform(keys[1], (1,), minval=1e-3, maxval=1.0)
         S1 *= a1 / jnp.linalg.norm(S1)
@@ -641,7 +641,7 @@ class TestSpinAnglesToCartesianSpinTransform:
         """
 
         n = 10
-        key = jax.random.PRNGKey(42)
+        key = jax.random.key(42)
         subkeys = jax.random.split(key, 7)
 
         S1, S2 = jax.random.uniform(subkeys[0], (2, 3, n), minval=-1, maxval=1)
@@ -680,7 +680,7 @@ class TestSpinAnglesToCartesianSpinTransform:
         """
 
         # Generate random sample
-        subkeys = jax.random.split(jax.random.PRNGKey(12), 8)
+        subkeys = jax.random.split(jax.random.key(12), 8)
         iota = jax.random.uniform(subkeys[0], (1,), minval=0, maxval=jnp.pi)
         M_c = jax.random.uniform(subkeys[1], (1,), minval=1, maxval=100)
         q = jax.random.uniform(subkeys[2], (1,), minval=0.125, maxval=1)
@@ -724,7 +724,7 @@ class TestSpinAnglesToCartesianSpinTransform:
         """
 
         # Generate random sample
-        subkeys = jax.random.split(jax.random.PRNGKey(123), 11)
+        subkeys = jax.random.split(jax.random.key(123), 11)
 
         theta_jn = jax.random.uniform(subkeys[0], (1,), minval=0, maxval=jnp.pi)
         phi_jl = jax.random.uniform(subkeys[1], (1,), minval=0, maxval=2 * jnp.pi)
@@ -776,7 +776,7 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
         """
         ifos = [H1, L1, V1]
         gps_time = [1126259642.413, 1242442967.4]
-        key = jax.random.PRNGKey(42)
+        key = jax.random.key(42)
 
         for ifo_pair in combinations(ifos, 2):
             for time in gps_time:
@@ -804,7 +804,7 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
         Test that the forward transformation is JIT compilable
         """
         # Generate random sample
-        subkeys = jax.random.split(jax.random.PRNGKey(12), 2)
+        subkeys = jax.random.split(jax.random.key(12), 2)
         sample_dict = {
             "ra": jax.random.uniform(subkeys[0], (1,), minval=0, maxval=2 * jnp.pi)[0],
             "dec": jax.random.uniform(subkeys[1], (1,), minval=0, maxval=jnp.pi)[0],
@@ -833,7 +833,7 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
         """
 
         # Generate random sample
-        subkeys = jax.random.split(jax.random.PRNGKey(123), 2)
+        subkeys = jax.random.split(jax.random.key(123), 2)
         sample_dict = {
             "zenith": jax.random.uniform(subkeys[0], (1,), minval=0, maxval=jnp.pi)[0],
             "azimuth": jax.random.uniform(
