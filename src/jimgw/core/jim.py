@@ -85,7 +85,7 @@ class Jim(object):
             seed = int(time.time())
             rng_key = jax.random.key(seed)
             logger.info(
-                "No rng_key provided. Using time-based key with seed=%d (key=%s).",
+                "No rng_key provided for sampler initialization. Using time-based key with seed=%d (key=%s).",
                 seed,
                 rng_key,
             )

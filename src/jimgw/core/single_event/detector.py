@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 import logging
+import time
 
 import jax
 import jax.numpy as jnp
@@ -586,7 +587,7 @@ class GroundBased2G(Detector):
         waveform_model,
         parameters: dict[str, float],
         is_zero_noise: bool = False,
-        rng_key: Key = jax.random.key(0),
+        rng_key: Optional[Key] = None,
     ) -> None:
         """Inject a signal into the detector data.
 
@@ -618,6 +619,14 @@ class GroundBased2G(Detector):
         # 3. Set the new data
         strain_data = jnp.where(self.frequency_mask, projected_strain, 0.0 + 0.0j)
         if not is_zero_noise:
+            if rng_key is None:
+                seed = int(time.time())
+                rng_key = jax.random.key(seed)
+                logger.info(
+                    "No rng_key provided for noise simulation. Using time-based key with seed=%d (key=%s).",
+                    seed,
+                    rng_key,
+                )
             strain_data += jnp.where(
                 self.frequency_mask, self.psd.simulate_data(rng_key), 0.0 + 0.0j
             )
