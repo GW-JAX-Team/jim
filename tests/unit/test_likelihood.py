@@ -59,7 +59,7 @@ class TestZeroLikelihood:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = ZeroLikelihood()
         assert isinstance(likelihood, ZeroLikelihood)
-        params = example_params(likelihood.gmst)
+        params = example_params(0.0)
         result = likelihood.evaluate(params, {})
         assert result == 0.0
 
