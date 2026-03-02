@@ -31,11 +31,29 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+cuda = [
+    "jax[cuda]>=0.8.2",
+]
 visualize = [
     "corner>=2.2.3",
     "matplotlib>=3.10.7",
 ]
-docs = [
+
+[dependency-groups]
+test = [
+    "pre-commit>=4.2.0",
+    "coverage>=7.7.0",
+    "coveralls>=4.0.1",
+    "pytest>=8.3.3",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.12.2",
+    "pyright>=1.1.402",
+]
+cross-validation = [
+    "lalsuite>=7.26.4",
+    "bilby[gw]>=2.8.0",
+]
+doc = [
     "mkdocs-gen-files==0.6.0",
     "mkdocs-jupyter==0.25.1",
     "mkdocs-literate-nav==0.6.2",
@@ -44,22 +62,13 @@ docs = [
     "mkdocstrings[python]==1.0.3",
     "pymdown-extensions==10.20.1",
 ]
-cuda = [
-    "jax[cuda]>=0.8.2",
-]
 
-[dependency-groups]
-dev = [
-    "pre-commit>=4.2.0",
-    "coverage>=7.7.0",
-    "coveralls>=4.0.1",
-    "pytest>=8.3.3",
-    "pytest-cov>=6.0.0",
-    "ruff>=0.12.2",
-    "pyright>=1.1.402",
-    "lalsuite>=7.26.4",  # for cross-validation tests
-    "bilby[gw]>=2.8.0",  # for cross-validation tests
-]
+[project.urls]
+Homepage = "https://github.com/GW-JAX-Team/jim"
+Documentation = "https://jim.readthedocs.io"
+Repository = "https://github.com/GW-JAX-Team/jim"
+"Bug Tracker" = "https://github.com/GW-JAX-Team/jim/issues"
+Changelog = "https://github.com/GW-JAX-Team/jim/releases"
 
 [tool.uv.sources]
 jimgw = { workspace = true }

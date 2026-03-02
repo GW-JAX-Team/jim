@@ -1351,7 +1351,17 @@ dependencies = [
 cuda = [
     { name = "jax", extra = ["cuda"] },
 ]
-docs = [
+visualize = [
+    { name = "corner" },
+    { name = "matplotlib" },
+]
+
+[package.dev-dependencies]
+cross-validation = [
+    { name = "bilby", extra = ["gw"] },
+    { name = "lalsuite" },
+]
+doc = [
     { name = "mkdocs" },
     { name = "mkdocs-gen-files" },
     { name = "mkdocs-jupyter" },
@@ -1360,17 +1370,9 @@ docs = [
     { name = "mkdocstrings", extra = ["python"] },
     { name = "pymdown-extensions" },
 ]
-visualize = [
-    { name = "corner" },
-    { name = "matplotlib" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "bilby", extra = ["gw"] },
+test = [
     { name = "coverage" },
     { name = "coveralls" },
-    { name = "lalsuite" },
     { name = "pre-commit" },
     { name = "pyright" },
     { name = "pytest" },
@@ -1389,23 +1391,27 @@ requires-dist = [
     { name = "jax", extras = ["cuda"], marker = "extra == 'cuda'", specifier = ">=0.8.2" },
     { name = "jaxtyping", specifier = ">=0.3.3" },
     { name = "matplotlib", marker = "extra == 'visualize'", specifier = ">=3.10.7" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = "==1.6.1" },
-    { name = "mkdocs-gen-files", marker = "extra == 'docs'", specifier = "==0.6.0" },
-    { name = "mkdocs-jupyter", marker = "extra == 'docs'", specifier = "==0.25.1" },
-    { name = "mkdocs-literate-nav", marker = "extra == 'docs'", specifier = "==0.6.2" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = "==9.7.1" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = "==1.0.3" },
-    { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = "==10.20.1" },
     { name = "ripplegw", specifier = ">=0.0.9" },
 ]
-provides-extras = ["visualize", "docs", "cuda"]
+provides-extras = ["cuda", "visualize"]
 
 [package.metadata.requires-dev]
-dev = [
+cross-validation = [
     { name = "bilby", extras = ["gw"], specifier = ">=2.8.0" },
+    { name = "lalsuite", specifier = ">=7.26.4" },
+]
+doc = [
+    { name = "mkdocs", specifier = "==1.6.1" },
+    { name = "mkdocs-gen-files", specifier = "==0.6.0" },
+    { name = "mkdocs-jupyter", specifier = "==0.25.1" },
+    { name = "mkdocs-literate-nav", specifier = "==0.6.2" },
+    { name = "mkdocs-material", specifier = "==9.7.1" },
+    { name = "mkdocstrings", extras = ["python"], specifier = "==1.0.3" },
+    { name = "pymdown-extensions", specifier = "==10.20.1" },
+]
+test = [
     { name = "coverage", specifier = ">=7.7.0" },
     { name = "coveralls", specifier = ">=4.0.1" },
-    { name = "lalsuite", specifier = ">=7.26.4" },
     { name = "pre-commit", specifier = ">=4.2.0" },
     { name = "pyright", specifier = ">=1.1.402" },
     { name = "pytest", specifier = ">=8.3.3" },

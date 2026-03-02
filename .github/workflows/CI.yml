@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
       - name: Install dependencies
-        run: uv sync --all-extras --dev
+        run: uv sync --group test
       - name: Install flowMC from GW-JAX-Team (flowMC-dev)
         if: github.ref == 'refs/heads/jim-dev' || github.base_ref == 'jim-dev'
         run: uv pip install git+https://github.com/GW-JAX-Team/flowMC.git@flowMC-dev
@@ -42,22 +42,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - name: Install dependencies
-        run: uv sync --all-extras --dev
+        run: uv sync --python 3.12 --group test
       - name: Install flowMC from GW-JAX-Team (flowMC-dev)
         if: github.ref == 'refs/heads/jim-dev' || github.base_ref == 'jim-dev'
         run: uv pip install git+https://github.com/GW-JAX-Team/flowMC.git@flowMC-dev
       - name: Install flowMC from GW-JAX-Team (main)
         if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && github.event_name != 'release'
         run: uv pip install git+https://github.com/GW-JAX-Team/flowMC.git@main
-      - name: Run pre-commit
-        run: uv run pre-commit run --all-files
+      - name: Run pre-commit (excluding pyright)
+        run: SKIP=pyright uv run pre-commit run --all-files
+      - name: Run pyright
+        run: uv run pyright src/
 
   publish:
     needs: [test, pre-commit]
