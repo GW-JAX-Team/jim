@@ -98,10 +98,10 @@ class Jim(object):
             )
 
         if rng_key is None:
-            seed = int(time.time())
+            seed = int(time.time_ns() % (2**32))
             rng_key = jax.random.key(seed)
             logger.info(
-                "No rng_key provided. Using time-based key with seed=%d (key=%s).",
+                "No rng_key provided for sampler initialization. Using time-based key with seed=%d (key=%s).",
                 seed,
                 rng_key,
             )
@@ -134,6 +134,10 @@ class Jim(object):
             max_temperature=max_temperature,
             n_tempered_steps=n_tempered_steps,
             logprior=self.evaluate_prior,
+            early_stopping=True,  # type: ignore # Type ignored should be removed once the flowMC release is published
+            early_stopping_tolerance=0.1,  # type: ignore # Type ignored should be removed once the flowMC release is published
+            early_stopping_patience=3,  # type: ignore # Type ignored should be removed once the flowMC release is published
+            early_stopping_min_acceptance=0.1,  # type: ignore # Type ignored should be removed once the flowMC release is published
             verbose=verbose,
             periodic=periodic_index_dict,  # type: ignore # Type ignored should be removed once the flowMC release is published
         )
@@ -188,7 +192,7 @@ class Jim(object):
             named_params = transform.forward(named_params)
         return self.likelihood.evaluate(named_params, data) + prior
 
-    def sample_initial_condition(self) -> Float[Array, " n_chains n_dims"]:
+    def sample_initial_condition(self) -> Float[Array, "n_chains n_dims"]:
         rng_key, subkey = jax.random.split(self.sampler.rng_key)
 
         initial_position = self.prior.sample(subkey, self.sampler.n_chains)
@@ -210,7 +214,7 @@ class Jim(object):
 
     def sample(
         self,
-        initial_position: Optional[Float[Array, " n_chains n_dims"]] = None,
+        initial_position: Optional[Float[Array, "n_chains n_dims"]] = None,
     ):
         if initial_position is None:
             logger.info("No initial_position provided. Sampling from prior.")

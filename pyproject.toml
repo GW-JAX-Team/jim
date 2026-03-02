@@ -63,6 +63,8 @@ dev = [
     "pytest-cov>=6.0.0",
     "ruff>=0.12.2",
     "pyright>=1.1.402",
+    "lalsuite>=7.26.4",  # for cross-validation tests
+    "bilby[gw]>=2.8.0",  # for cross-validation tests
 ]
 
 [tool.uv.sources]

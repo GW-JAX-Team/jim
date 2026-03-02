@@ -42,7 +42,7 @@ class Prior(eqx.Module):
         """
         self.parameter_names = tuple(parameter_names)
 
-    def add_name(self, x: Float[Array, " n_dims"]) -> dict[str, Float]:
+    def add_name(self, x: Float[Array, "n_dims"]) -> dict[str, Float]:
         """
         Turn an array into a dictionary
 
