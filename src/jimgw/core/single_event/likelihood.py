@@ -163,6 +163,7 @@ class BaseTransientLikelihoodFD(SingleEventLikelihood):
             BaseTransientLikelihoodFD,
             PhaseMarginalizedLikelihoodFD,
             DistanceMarginalizedLikelihoodFD,
+            PhaseDistanceMarginalizedLikelihoodFD,
         ]:
             assert all(
                 jnp.array_equal(_frequencies[0], freq) for freq in _frequencies
@@ -500,6 +501,62 @@ class DistanceMarginalizedLikelihoodFD(BaseTransientLikelihoodFD):
 
         log_integrand = (
             kappa2_ref * self.scaling
+            - 0.5 * rho2_ref * self.scaling**2
+            + self.log_weights
+        )
+        return logsumexp(log_integrand)
+
+
+class PhaseDistanceMarginalizedLikelihoodFD(DistanceMarginalizedLikelihoodFD):
+    """Frequency-domain likelihood with marginalization over both phase and distance.
+
+    Implements combined phase + distance marginalization following
+    Thrane & Talbot (2019), Section C.5 (Eq. 79). Phase is marginalized first
+    (analytically via Bessel function), then distance is marginalized numerically.
+
+    The integrand at each distance grid point i is:
+
+        log I_0(|kappa^2_C_ref| * s_i) - 0.5 * rho^2_opt_ref * s_i^2 + log_w_i
+
+    where kappa^2_C_ref is the complex matched-filter inner product at the
+    reference distance, s_i = D_0/D_i is the scaling factor, and log_w_i are
+    the normalized log prior weights.
+
+    Inherits all distance grid setup and validation from
+    DistanceMarginalizedLikelihoodFD.
+    """
+
+    def evaluate(self, params: dict[str, Float], data: dict) -> Float:
+        params.update(self.fixed_parameters)
+        params["d_L"] = self.ref_dist
+        params["phase_c"] = 0.0
+        params["trigger_time"] = self.trigger_time
+        params["gmst"] = self.gmst
+        return self._likelihood(params, data)
+
+    def _likelihood(self, params: dict[str, Float], data: dict) -> Float:
+        waveform_sky = self.waveform(self.frequencies, params)
+
+        complex_d_inner_h_ref = 0.0 + 0.0j
+        rho2_ref = 0.0
+        for i, ifo in enumerate(self.detectors):
+            psd = ifo.sliced_psd
+
+            waveform_sky_ifo = {
+                key: waveform_sky[key][self.frequency_masks[i]] for key in waveform_sky
+            }
+            h_dec = ifo.fd_response(ifo.sliced_frequencies, waveform_sky_ifo, params)
+            complex_d_inner_h_ref += complex_inner_product(
+                h_dec, ifo.sliced_fd_data, psd, self.df
+            )
+            rho2_ref += inner_product(h_dec, h_dec, psd, self.df)
+
+        abs_complex_kappa2_ref = jnp.absolute(complex_d_inner_h_ref)
+
+        # Phase + distance marginalization (Thrane & Talbot 2019, Eq. 79):
+        # logsumexp_i [ log_I0(|kappa^2_C_ref| * s_i) - 0.5 * rho^2_ref * s_i^2 + log_w_i ]
+        log_integrand = (
+            log_i0(abs_complex_kappa2_ref * self.scaling)
             - 0.5 * rho2_ref * self.scaling**2
             + self.log_weights
         )
@@ -965,6 +1022,7 @@ likelihood_presets = {
     "TimeMarginalizedLikelihoodFD": TimeMarginalizedLikelihoodFD,
     "PhaseMarginalizedLikelihoodFD": PhaseMarginalizedLikelihoodFD,
     "DistanceMarginalizedLikelihoodFD": DistanceMarginalizedLikelihoodFD,
+    "PhaseDistanceMarginalizedLikelihoodFD": PhaseDistanceMarginalizedLikelihoodFD,
     "PhaseTimeMarginalizedLikelihoodFD": PhaseTimeMarginalizedLikelihoodFD,
     "HeterodynedTransientLikelihoodFD": HeterodynedTransientLikelihoodFD,
     "PhaseMarginalizedHeterodynedLikelihoodFD": HeterodynedPhaseMarginalizedLikelihoodFD,
