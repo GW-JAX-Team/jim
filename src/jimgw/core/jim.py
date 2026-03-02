@@ -32,6 +32,7 @@ class Jim(object):
 
     def __init__(
         self,
+        # --- Required ---
         likelihood: LikelihoodBase,
         prior: Prior,
         sample_transforms: Sequence[BijectiveTransform] = [],
@@ -43,21 +44,27 @@ class Jim(object):
         n_training_loops: int = 20,
         n_production_loops: int = 10,
         n_epochs: int = 20,
+        # --- Local sampler ---
         mala_step_size: Float | Float[Array, " n_dims"] = 2e-3,
-        chain_batch_size: int = 0,
+        # --- Normalizing flow model ---
         rq_spline_hidden_units: list[int] = [128, 128],
         rq_spline_n_bins: int = 10,
         rq_spline_n_layers: int = 8,
+        n_NFproposal_batch_size: int = 1000,
+        # --- Training ---
         learning_rate: float = 1e-3,
         batch_size: int = 10000,
         n_max_examples: int = 30000,
+        history_window: int = 100,
+        # --- Sampling execution ---
+        chain_batch_size: int = 0,
         local_thinning: int = 1,
         global_thinning: int = 100,
-        n_NFproposal_batch_size: int = 1000,
-        history_window: int = 100,
+        # --- Parallel tempering ---
         n_temperatures: int = 5,
         max_temperature: float = 10.0,
         n_tempered_steps: int = 5,
+        # --- Misc ---
         verbose: bool = False,
         periodic: Optional[dict[str, tuple[float, float]]] = None,
     ):
@@ -109,6 +116,7 @@ class Jim(object):
         rng_key, subkey = jax.random.split(rng_key)
 
         resource_strategy_bundle = RQSpline_MALA_PT_Bundle(
+            # --- Required ---
             rng_key=subkey,
             n_chains=n_chains,
             n_dims=self.prior.n_dims,
@@ -118,28 +126,35 @@ class Jim(object):
             n_training_loops=n_training_loops,
             n_production_loops=n_production_loops,
             n_epochs=n_epochs,
-            mala_step_size=mala_step_size,  # type: ignore # Type ignored should be removed once the next flowMC release is published
-            chain_batch_size=chain_batch_size,
+            # --- Local sampler ---
+            mala_step_size=mala_step_size,
+            periodic=periodic_index_dict,  # type: ignore # Type ignored should be removed once the flowMC release is published
+            # --- Normalizing flow model ---
             rq_spline_hidden_units=rq_spline_hidden_units,
             rq_spline_n_bins=rq_spline_n_bins,
             rq_spline_n_layers=rq_spline_n_layers,
+            n_NFproposal_batch_size=n_NFproposal_batch_size,
+            # --- Training ---
             learning_rate=learning_rate,
             batch_size=batch_size,
             n_max_examples=n_max_examples,
+            history_window=history_window,
+            # --- Sampling execution ---
+            chain_batch_size=chain_batch_size,
             local_thinning=local_thinning,
             global_thinning=global_thinning,
-            n_NFproposal_batch_size=n_NFproposal_batch_size,
-            history_window=history_window,
+            # --- Parallel tempering ---
             n_temperatures=max(n_temperatures, 1),
             max_temperature=max_temperature,
             n_tempered_steps=n_tempered_steps,
             logprior=self.evaluate_prior,
-            early_stopping=True,  # type: ignore # Type ignored should be removed once the flowMC release is published
-            early_stopping_tolerance=0.1,  # type: ignore # Type ignored should be removed once the flowMC release is published
-            early_stopping_patience=3,  # type: ignore # Type ignored should be removed once the flowMC release is published
-            early_stopping_min_acceptance=0.1,  # type: ignore # Type ignored should be removed once the flowMC release is published
+            # --- Early stopping ---
+            early_stopping=True,
+            early_stopping_tolerance=0.1,
+            early_stopping_patience=3,
+            early_stopping_min_acceptance=0.1,
+            # --- Misc ---
             verbose=verbose,
-            periodic=periodic_index_dict,  # type: ignore # Type ignored should be removed once the flowMC release is published
         )
 
         if n_temperatures == 0:
