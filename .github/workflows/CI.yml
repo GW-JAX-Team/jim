@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
       - name: Install dependencies
-        run: uv sync --group test
+        run: uv sync --python ${{ matrix.python-version }} --group test
       - name: Install flowMC from GW-JAX-Team (flowMC-dev)
         if: github.ref == 'refs/heads/jim-dev' || github.base_ref == 'jim-dev'
         run: uv pip install git+https://github.com/GW-JAX-Team/flowMC.git@flowMC-dev
