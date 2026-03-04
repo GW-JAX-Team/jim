@@ -66,6 +66,7 @@ class Jim(object):
         n_tempered_steps: int = 5,
         # --- Misc ---
         verbose: bool = False,
+        periodic: Optional[dict[str, tuple[float, float]]] = None,
     ):
         self.likelihood = likelihood
         self.prior = prior
@@ -82,6 +83,21 @@ class Jim(object):
             logger.info("Using sample transforms")
             for transform in sample_transforms:
                 self.parameter_names = transform.propagate_name(self.parameter_names)
+
+        # Validate periodic parameter names are in sampling space
+        if periodic is not None:
+            unknown = set(periodic.keys()) - set(self.parameter_names)
+            if unknown:
+                raise ValueError(
+                    f"Periodic parameter(s) {unknown} not found in sampling parameters. "
+                    f"Sampling parameters: {self.parameter_names}"
+                )
+            periodic_index_dict: Optional[dict[int, tuple[float, float]]] = {
+                self.parameter_names.index(name): bounds
+                for name, bounds in periodic.items()
+            }
+        else:
+            periodic_index_dict = None
 
         if len(likelihood_transforms) == 0:
             logger.info(
@@ -112,6 +128,7 @@ class Jim(object):
             n_epochs=n_epochs,
             # --- Local sampler ---
             mala_step_size=mala_step_size,
+            periodic=periodic_index_dict,  # type: ignore # Type ignored should be removed once the flowMC release is published
             # --- Normalizing flow model ---
             rq_spline_hidden_units=rq_spline_hidden_units,
             rq_spline_n_bins=rq_spline_n_bins,
