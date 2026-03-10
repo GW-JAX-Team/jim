@@ -96,6 +96,11 @@ class TimeMarginalizationMixin:
     ``_reduce_time`` / ``_reduce_phase_time`` in ``_likelihood``.
     """
 
+    # Attributes expected from the host class (provided via SingleEventLikelihood)
+    fixed_parameters: dict[str, Float]
+    detectors: Sequence[Detector]
+    frequencies: Float[Array, " n_freq"]
+
     tc_range: tuple[Float, Float]
     tc_array: Float[Array, " duration * f_sample / 2"]
     pad_low: Float[Array, " n_pad_low"]
@@ -149,6 +154,9 @@ class DistanceMarginalizationMixin:
     Call ``_init_distance_marginalization`` from ``__init__`` and use
     ``_reduce_distance`` / ``_reduce_phase_distance`` in ``_likelihood``.
     """
+
+    # Attributes expected from the host class (provided via SingleEventLikelihood)
+    fixed_parameters: dict[str, Float]
 
     ref_dist: Float
     scaling: Float[Array, " n_dist"]
@@ -381,11 +389,8 @@ class TransientLikelihoodFD(
 
         elif self.marginalize_phase or self.marginalize_distance:
             # Need complex or real accumulation across detectors
-            if self.marginalize_phase:
-                complex_d_inner_h = 0.0 + 0.0j
-            else:
-                match_filter_snr = 0.0
-
+            complex_d_inner_h = 0.0 + 0.0j
+            match_filter_snr = 0.0
             optimal_snr = 0.0
 
             for i, ifo in enumerate(self.detectors):
@@ -652,8 +657,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         waveform_sky_low = self.waveform(frequencies_low, params)
         waveform_sky_center = self.waveform(frequencies_center, params)
 
-        if self.marginalize_phase:
-            complex_d_inner_h = 0.0
+        complex_d_inner_h = 0.0 + 0.0j
 
         for detector in self.detectors:
             waveform_low = detector.fd_response(
