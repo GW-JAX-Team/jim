@@ -8,6 +8,7 @@ All seven likelihood classes are tested:
     TransientLikelihoodFD(marginalize_phase=True)          GravitationalWaveTransient (phase_marginalization=True)
     TransientLikelihoodFD(marginalize_time=True)           GravitationalWaveTransient (time_marginalization=True)
     TransientLikelihoodFD(marginalize_distance=True)       GravitationalWaveTransient (distance_marginalization=True)
+    TransientLikelihoodFD(marg_phase+distance)             GravitationalWaveTransient (phase+distance marginalization)
     TransientLikelihoodFD(marg_time+phase)                 GravitationalWaveTransient (time+phase marginalization)
     HeterodynedTransientLikelihoodFD                       RelativeBinningGravitationalWaveTransient
     HeterodynedTransientLikelihoodFD(marg_phase=True)      RelativeBinningGravitationalWaveTransient (phase_marg=True)
