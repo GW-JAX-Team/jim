@@ -1195,7 +1195,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
 
         params = self.params_without_d_L_phase(phase_distance_likelihood.gmst)
         pd_result = phase_distance_likelihood.evaluate(params, {})
-        d_result = distance_likelihood.evaluate(params, {})
+        d_result = distance_likelihood.evaluate({**params, "phase_c": 0.0}, {})
 
         assert jnp.isfinite(pd_result)
         assert pd_result >= d_result, (
