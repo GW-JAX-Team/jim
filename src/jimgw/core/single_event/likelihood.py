@@ -808,7 +808,9 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         named_params.update(self.fixed_parameters)
         return named_params
 
-    def _matched_filter_log_likelihood(self, params: dict[str, Float], data: dict) -> Float:
+    def _matched_filter_log_likelihood(
+        self, params: dict[str, Float], data: dict
+    ) -> Float:
         """Evaluate the standard matched-filter log-likelihood.
 
         Used internally by the optimizer to find reference parameters.
