@@ -85,168 +85,11 @@ class ZeroLikelihood(LikelihoodBase):
 
 
 # ---------------------------------------------------------------------------
-# Marginalization mixins
-# ---------------------------------------------------------------------------
-
-
-class TimeMarginalizationMixin:
-    """Mixin providing setup and reduction helpers for coalescence-time marginalization.
-
-    Call ``_init_time_marginalization`` from ``__init__`` and use
-    ``_reduce_time`` / ``_reduce_phase_time`` in ``_likelihood``.
-    """
-
-    # Attributes expected from the host class (provided via SingleEventLikelihood)
-    fixed_parameters: dict[str, Float]
-    detectors: Sequence[Detector]
-    frequencies: Float[Array, " n_freq"]
-
-    tc_range: tuple[Float, Float]
-    tc_array: Float[Array, " duration * f_sample / 2"]
-    pad_low: Float[Array, " n_pad_low"]
-    pad_high: Float[Array, " n_pad_high"]
-
-    def _init_time_marginalization(self, tc_range: tuple[Float, Float]) -> None:
-        if "t_c" in self.fixed_parameters:
-            raise ValueError("Cannot have t_c fixed while marginalizing over t_c")
-        self.tc_range = tc_range
-        fs = self.detectors[0].data.sampling_frequency
-        duration = self.detectors[0].data.duration
-        self.tc_array = jnp.fft.fftfreq(int(duration * fs / 2), 1.0 / duration)
-        self.pad_low = jnp.zeros(int(self.frequencies[0] * duration))
-        n_pad_high = int(
-            (fs / 2.0 - 1.0 / duration - float(self.frequencies[-1])) * duration
-        )
-        self.pad_high = jnp.zeros(max(0, n_pad_high))
-
-    def _reduce_time(self, complex_d_inner_h: Float[Array, " n_freq"]) -> Float:
-        """FFT-based time marginalization (real part)."""
-        complex_d_inner_h_positive_f = jnp.concatenate(
-            (self.pad_low, complex_d_inner_h, self.pad_high)
-        )
-        fft_d_inner_h = jnp.fft.fft(complex_d_inner_h_positive_f, norm="backward")
-        fft_d_inner_h = jnp.where(
-            (self.tc_array > self.tc_range[0]) & (self.tc_array < self.tc_range[1]),
-            fft_d_inner_h.real,
-            jnp.zeros_like(fft_d_inner_h.real) - jnp.inf,
-        )
-        return logsumexp(fft_d_inner_h) - jnp.log(len(self.tc_array))
-
-    def _reduce_phase_time(self, complex_d_inner_h: Float[Array, " n_freq"]) -> Float:
-        """FFT-based time marginalization with Bessel phase marginalization."""
-        complex_d_inner_h_positive_f = jnp.concatenate(
-            (self.pad_low, complex_d_inner_h, self.pad_high)
-        )
-        fft_d_inner_h = jnp.fft.fft(complex_d_inner_h_positive_f, norm="backward")
-        log_i0_abs_fft = jnp.where(
-            (self.tc_array > self.tc_range[0]) & (self.tc_array < self.tc_range[1]),
-            log_i0(jnp.absolute(fft_d_inner_h)),
-            jnp.zeros_like(fft_d_inner_h.real) - jnp.inf,
-        )
-        return logsumexp(log_i0_abs_fft) - jnp.log(len(self.tc_array))
-
-
-class DistanceMarginalizationMixin:
-    """Mixin providing setup and reduction helpers for distance marginalization.
-
-    Call ``_init_distance_marginalization`` from ``__init__`` and use
-    ``_reduce_distance`` / ``_reduce_phase_distance`` in ``_likelihood``.
-    """
-
-    # Attributes expected from the host class (provided via SingleEventLikelihood)
-    fixed_parameters: dict[str, Float]
-
-    ref_dist: Float
-    scaling: Float[Array, " n_dist"]
-    log_weights: Float[Array, " n_dist"]
-
-    def _init_distance_marginalization(
-        self,
-        dist_prior: Optional[Prior],
-        n_dist_points: int,
-        ref_dist: Optional[float],
-    ) -> None:
-        if "d_L" in self.fixed_parameters:
-            raise ValueError("Cannot have d_L fixed while marginalising over d_L")
-
-        if dist_prior is None:
-            raise ValueError(
-                "dist_prior must be provided when marginalize_distance=True. "
-                "Example: PowerLawPrior(xmin=100, xmax=5000, alpha=2.0, parameter_names=['d_L'])"
-            )
-
-        if list(dist_prior.parameter_names) != ["d_L"]:
-            raise ValueError(
-                f"dist_prior must be a 1D prior with parameter_names=['d_L'], "
-                f"got parameter_names={list(dist_prior.parameter_names)}."
-            )
-
-        if not hasattr(dist_prior, "xmin") or not hasattr(dist_prior, "xmax"):
-            raise ValueError(
-                "The d_L sub-prior must have xmin and xmax attributes. "
-                "Use a bounded prior such as PowerLawPrior or UniformPrior."
-            )
-
-        dist_min = float(getattr(dist_prior, "xmin"))
-        dist_max = float(getattr(dist_prior, "xmax"))
-
-        if dist_min <= 0:
-            raise ValueError(
-                "The d_L prior's xmin must be > 0 (distance must be positive)"
-            )
-        if dist_max <= dist_min:
-            raise ValueError("The d_L prior's xmax must be greater than xmin")
-
-        if n_dist_points < 2:
-            raise ValueError("n_dist_points must be at least 2")
-
-        if ref_dist is None:
-            self.ref_dist = (dist_min + dist_max) / 2.0
-        else:
-            if ref_dist <= 0:
-                raise ValueError("ref_dist must be > 0")
-            self.ref_dist = ref_dist
-
-        distance_grid = jnp.linspace(dist_min, dist_max, n_dist_points)
-        delta_d = (dist_max - dist_min) / (n_dist_points - 1)
-        self.scaling = self.ref_dist / distance_grid
-
-        log_prob_fn = jax.vmap(lambda d: dist_prior.log_prob({"d_L": d}))
-        log_w = log_prob_fn(distance_grid) + jnp.log(delta_d)
-        self.log_weights = log_w - logsumexp(log_w)
-
-    def _reduce_distance(self, match_filter_snr: Float, optimal_snr: Float) -> Float:
-        """Distance marginalization using scaling + logsumexp."""
-        log_integrand = (
-            match_filter_snr * self.scaling
-            - 0.5 * optimal_snr * self.scaling**2
-            + self.log_weights
-        )
-        return logsumexp(log_integrand)
-
-    def _reduce_phase_distance(
-        self, complex_d_inner_h: complex, optimal_snr: Float
-    ) -> Float:
-        """Phase + distance marginalization (Thrane & Talbot 2019, Eq. 79)."""
-        abs_kappa = jnp.absolute(complex_d_inner_h)
-        log_integrand = (
-            log_i0(abs_kappa * self.scaling)
-            - 0.5 * optimal_snr * self.scaling**2
-            + self.log_weights
-        )
-        return logsumexp(log_integrand)
-
-
-# ---------------------------------------------------------------------------
 # Unified transient likelihood
 # ---------------------------------------------------------------------------
 
 
-class TransientLikelihoodFD(
-    TimeMarginalizationMixin,
-    DistanceMarginalizationMixin,
-    SingleEventLikelihood,
-):
+class TransientLikelihoodFD(SingleEventLikelihood):
     """Frequency-domain transient gravitational wave likelihood.
 
     Supports optional analytic marginalization over coalescence time, phase,
@@ -336,10 +179,8 @@ class TransientLikelihoodFD(
 
         if marginalize_time:
             self._init_time_marginalization(tc_range)
-        if marginalize_phase and "phase_c" in self.fixed_parameters:
-            raise ValueError(
-                "Cannot have phase_c fixed while marginalizing over phase_c"
-            )
+        if marginalize_phase:
+            self._init_phase_marginalization()
         if marginalize_distance:
             self._init_distance_marginalization(dist_prior, n_dist_points, ref_dist)
 
@@ -380,8 +221,10 @@ class TransientLikelihoodFD(
                 log_likelihood += -optimal_SNR / 2
 
             if self.marginalize_phase:
+                # joint time + phase marginalization
                 log_likelihood += self._reduce_phase_time(complex_d_inner_h)
             else:
+                # time only marginalization
                 log_likelihood += self._reduce_time(complex_d_inner_h)
             return log_likelihood
 
@@ -411,11 +254,13 @@ class TransientLikelihoodFD(
                 optimal_snr += inner_product(h_dec, h_dec, psd, self.df)
 
             if self.marginalize_phase and self.marginalize_distance:
+                # joint phase + distance marginalization
                 return self._reduce_phase_distance(complex_d_inner_h, optimal_snr)
             elif self.marginalize_phase:
-                return -optimal_snr / 2 + log_i0(jnp.absolute(complex_d_inner_h))
+                # phase only marginalization
+                return self._reduce_phase(complex_d_inner_h, optimal_snr)
             else:
-                # distance only
+                # distance only marginalization
                 return self._reduce_distance(match_filter_snr, optimal_snr)
 
         else:
@@ -436,6 +281,139 @@ class TransientLikelihoodFD(
                 optimal_SNR = inner_product(h_dec, h_dec, psd, self.df)
                 log_likelihood += match_filter_SNR - optimal_SNR / 2
             return log_likelihood
+
+    # --- time marginalization helpers ---
+
+    def _init_time_marginalization(self, tc_range: tuple[Float, Float]) -> None:
+        if "t_c" in self.fixed_parameters:
+            raise ValueError("Cannot have t_c fixed while marginalizing over t_c")
+        self.tc_range = tc_range
+        fs = self.detectors[0].data.sampling_frequency
+        duration = self.detectors[0].data.duration
+        self.tc_array = jnp.fft.fftfreq(int(duration * fs / 2), 1.0 / duration)
+        self.pad_low = jnp.zeros(int(self.frequencies[0] * duration))
+        n_pad_high = int(
+            (fs / 2.0 - 1.0 / duration - float(self.frequencies[-1])) * duration
+        )
+        self.pad_high = jnp.zeros(max(0, n_pad_high))
+
+    def _reduce_time(self, complex_d_inner_h: Float[Array, " n_freq"]) -> Float:
+        """FFT-based time marginalization (real part)."""
+        complex_d_inner_h_positive_f = jnp.concatenate(
+            (self.pad_low, complex_d_inner_h, self.pad_high)
+        )
+        fft_d_inner_h = jnp.fft.fft(complex_d_inner_h_positive_f, norm="backward")
+        fft_d_inner_h = jnp.where(
+            (self.tc_array > self.tc_range[0]) & (self.tc_array < self.tc_range[1]),
+            fft_d_inner_h.real,
+            jnp.zeros_like(fft_d_inner_h.real) - jnp.inf,
+        )
+        return logsumexp(fft_d_inner_h) - jnp.log(len(self.tc_array))
+
+    # --- phase marginalization helpers ---
+
+    def _init_phase_marginalization(self) -> None:
+        if "phase_c" in self.fixed_parameters:
+            raise ValueError(
+                "Cannot have phase_c fixed while marginalizing over phase_c"
+            )
+
+    def _reduce_phase(self, complex_d_inner_h: complex, optimal_snr: Float) -> Float:
+        """Phase marginalization via modified Bessel function (Thrane & Talbot 2019, Eq. 24)."""
+        return -optimal_snr / 2 + log_i0(jnp.absolute(complex_d_inner_h))
+
+    # --- distance marginalization helpers ---
+
+    def _init_distance_marginalization(
+        self,
+        dist_prior: Optional[Prior],
+        n_dist_points: int,
+        ref_dist: Optional[float],
+    ) -> None:
+        if "d_L" in self.fixed_parameters:
+            raise ValueError("Cannot have d_L fixed while marginalising over d_L")
+
+        if dist_prior is None:
+            raise ValueError(
+                "dist_prior must be provided when marginalize_distance=True. "
+                "Example: PowerLawPrior(xmin=100, xmax=5000, alpha=2.0, parameter_names=['d_L'])"
+            )
+
+        if list(dist_prior.parameter_names) != ["d_L"]:
+            raise ValueError(
+                f"dist_prior must be a 1D prior with parameter_names=['d_L'], "
+                f"got parameter_names={list(dist_prior.parameter_names)}."
+            )
+
+        if not hasattr(dist_prior, "xmin") or not hasattr(dist_prior, "xmax"):
+            raise ValueError(
+                "The d_L sub-prior must have xmin and xmax attributes. "
+                "Use a bounded prior such as PowerLawPrior or UniformPrior."
+            )
+
+        dist_min = float(getattr(dist_prior, "xmin"))
+        dist_max = float(getattr(dist_prior, "xmax"))
+
+        if dist_min <= 0:
+            raise ValueError(
+                "The d_L prior's xmin must be > 0 (distance must be positive)"
+            )
+        if dist_max <= dist_min:
+            raise ValueError("The d_L prior's xmax must be greater than xmin")
+
+        if n_dist_points < 2:
+            raise ValueError("n_dist_points must be at least 2")
+
+        if ref_dist is None:
+            self.ref_dist = (dist_min + dist_max) / 2.0
+        else:
+            if ref_dist <= 0:
+                raise ValueError("ref_dist must be > 0")
+            self.ref_dist = ref_dist
+
+        distance_grid = jnp.linspace(dist_min, dist_max, n_dist_points)
+        delta_d = (dist_max - dist_min) / (n_dist_points - 1)
+        self.scaling = self.ref_dist / distance_grid
+
+        log_prob_fn = jax.vmap(lambda d: dist_prior.log_prob({"d_L": d}))
+        log_w = log_prob_fn(distance_grid) + jnp.log(delta_d)
+        self.log_weights = log_w - logsumexp(log_w)
+
+    def _reduce_distance(self, match_filter_snr: Float, optimal_snr: Float) -> Float:
+        """Distance marginalization using scaling + logsumexp."""
+        log_integrand = (
+            match_filter_snr * self.scaling
+            - 0.5 * optimal_snr * self.scaling**2
+            + self.log_weights
+        )
+        return logsumexp(log_integrand)
+
+    # --- combined marginalization helpers ---
+
+    def _reduce_phase_time(self, complex_d_inner_h: Float[Array, " n_freq"]) -> Float:
+        """FFT-based time + phase marginalization (Bessel-weighted FFT)."""
+        complex_d_inner_h_positive_f = jnp.concatenate(
+            (self.pad_low, complex_d_inner_h, self.pad_high)
+        )
+        fft_d_inner_h = jnp.fft.fft(complex_d_inner_h_positive_f, norm="backward")
+        log_i0_abs_fft = jnp.where(
+            (self.tc_array > self.tc_range[0]) & (self.tc_array < self.tc_range[1]),
+            log_i0(jnp.absolute(fft_d_inner_h)),
+            jnp.zeros_like(fft_d_inner_h.real) - jnp.inf,
+        )
+        return logsumexp(log_i0_abs_fft) - jnp.log(len(self.tc_array))
+
+    def _reduce_phase_distance(
+        self, complex_d_inner_h: complex, optimal_snr: Float
+    ) -> Float:
+        """Phase + distance marginalization (Thrane & Talbot 2019, Eq. 79)."""
+        abs_kappa = jnp.absolute(complex_d_inner_h)
+        log_integrand = (
+            log_i0(abs_kappa * self.scaling)
+            - 0.5 * optimal_snr * self.scaling**2
+            + self.log_weights
+        )
+        return logsumexp(log_integrand)
 
 
 # ---------------------------------------------------------------------------
