@@ -8,6 +8,7 @@ from jimgw.core.single_event.likelihood import (
     TimeMarginalizedLikelihoodFD,
     PhaseMarginalizedLikelihoodFD,
     DistanceMarginalizedLikelihoodFD,
+    PhaseDistanceMarginalizedLikelihoodFD,
     PhaseTimeMarginalizedLikelihoodFD,
     HeterodynedTransientLikelihoodFD,
     HeterodynedPhaseMarginalizedLikelihoodFD,
@@ -1031,3 +1032,151 @@ class TestDistanceMarginalizedLikelihoodFD:
         params = self.params_without_d_L(likelihood.gmst)
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), f"Expected finite log-likelihood, got {result}"
+
+
+class TestPhaseDistanceMarginalizedLikelihoodFD:
+    """Tests for PhaseDistanceMarginalizedLikelihoodFD."""
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def make_d_L_prior(xmin: float = 100.0, xmax: float = 5000.0) -> PowerLawPrior:
+        return PowerLawPrior(xmin=xmin, xmax=xmax, alpha=2.0, parameter_names=["d_L"])
+
+    @staticmethod
+    def params_without_d_L_phase(gmst: float) -> dict:
+        return {
+            "M_c": 30.0,
+            "eta": 0.249,
+            "s1_z": 0.0,
+            "s2_z": 0.0,
+            "t_c": 0.0,
+            "iota": 0.0,
+            "ra": 1.375,
+            "dec": -1.2108,
+            "gmst": gmst,
+            "psi": 0.0,
+        }
+
+    # ------------------------------------------------------------------
+    # Validation tests
+    # ------------------------------------------------------------------
+
+    def test_init_fixed_phase_c_raises(self, detectors_and_waveform):
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        with pytest.raises(ValueError, match="Cannot have phase_c fixed"):
+            PhaseDistanceMarginalizedLikelihoodFD(
+                detectors=ifos,
+                waveform=waveform,
+                f_min=fmin,
+                f_max=fmax,
+                trigger_time=gps,
+                fixed_parameters={"phase_c": 0.0},
+                dist_prior=self.make_d_L_prior(),
+            )
+
+    def test_init_fixed_d_L_raises(self, detectors_and_waveform):
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        with pytest.raises(ValueError, match="Cannot have d_L fixed"):
+            PhaseDistanceMarginalizedLikelihoodFD(
+                detectors=ifos,
+                waveform=waveform,
+                f_min=fmin,
+                f_max=fmax,
+                trigger_time=gps,
+                fixed_parameters={"d_L": 400.0},
+                dist_prior=self.make_d_L_prior(),
+            )
+
+    # ------------------------------------------------------------------
+    # Numerical evaluation tests
+    # ------------------------------------------------------------------
+
+    def test_evaluate_is_finite(self, detectors_and_waveform):
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        likelihood = PhaseDistanceMarginalizedLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            dist_prior=self.make_d_L_prior(),
+        )
+        params = self.params_without_d_L_phase(likelihood.gmst)
+        result = likelihood.evaluate(params, {})
+        assert jnp.isfinite(result), (
+            f"Expected finite phase+distance-marginalized log-likelihood, got {result}"
+        )
+
+    def test_evaluate_jit_matches(self, detectors_and_waveform):
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        likelihood = PhaseDistanceMarginalizedLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            dist_prior=self.make_d_L_prior(),
+        )
+        params = self.params_without_d_L_phase(likelihood.gmst)
+        result = likelihood.evaluate(params, {})
+        result_jit = jax.jit(likelihood.evaluate)(params, {})
+        assert jnp.allclose(result, result_jit), (
+            f"JIT result {result_jit} does not match eager result {result}"
+        )
+
+    def test_geq_distance_marginalized(self, detectors_and_waveform):
+        """Phase+distance marginalization should be >= distance-only marginalization.
+
+        For each distance grid point, phase marginalization computes log I_0(|kappa|),
+        which is at least as large as evaluating the fixed phase used by the
+        distance-only likelihood, so the final logsumexp is also >=.
+        """
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+
+        d_prior = self.make_d_L_prior()
+        phase_distance_likelihood = PhaseDistanceMarginalizedLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            dist_prior=d_prior,
+        )
+        distance_likelihood = DistanceMarginalizedLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            dist_prior=d_prior,
+            ref_dist=phase_distance_likelihood.ref_dist,
+        )
+
+        params = self.params_without_d_L_phase(phase_distance_likelihood.gmst)
+        pd_result = phase_distance_likelihood.evaluate(params, {})
+        d_result = distance_likelihood.evaluate(params, {})
+
+        assert jnp.isfinite(pd_result)
+        assert pd_result >= d_result, (
+            f"Phase+distance-marginalized ({pd_result:.4f}) should be >= "
+            f"distance-marginalized ({d_result:.4f})"
+        )
+
+    def test_evaluate_different_fmin(self, detectors_and_waveform):
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        likelihood = PhaseDistanceMarginalizedLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min={"H1": fmin, "L1": fmin + 1.0},
+            f_max=fmax,
+            trigger_time=gps,
+            dist_prior=self.make_d_L_prior(),
+        )
+        params = self.params_without_d_L_phase(likelihood.gmst)
+        result = likelihood.evaluate(params, {})
+        assert jnp.isfinite(result), (
+            "Phase+distance-marginalized likelihood should be finite with different f_min"
+        )

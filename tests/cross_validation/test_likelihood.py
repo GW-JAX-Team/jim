@@ -528,6 +528,77 @@ class TestDistanceMarginalizedLikelihood:
         )
 
 
+class TestPhaseDistanceMarginalizedLikelihood:
+    """PhaseDistanceMarginalizedLikelihoodFD vs bilby phase+distance marginalization.
+
+    Uses phase=0 for parameter conversion so that jim's forced ``phase_c=0`` remains
+    consistent with the cartesian spin components.
+    """
+
+    def test_log_likelihood_ratio(self, setup):
+        from jimgw.core.single_event.likelihood import (
+            PhaseDistanceMarginalizedLikelihoodFD,
+        )
+        from jimgw.core.prior import PowerLawPrior
+
+        dist_min, dist_max = 100.0, 2000.0
+
+        bilby_params_ph0 = {**setup["bilby_params"], "phase": 0.0}
+        jim_params_ph0 = bilby_to_jim_params(bilby_params_ph0)
+
+        jim_dist_prior = PowerLawPrior(
+            xmin=dist_min,
+            xmax=dist_max,
+            alpha=2.0,
+            parameter_names=["d_L"],
+        )
+
+        jim_ll = PhaseDistanceMarginalizedLikelihoodFD(
+            detectors=setup["jim_ifos"],
+            waveform=setup["waveform"],
+            f_min=F_MIN,
+            f_max=F_MAX,
+            trigger_time=GPS,
+            dist_prior=jim_dist_prior,
+            n_dist_points=10000,
+        ).evaluate(jim_params_ph0.copy(), {})
+
+        bilby_priors = bilby.core.prior.PriorDict()
+        bilby_priors["luminosity_distance"] = bilby.core.prior.PowerLaw(
+            alpha=2,
+            minimum=dist_min,
+            maximum=dist_max,
+            name="luminosity_distance",
+            unit="Mpc",
+        )
+        bilby_priors["phase"] = bilby.core.prior.Uniform(
+            minimum=0.0,
+            maximum=2 * np.pi,
+            boundary="periodic",
+            name="phase",
+        )
+
+        _lookup_table = str(
+            Path(__file__).parent / ".phase_distance_marginalization_lookup.npz"
+        )
+        bilby_ll = bilby.gw.likelihood.GravitationalWaveTransient(
+            interferometers=setup["bilby_ifos"],
+            waveform_generator=setup["wfg"],
+            phase_marginalization=True,
+            distance_marginalization=True,
+            distance_marginalization_lookup_table=_lookup_table,
+            priors=bilby_priors,
+        ).log_likelihood_ratio(bilby_params_ph0.copy())
+
+        print(
+            f"\n[PhaseDistMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
+        )
+        assert jnp.isclose(jim_ll, bilby_ll, rtol=5e-2), (
+            f"PhaseDistanceMarginalizedLikelihoodFD mismatch: jim={float(jim_ll):.6f}, "
+            f"bilby={float(bilby_ll):.6f}"
+        )
+
+
 class TestPhaseTimeMarginalizedLikelihood:
     """PhaseTimeMarginalizedLikelihoodFD vs GravitationalWaveTransient(time+phase marginalization).
 
