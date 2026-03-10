@@ -741,6 +741,12 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         right_bounds = freq_bins_right[:, None]
 
         mask = (freqs_broadcast >= left_bounds) & (freqs_broadcast < right_bounds)
+        # The half-open interval [left, right) excludes any frequency that lands
+        # exactly on the upper edge of the last bin (f_bins[-1]).  This happens
+        # whenever the interpolated bin edge coincides with the last discrete
+        # frequency sample (common when the waveform reaches f_max).  Extend the
+        # last row to a closed interval by OR-ing in the equality condition.
+        mask = mask.at[-1].set(mask[-1] | (freqs == freq_bins_right[-1]))
 
         f_bins_center_broadcast = f_bins_center[:, None]
         freq_shift_matrix = (freqs_broadcast - f_bins_center_broadcast) * mask
