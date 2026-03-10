@@ -776,7 +776,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
                 named_params = transform.backward(named_params)
             for transform in likelihood_transforms:
                 named_params = transform.forward(named_params)
-            return -self._evaluate_unmarginalized(named_params, data)
+            return -self._matched_filter_log_likelihood(named_params, data)
 
         logger.info("Starting the optimizer")
 
@@ -805,13 +805,15 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
             named_params = transform.backward(named_params)
         for transform in likelihood_transforms:
             named_params = transform.forward(named_params)
+        named_params.update(self.fixed_parameters)
         return named_params
 
-    def _evaluate_unmarginalized(self, params: dict[str, Float], data: dict) -> Float:
-        """Evaluate the base (non-heterodyned, non-marginalized) likelihood.
+    def _matched_filter_log_likelihood(self, params: dict[str, Float], data: dict) -> Float:
+        """Evaluate the standard matched-filter log-likelihood.
 
         Used internally by the optimizer to find reference parameters.
         """
+        params.update(self.fixed_parameters)
         params["trigger_time"] = self.trigger_time
         params["gmst"] = self.gmst
         waveform_sky = self.waveform(self.frequencies, params)
