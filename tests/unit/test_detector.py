@@ -110,7 +110,7 @@ class TestDataInterface:
         assert isinstance(psd_interp, PowerSpectrum)
 
         # check drawing frequency domain data from PSD
-        fd_data = self.psd.simulate_data(jax.random.PRNGKey(0))
+        fd_data = self.psd.simulate_data(jax.random.key(0))
 
         # the variance of the simulated data should equal PSD / (4 * delta_f)
         target_var = self.psd.values / (4 * self.psd.delta_f)
@@ -167,7 +167,7 @@ class TestDataInterface:
             waveform_model=waveform,
             parameters=params,
             is_zero_noise=True,
-            rng_key=jax.random.PRNGKey(0),
+            rng_key=jax.random.key(0),
         )
 
         # Check that data was created
@@ -195,7 +195,7 @@ class TestDataInterface:
             waveform_model=waveform,
             parameters=params,
             is_zero_noise=False,
-            rng_key=jax.random.PRNGKey(42),
+            rng_key=jax.random.key(42),
         )
 
         # Check that data with noise differs from zero-noise data

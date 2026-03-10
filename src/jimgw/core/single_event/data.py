@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Complex, PRNGKeyArray
+from jaxtyping import Array, Float, Complex, Key
 
 from gwpy.timeseries import TimeSeries
 from typing import Optional, Self
@@ -40,13 +40,13 @@ class Data(ABC):
 
     name: str
 
-    td: Float[Array, " n_time"]
-    fd: Complex[Array, " n_time // 2 + 1"]
+    td: Float[Array, "n_time"]
+    fd: Complex[Array, "n_time // 2 + 1"]
 
     epoch: Float
     delta_t: Float
 
-    window: Float[Array, " n_time"]
+    window: Float[Array, "n_time"]
 
     def __len__(self) -> int:
         """Returns the length of the time-domain data.
@@ -110,7 +110,7 @@ class Data(ABC):
         return 1 / self.delta_t
 
     @property
-    def times(self) -> Float[Array, " n_time"]:
+    def times(self) -> Float[Array, "n_time"]:
         """Gets time points of the data.
 
         Returns:
@@ -119,7 +119,7 @@ class Data(ABC):
         return jnp.arange(self.n_time) * self.delta_t + self.epoch
 
     @property
-    def frequencies(self) -> Float[Array, " n_time // 2 + 1"]:
+    def frequencies(self) -> Float[Array, "n_time // 2 + 1"]:
         """Gets frequencies of the data.
 
         Returns:
@@ -138,11 +138,11 @@ class Data(ABC):
 
     def __init__(
         self,
-        td: Float[Array, " n_time"] = jnp.array([]),
+        td: Float[Array, "n_time"] = jnp.array([]),
         delta_t: Float = 0.0,
         epoch: Float = 0.0,
         name: str = "",
-        window: Optional[Float[Array, " n_time"]] = None,
+        window: Optional[Float[Array, "n_time"]] = None,
     ) -> None:
         """Initialize the data class.
 
@@ -185,8 +185,8 @@ class Data(ABC):
         self.window = jnp.array(tukey(self.n_time, alpha))
 
     def fft(
-        self, window: Optional[Float[Array, " n_time"]] = None
-    ) -> Complex[Array, " n_freq"]:
+        self, window: Optional[Float[Array, "n_time"]] = None
+    ) -> Complex[Array, "n_freq"]:
         """Compute the Fourier transform of the data and store it
         in the fd attribute.
 
@@ -275,8 +275,8 @@ class Data(ABC):
     @classmethod
     def from_fd(
         cls,
-        fd_strain: Complex[Array, " n_freq"],
-        frequencies: Float[Array, " n_freq"],
+        fd_strain: Complex[Array, "n_freq"],
+        frequencies: Float[Array, "n_freq"],
         epoch: float = 0.0,
         name: str = "",
     ) -> Self:
@@ -381,8 +381,8 @@ class PowerSpectrum(ABC):
     """
 
     name: str
-    values: Float[Array, " n_freq"]
-    frequencies: Float[Array, " n_freq"]
+    values: Float[Array, "n_freq"]
+    frequencies: Float[Array, "n_freq"]
 
     @property
     def n_freq(self) -> int:
@@ -440,8 +440,8 @@ class PowerSpectrum(ABC):
 
     def __init__(
         self,
-        values: Float[Array, " n_freq"] = jnp.array([]),
-        frequencies: Float[Array, " n_freq"] = jnp.array([]),
+        values: Float[Array, "n_freq"] = jnp.array([]),
+        frequencies: Float[Array, "n_freq"] = jnp.array([]),
         name: Optional[str] = None,
     ) -> None:
         """Initialize PowerSpectrum.
@@ -515,7 +515,7 @@ class PowerSpectrum(ABC):
 
     def simulate_data(
         self,
-        key: PRNGKeyArray,
+        key: Key,
     ) -> Complex[Array, " n_sample"]:
         """Simulate noise data based on the power spectrum.
 

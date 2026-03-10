@@ -233,8 +233,8 @@ class SkyFrameToDetectorFrameSkyPositionTransform(BijectiveTransform):
     """
 
     gmst: Float
-    rotation: Float[Array, " 3 3"]
-    rotation_inv: Float[Array, " 3 3"]
+    rotation: Float[Array, "3 3"]
+    rotation_inv: Float[Array, "3 3"]
 
     def __repr__(self):
         return f"SkyFrameToDetectorFrameSkyPositionTransform(gmst={self.gmst})"
