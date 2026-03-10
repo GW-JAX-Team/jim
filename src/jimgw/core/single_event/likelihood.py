@@ -344,7 +344,7 @@ class TransientLikelihoodFD(
             self._init_distance_marginalization(dist_prior, n_dist_points, ref_dist)
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
-        params.update(self.fixed_parameters)
+        params = {**params, **self.fixed_parameters}
         params["trigger_time"] = self.trigger_time
         params["gmst"] = self.gmst
         if self.marginalize_time:
@@ -641,9 +641,9 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
             self.B1_array[detector.name] = B1[mask_heterodyne_center]
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
+        params = {**params, **self.fixed_parameters}
         params["trigger_time"] = self.trigger_time
         params["gmst"] = self.gmst
-        params.update(self.fixed_parameters)
         if self.marginalize_phase:
             params["phase_c"] = 0.0
         return self._likelihood(params, data)
@@ -815,7 +815,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
 
         Used internally by the optimizer to find reference parameters.
         """
-        params.update(self.fixed_parameters)
+        params = {**params, **self.fixed_parameters}
         params["trigger_time"] = self.trigger_time
         params["gmst"] = self.gmst
         waveform_sky = self.waveform(self.frequencies, params)
