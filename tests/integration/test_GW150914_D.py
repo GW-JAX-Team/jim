@@ -14,7 +14,7 @@ from jimgw.core.prior import (
 )
 from jimgw.core.single_event.data import Data, PowerSpectrum
 from jimgw.core.single_event.detector import get_detector_preset
-from jimgw.core.single_event.likelihood import BaseTransientLikelihoodFD
+from jimgw.core.single_event.likelihood import TransientLikelihoodFD
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
 from jimgw.core.single_event.transforms import MassRatioToSymmetricMassRatioTransform
 
@@ -70,7 +70,7 @@ prior = CombinePrior(
 
 likelihood_transforms = [MassRatioToSymmetricMassRatioTransform]
 
-likelihood = BaseTransientLikelihoodFD(
+likelihood = TransientLikelihoodFD(
     ifos,
     waveform=RippleIMRPhenomD(),
     f_min=fmin,

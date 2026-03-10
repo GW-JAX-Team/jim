@@ -17,7 +17,7 @@ from jimgw.core.prior import (
 )
 from jimgw.core.single_event.data import Data, PowerSpectrum
 from jimgw.core.single_event.detector import get_detector_preset
-from jimgw.core.single_event.likelihood import BaseTransientLikelihoodFD
+from jimgw.core.single_event.likelihood import TransientLikelihoodFD
 from jimgw.core.single_event.waveform import RippleIMRPhenomPv2
 from jimgw.core.single_event.transforms import (
     SphereSpinToCartesianSpinTransform,
@@ -82,7 +82,7 @@ likelihood_transforms = [
     SphereSpinToCartesianSpinTransform("s2"),
 ]
 
-likelihood = BaseTransientLikelihoodFD(
+likelihood = TransientLikelihoodFD(
     ifos,
     waveform=RippleIMRPhenomPv2(),
     f_min=fmin,
