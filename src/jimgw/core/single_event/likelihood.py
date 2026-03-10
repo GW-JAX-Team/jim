@@ -114,12 +114,10 @@ class TimeMarginalizationMixin:
         duration = self.detectors[0].data.duration
         self.tc_array = jnp.fft.fftfreq(int(duration * fs / 2), 1.0 / duration)
         self.pad_low = jnp.zeros(int(self.frequencies[0] * duration))
-        if jnp.isclose(self.frequencies[-1], fs / 2.0 - 1.0 / duration):
-            self.pad_high = jnp.array([])
-        else:
-            self.pad_high = jnp.zeros(
-                int((fs / 2.0 - 1.0 / duration - self.frequencies[-1]) * duration)
-            )
+        n_pad_high = int(
+            (fs / 2.0 - 1.0 / duration - float(self.frequencies[-1])) * duration
+        )
+        self.pad_high = jnp.zeros(max(0, n_pad_high))
 
     def _reduce_time(self, complex_d_inner_h: Float[Array, " n_freq"]) -> Float:
         """FFT-based time marginalization (real part)."""
