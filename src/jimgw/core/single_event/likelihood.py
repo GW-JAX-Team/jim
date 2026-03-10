@@ -116,9 +116,7 @@ class TimeMarginalizationMixin:
                 int((fs / 2.0 - 1.0 / duration - self.frequencies[-1]) * duration)
             )
 
-    def _reduce_time(
-        self, complex_d_inner_h: Float[Array, " n_freq"]
-    ) -> Float:
+    def _reduce_time(self, complex_d_inner_h: Float[Array, " n_freq"]) -> Float:
         """FFT-based time marginalization (real part)."""
         complex_d_inner_h_positive_f = jnp.concatenate(
             (self.pad_low, complex_d_inner_h, self.pad_high)
@@ -131,9 +129,7 @@ class TimeMarginalizationMixin:
         )
         return logsumexp(fft_d_inner_h) - jnp.log(len(self.tc_array))
 
-    def _reduce_phase_time(
-        self, complex_d_inner_h: Float[Array, " n_freq"]
-    ) -> Float:
+    def _reduce_phase_time(self, complex_d_inner_h: Float[Array, " n_freq"]) -> Float:
         """FFT-based time marginalization with Bessel phase marginalization."""
         complex_d_inner_h_positive_f = jnp.concatenate(
             (self.pad_low, complex_d_inner_h, self.pad_high)
@@ -359,9 +355,7 @@ class TransientLikelihoodFD(
         # --- choose accumulation type based on flags ---
         if self.marginalize_time:
             # Per-frequency complex array for FFT-based time marginalization
-            complex_d_inner_h = jnp.zeros(
-                len(self.frequencies), dtype=jnp.complex128
-            )
+            complex_d_inner_h = jnp.zeros(len(self.frequencies), dtype=jnp.complex128)
             log_likelihood = 0.0
 
             for i, ifo in enumerate(self.detectors):
@@ -373,9 +367,7 @@ class TransientLikelihoodFD(
                 h_dec = ifo.fd_response(
                     ifo.sliced_frequencies, waveform_sky_ifo, params
                 )
-                complex_d_inner_h = complex_d_inner_h.at[
-                    self.frequency_masks[i]
-                ].add(
+                complex_d_inner_h = complex_d_inner_h.at[self.frequency_masks[i]].add(
                     4 * h_dec * jnp.conj(ifo.sliced_fd_data) / psd * self.df
                 )
                 optimal_SNR = inner_product(h_dec, h_dec, psd, self.df)
@@ -807,9 +799,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
             named_params = transform.forward(named_params)
         return named_params
 
-    def _evaluate_unmarginalized(
-        self, params: dict[str, Float], data: dict
-    ) -> Float:
+    def _evaluate_unmarginalized(self, params: dict[str, Float], data: dict) -> Float:
         """Evaluate the base (non-heterodyned, non-marginalized) likelihood.
 
         Used internally by the optimizer to find reference parameters.
@@ -821,15 +811,10 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         for i, ifo in enumerate(self.detectors):
             psd = ifo.sliced_psd
             waveform_sky_ifo = {
-                key: waveform_sky[key][self.frequency_masks[i]]
-                for key in waveform_sky
+                key: waveform_sky[key][self.frequency_masks[i]] for key in waveform_sky
             }
-            h_dec = ifo.fd_response(
-                ifo.sliced_frequencies, waveform_sky_ifo, params
-            )
-            match_filter_SNR = inner_product(
-                h_dec, ifo.sliced_fd_data, psd, self.df
-            )
+            h_dec = ifo.fd_response(ifo.sliced_frequencies, waveform_sky_ifo, params)
+            match_filter_SNR = inner_product(h_dec, ifo.sliced_fd_data, psd, self.df)
             optimal_SNR = inner_product(h_dec, h_dec, psd, self.df)
             log_likelihood += match_filter_SNR - optimal_SNR / 2
         return log_likelihood
