@@ -1037,6 +1037,10 @@ class TestDistanceMarginalizedLikelihoodFD:
 class TestPhaseDistanceMarginalizedLikelihoodFD:
     """Tests for PhaseDistanceMarginalizedLikelihoodFD."""
 
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
     @staticmethod
     def make_d_L_prior(xmin: float = 100.0, xmax: float = 5000.0) -> PowerLawPrior:
         return PowerLawPrior(xmin=xmin, xmax=xmax, alpha=2.0, parameter_names=["d_L"])
@@ -1055,6 +1059,10 @@ class TestPhaseDistanceMarginalizedLikelihoodFD:
             "gmst": gmst,
             "psi": 0.0,
         }
+
+    # ------------------------------------------------------------------
+    # Validation tests
+    # ------------------------------------------------------------------
 
     def test_init_fixed_phase_c_raises(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
@@ -1081,6 +1089,10 @@ class TestPhaseDistanceMarginalizedLikelihoodFD:
                 fixed_parameters={"d_L": 400.0},
                 dist_prior=self.make_d_L_prior(),
             )
+
+    # ------------------------------------------------------------------
+    # Numerical evaluation tests
+    # ------------------------------------------------------------------
 
     def test_evaluate_is_finite(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
