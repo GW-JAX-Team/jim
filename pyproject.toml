@@ -54,13 +54,13 @@ cross-validation = [
     "bilby[gw]>=2.8.0",
 ]
 doc = [
-    "mkdocs-gen-files==0.6.0",
-    "mkdocs-jupyter==0.25.1",
-    "mkdocs-literate-nav==0.6.2",
-    "mkdocs-material==9.7.1",
-    "mkdocs==1.6.1",
-    "mkdocstrings[python]==1.0.3",
-    "pymdown-extensions==10.20.1",
+    "mkdocs-gen-files",
+    "mkdocs-jupyter",
+    "mkdocs-literate-nav",
+    "mkdocs-material",
+    "mkdocs",
+    "mkdocstrings[python]",
+    "pymdown-extensions",
 ]
 
 [project.urls]
