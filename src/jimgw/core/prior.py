@@ -67,6 +67,22 @@ class Prior(eqx.Module):
     ) -> dict[str, Float[Array, " n_samples"]]:
         raise NotImplementedError
 
+    @abstractmethod
+    def rescale(self, u: dict[str, Float]) -> dict[str, Float]:
+        """Map unit cube samples to physical parameters.
+
+        Parameters
+        ----------
+        u : dict[str, Float]
+            Unit cube values in [0, 1], keyed by physical parameter names.
+
+        Returns
+        -------
+        dict[str, Float]
+            Physical parameter values.
+        """
+        raise NotImplementedError
+
 
 @jaxtyped(typechecker=typechecker)
 class CompositePrior(Prior):
@@ -147,6 +163,10 @@ class LogisticDistribution(Prior):
         variable = z[self.parameter_names[0]]
         return -variable - 2 * jnp.log(1 + jnp.exp(-variable))
 
+    def rescale(self, u: dict[str, Float]) -> dict[str, Float]:
+        variable = u[self.parameter_names[0]]
+        return {self.parameter_names[0]: logit(variable)}
+
 
 @jaxtyped(typechecker=typechecker)
 class StandardNormalDistribution(Prior):
@@ -191,6 +211,10 @@ class StandardNormalDistribution(Prior):
     def log_prob(self, z: dict[str, Float]) -> Float:
         variable = z[self.parameter_names[0]]
         return -0.5 * (variable**2 + jnp.log(2 * jnp.pi))
+
+    def rescale(self, u: dict[str, Float]) -> dict[str, Float]:
+        variable = u[self.parameter_names[0]]
+        return {self.parameter_names[0]: jax.scipy.stats.norm.ppf(variable)}
 
 
 @jaxtyped(typechecker=typechecker)
@@ -240,6 +264,9 @@ class UniformDistribution(Prior):
             jnp.logical_and(variable >= 0.0, variable <= 1.0), 0.0, -jnp.inf
         )
 
+    def rescale(self, u: dict[str, Float]) -> dict[str, Float]:
+        return u
+
 
 class SequentialTransformPrior(CompositePrior):
     """
@@ -252,6 +279,9 @@ class SequentialTransformPrior(CompositePrior):
     """
 
     transforms: tuple[BijectiveTransform, ...]
+    _all_transforms: tuple[BijectiveTransform, ...]
+    _leaf_prior: Prior
+    _leaf_param_names: tuple[str, ...]
 
     def __repr__(self):
         return f"Sequential(priors={self.base_prior}, parameter_names={self.parameter_names})"
@@ -268,6 +298,32 @@ class SequentialTransformPrior(CompositePrior):
         self.transforms = tuple(transforms)
         for transform in self.transforms:
             self.parameter_names = tuple(transform.propagate_name(self.parameter_names))
+
+        # Flatten all transforms from leaf to physical for rescale
+        leaf, all_transforms = self._collect_transforms()
+        self._leaf_prior = leaf
+        self._leaf_param_names = leaf.parameter_names
+        self._all_transforms = all_transforms
+
+    @staticmethod
+    def _collect_transforms_from(prior):
+        """Walk the nested prior tree, collect all transforms and find the leaf.
+
+        Returns the leaf distribution and a flat tuple of all transforms
+        ordered from innermost (leaf-side) to outermost (physical-side).
+        """
+        transforms_stack = []
+        current = prior
+        while isinstance(current, SequentialTransformPrior):
+            transforms_stack.append(current.transforms)
+            current = current.base_prior[0]
+        all_transforms = []
+        for level_transforms in reversed(transforms_stack):
+            all_transforms.extend(level_transforms)
+        return current, tuple(all_transforms)
+
+    def _collect_transforms(self):
+        return self._collect_transforms_from(self)
 
     def sample(
         self, rng_key: PRNGKeyArray, n_samples: int
@@ -289,6 +345,25 @@ class SequentialTransformPrior(CompositePrior):
 
     def transform(self, x: dict[str, Float]) -> dict[str, Float]:
         for transform in self.transforms:
+            x = transform.forward(x)
+        return x
+
+    def rescale(self, u: dict[str, Float]) -> dict[str, Float]:
+        """Map unit cube samples to physical parameters.
+
+        Renames input keys from physical names to leaf names, applies the
+        leaf distribution's rescale (identity for Uniform, ppf for Normal),
+        then pushes forward through the flattened transform chain.
+        """
+        # Rename physical keys to leaf keys
+        renamed = {
+            leaf_name: u[phys_name]
+            for phys_name, leaf_name in zip(self.parameter_names, self._leaf_param_names)
+        }
+        # Leaf rescale (identity for UniformDistribution, ppf for Normal, etc.)
+        x = self._leaf_prior.rescale(renamed)
+        # Apply all transforms from leaf to physical
+        for transform in self._all_transforms:
             x = transform.forward(x)
         return x
 
@@ -360,6 +435,18 @@ class CombinePrior(CompositePrior):
         for prior in self.base_prior:
             output += prior.log_prob(z)
         return output
+
+    def rescale(self, u: dict[str, Float]) -> dict[str, Float]:
+        """Map unit cube samples to physical parameters.
+
+        Dispatches to each sub-prior's rescale, passing only the keys
+        that sub-prior owns, then merges the results.
+        """
+        result = {}
+        for prior in self.base_prior:
+            sub_u = {name: u[name] for name in prior.parameter_names}
+            result.update(prior.rescale(sub_u))
+        return result
 
 
 @jaxtyped(typechecker=typechecker)
