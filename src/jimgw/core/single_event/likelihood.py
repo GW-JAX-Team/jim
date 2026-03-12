@@ -10,7 +10,7 @@ from jimgw.core.prior import Prior
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.transforms import BijectiveTransform, NtoMTransform
 from jimgw.core.single_event.detector import Detector
-from ripplegw.interfaces import Waveform
+from jimgw.core.single_event.waveform import Waveform
 from jimgw.core.single_event.utils import inner_product, complex_inner_product
 from jimgw.core.single_event.gps_times import (
     greenwich_mean_sidereal_time as compute_gmst,

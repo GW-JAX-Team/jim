@@ -1,4 +1,4 @@
-from ripplegw import (  # noqa: F401
+from ripplegw import (
     IMRPhenomD,
     IMRPhenomPv2,
     TaylorF2,
@@ -7,6 +7,7 @@ from ripplegw import (  # noqa: F401
     IMRPhenomXAS_NRTidalv3,
     SineGaussian,
 )
+from ripplegw.interfaces import Waveform  # noqa: F401
 
 # aliases
 RippleIMRPhenomD = IMRPhenomD
