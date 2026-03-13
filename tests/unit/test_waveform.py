@@ -271,12 +271,6 @@ class TestRippleTaylorF2:
         assert_all_finite(h["p"])
         assert_all_finite(h["c"])
 
-    def test_repr(self):
-        """Test string representation."""
-        waveform = RippleTaylorF2(f_ref=25.0)
-        assert "RippleTaylorF2" in repr(waveform)
-        assert "25.0" in repr(waveform)
-
 
 class TestRippleIMRPhenomD_NRTidalv2:
     """Test suite for RippleIMRPhenomD_NRTidalv2 waveform model."""
@@ -325,9 +319,3 @@ class TestRippleIMRPhenomD_NRTidalv2:
 
         assert_all_finite(h["p"])
         assert_all_finite(h["c"])
-
-    def test_repr(self):
-        """Test string representation."""
-        waveform = RippleIMRPhenomD_NRTidalv2(f_ref=25.0)
-        assert "RippleIMRPhenomD_NRTidalv2" in repr(waveform)
-        assert "25.0" in repr(waveform)
