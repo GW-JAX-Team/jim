@@ -1,11 +1,16 @@
+ci:
+  autoupdate_branch: jim-dev
+  skip: [uv-lock, pyright]
+
 repos:
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.9.26
+    rev: 0.10.8
     hooks:
       - id: uv-lock
+        args: ["--upgrade"]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.6
+    rev: v0.15.4
     hooks:
       - id: ruff-check
         args: ["--fix"]
@@ -14,8 +19,8 @@ repos:
         files: src/
   
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.402
+    rev: v1.1.408
     hooks:
     - id: pyright
       files: src/
-      additional_dependencies: [beartype, jax, jaxtyping, pytest, typing_extensions, flowMC, ripplegw, gwpy, astropy, dagster, corner]
+      additional_dependencies: [beartype, jax, jaxtyping, pytest, typing_extensions, flowMC, ripplegw, gwpy, astropy]

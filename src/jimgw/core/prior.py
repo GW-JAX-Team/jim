@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from jax.scipy.special import logit
 from beartype import beartype as typechecker
-from jaxtyping import Array, Float, PRNGKeyArray, jaxtyped
+from jaxtyping import Array, Float, Key, jaxtyped
 from abc import abstractmethod
 import equinox as eqx
 
@@ -42,7 +42,7 @@ class Prior(eqx.Module):
         """
         self.parameter_names = tuple(parameter_names)
 
-    def add_name(self, x: Float[Array, " n_dims"]) -> dict[str, Float]:
+    def add_name(self, x: Float[Array, "n_dims"]) -> dict[str, Float]:
         """
         Turn an array into a dictionary
 
@@ -63,7 +63,7 @@ class Prior(eqx.Module):
 
     @abstractmethod
     def sample(
-        self, rng_key: PRNGKeyArray, n_samples: int
+        self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
         raise NotImplementedError
 
@@ -137,14 +137,14 @@ class LogisticDistribution(Prior):
         assert self.n_dims == 1, "LogisticDistribution needs to be 1D distributions"
 
     def sample(
-        self, rng_key: PRNGKeyArray, n_samples: int
+        self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
         """
         Sample from a logistic distribution.
 
         Parameters
         ----------
-        rng_key : PRNGKeyArray
+        rng_key : Key
             A random key to use for sampling.
         n_samples : int
             The number of samples to draw.
@@ -187,14 +187,14 @@ class StandardNormalDistribution(Prior):
         )
 
     def sample(
-        self, rng_key: PRNGKeyArray, n_samples: int
+        self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
         """
         Sample from a standard normal distribution.
 
         Parameters
         ----------
-        rng_key : PRNGKeyArray
+        rng_key : Key
             A random key to use for sampling.
         n_samples : int
             The number of samples to draw.
@@ -237,14 +237,14 @@ class UniformDistribution(Prior):
         assert self.n_dims == 1, "UniformDistribution needs to be 1D distributions"
 
     def sample(
-        self, rng_key: PRNGKeyArray, n_samples: int
+        self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
         """
         Sample from a uniform distribution.
 
         Parameters
         ----------
-        rng_key : PRNGKeyArray
+        rng_key : Key
             A random key to use for sampling.
         n_samples : int
             The number of samples to draw.
@@ -326,7 +326,7 @@ class SequentialTransformPrior(CompositePrior):
         return self._collect_transforms_from(self)
 
     def sample(
-        self, rng_key: PRNGKeyArray, n_samples: int
+        self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
         output = self.base_prior[0].sample(rng_key, n_samples)
         return jax.vmap(self.transform)(output)
@@ -422,7 +422,7 @@ class CombinePrior(CompositePrior):
         super().__init__(priors)
 
     def sample(
-        self, rng_key: PRNGKeyArray, n_samples: int
+        self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
         output = {}
         for prior in self.base_prior:

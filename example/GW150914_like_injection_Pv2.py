@@ -48,7 +48,7 @@ print(f"Setting output directory to: {outdir.as_posix()}")
 ###########################################
 
 total_time_start = time.time()
-rng_key = jax.random.PRNGKey(int(total_time_start))
+rng_key = jax.random.key(int(total_time_start))
 rng_key, *sub_key = jax.random.split(rng_key, 2)
 
 gps_time = total_time_start - 1000
@@ -201,7 +201,7 @@ jim = Jim(
     prior,
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    rng_key=jax.random.PRNGKey(12345),
+    rng_key=jax.random.key(12345),
     n_chains=512,
     n_local_steps=20,
     n_global_steps=15,
@@ -262,7 +262,7 @@ jnp.savez(
 
 print("Preparing NF samples")
 nf_samples, _ = jim.sampler.resources["global_sampler"].sample_flow(
-    jax.random.PRNGKey(123), 5000
+    jax.random.key(123), 5000
 )
 nf_samples = jax.vmap(jim.add_name)(nf_samples)
 for transform in reversed(sample_transforms):

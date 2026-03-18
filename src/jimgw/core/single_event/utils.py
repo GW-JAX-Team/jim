@@ -244,7 +244,7 @@ def eta_to_q(eta: Float) -> Float:
     return temp - (temp**2 - 1) ** 0.5
 
 
-def euler_rotation(delta_x: Float[Array, " 3"]) -> Float[Array, " 3 3"]:
+def euler_rotation(delta_x: Float[Array, "3"]) -> Float[Array, "3 3"]:
     """
     Calculate the rotation matrix mapping the vector (0, 0, 1) to delta_x
     while preserving the origin of the azimuthal angle.
@@ -287,7 +287,7 @@ def euler_rotation(delta_x: Float[Array, " 3"]) -> Float[Array, " 3 3"]:
 
 
 def angle_rotation(
-    zenith: Float, azimuth: Float, rotation: Float[Array, " 3 3"]
+    zenith: Float, azimuth: Float, rotation: Float[Array, "3 3"]
 ) -> tuple[Float, Float]:
     """
     Transforming the azimuthal angle and zenith angle in Earth frame
@@ -301,7 +301,7 @@ def angle_rotation(
             Zenith angle.
     azimuth : Float
             Azimuthal angle.
-    rotation : Float[Array, " 3 3"]
+    rotation : Float[Array, "3 3"]
             The rotation matrix.
 
     Returns
@@ -355,7 +355,7 @@ def theta_phi_to_ra_dec(theta: Float, phi: Float, gmst: Float) -> tuple[Float, F
 
 
 def zenith_azimuth_to_ra_dec(
-    zenith: Float, azimuth: Float, gmst: Float, rotation: Float[Array, " 3 3"]
+    zenith: Float, azimuth: Float, gmst: Float, rotation: Float[Array, "3 3"]
 ) -> tuple[Float, Float]:
     """
     Transforming the azimuthal angle and zenith angle in Earth frame to right ascension and declination.
@@ -368,7 +368,7 @@ def zenith_azimuth_to_ra_dec(
             Azimuthal angle.
     gmst : Float
             Greenwich mean sidereal time.
-    rotation : Float[Array, " 3 3"]
+    rotation : Float[Array, "3 3"]
             The rotation matrix.
 
     Copied and modified from bilby/gw/utils.py
@@ -413,7 +413,7 @@ def ra_dec_to_theta_phi(ra: Float, dec: Float, gmst: Float) -> tuple[Float, Floa
 
 
 def ra_dec_to_zenith_azimuth(
-    ra: Float, dec: Float, gmst: Float, rotation: Float[Array, " 3 3"]
+    ra: Float, dec: Float, gmst: Float, rotation: Float[Array, "3 3"]
 ) -> tuple[Float, Float]:
     """
     Transforming the right ascension and declination to the zenith angle and azimuthal angle.
@@ -426,7 +426,7 @@ def ra_dec_to_zenith_azimuth(
             Declination.
     gmst : Float
             Greenwich mean sidereal time.
-    rotation : Float[Array, " 3 3"]
+    rotation : Float[Array, "3 3"]
             The rotation matrix.
 
     Returns
@@ -441,7 +441,7 @@ def ra_dec_to_zenith_azimuth(
     return zenith, azimuth
 
 
-def rotate_y(angle: Float, vec: Float[Array, " 3"]) -> Float[Array, " 3"]:
+def rotate_y(angle: Float, vec: Float[Array, "3"]) -> Float[Array, "3"]:
     """
     Rotate the vector (x, y, z) about y-axis
 
@@ -449,11 +449,11 @@ def rotate_y(angle: Float, vec: Float[Array, " 3"]) -> Float[Array, " 3"]:
     ----------
     angle : Float
         Angle in radians.
-    vec : Float[Array, " 3"]
+    vec : Float[Array, "3"]
         Vector to be rotated.
     Returns
     -------
-    rotated_vec : Float[Array, " 3"]
+    rotated_vec : Float[Array, "3"]
         Rotated vector.
     -------
     """
@@ -466,7 +466,7 @@ def rotate_y(angle: Float, vec: Float[Array, " 3"]) -> Float[Array, " 3"]:
     return rotated_vec
 
 
-def rotate_z(angle: Float, vec: Float[Array, " 3"]) -> Float[Array, " 3"]:
+def rotate_z(angle: Float, vec: Float[Array, "3"]) -> Float[Array, "3"]:
     """
     Rotate the vector (x, y, z) about z-axis
 
@@ -474,11 +474,11 @@ def rotate_z(angle: Float, vec: Float[Array, " 3"]) -> Float[Array, " 3"]:
     ----------
     angle : Float
         Angle in radians.
-    vec : Float[Array, " 3"]
+    vec : Float[Array, "3"]
         Vector to be rotated.
     Returns
     -------
-    rotated_vec : Float[Array, " 3"]
+    rotated_vec : Float[Array, "3"]
         Rotated vector.
     """
     cos_angle = jnp.cos(angle)

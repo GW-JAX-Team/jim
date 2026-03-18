@@ -44,7 +44,7 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
         from jimgw.core.single_event.utils import Mc_q_to_m1_m2
 
         n_samples = 50
-        key = jax.random.PRNGKey(42)
+        key = jax.random.key(42)
         subkeys = jax.random.split(key, 11)
 
         # Generate random spin angle parameters
@@ -136,7 +136,7 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
         from jimgw.core.single_event.utils import Mc_q_to_m1_m2
 
         n_samples = 50
-        key = jax.random.PRNGKey(123)
+        key = jax.random.key(123)
         subkeys = jax.random.split(key, 8)
 
         # Generate random cartesian spin parameters
