@@ -52,13 +52,7 @@ plugins:
     - mkdocstrings:
         handlers:
             python:
-              setup_commands:
-                    - import pytkdocs_tweaks
-                    - pytkdocs_tweaks.main()
-                    - import jaxtyping
-                    - jaxtyping.set_array_name_format("array")
-
-              optional:
+              options:
                     inherited_members: true  # Allow looking up inherited methods
                     show_root_heading: true  # actually display anything at all...
                     show_root_full_path: true  # display "diffrax.asdf" not just "asdf"

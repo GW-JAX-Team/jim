@@ -543,14 +543,6 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
             raise ValueError(
                 "Either reference parameters or parameter names must be provided"
             )
-
-        # safe guard for the reference parameters
-        # since ripple cannot handle eta=0.25
-        if jnp.isclose(self.reference_parameters["eta"], 0.25):
-            self.reference_parameters["eta"] = 0.249995
-            logger.warning("The eta of the reference parameter is close to 0.25")
-            logger.warning(f"The eta is adjusted to {self.reference_parameters['eta']}")
-
         logger.info("Constructing reference waveforms..")
 
         self.reference_parameters["trigger_time"] = self.trigger_time

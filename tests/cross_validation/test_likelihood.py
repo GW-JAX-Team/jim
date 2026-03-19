@@ -53,6 +53,9 @@ F_MIN = 20.0
 F_MAX = 1024.0
 F_REF = 20.0
 
+# Single tolerance used by every cross-validation assertion.
+CROSS_VAL_RTOL = 1e-3
+
 # Reference parameters in bilby convention (GW150914-like)
 BILBY_PARAMS = {
     "mass_1": 35.6,
@@ -158,6 +161,13 @@ def build_bilby_ifo_from_jim(jim_ifo, f_min: float, f_max: float):
     duration = float(jim_ifo.data.duration)
     sampling_frequency = float(jim_ifo.data.sampling_frequency)
     epoch = float(jim_ifo.data.epoch)
+
+    # Zero out contributions outside [f_min, f_max].  Bilby's time-marginalization
+    # FFT runs over the *full* one-sided frequency array without a frequency mask,
+    # so keeping out-of-band data would add spurious contributions absent in jim
+    # (which pads those bins with zeros).  Zeroing here makes both FFTs identical.
+    out_of_band = (frequencies_full < f_min) | (frequencies_full > f_max)
+    fd_strain_full[out_of_band] = 0.0
 
     # Interpolate jim PSD onto the full frequency grid and extract the values array
     psd_full = np.array(
@@ -347,7 +357,7 @@ class TestBaseTransientLikelihood:
         ).log_likelihood_ratio(setup["bilby_params"].copy())
 
         print(f"\n[BaseTransient] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}")
-        assert jnp.isclose(jim_ll, bilby_ll, rtol=1e-3), (
+        assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
         )
@@ -400,7 +410,7 @@ class TestPhaseMarginalizedLikelihood:
         print(
             f"\n[PhaseMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
         )
-        assert jnp.isclose(jim_ll, bilby_ll, rtol=1e-3), (
+        assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD(marginalize_phase) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
         )
@@ -409,23 +419,26 @@ class TestPhaseMarginalizedLikelihood:
 class TestTimeMarginalizedLikelihood:
     """TransientLikelihoodFD(marginalize_time=True) vs GravitationalWaveTransient(time_marginalization=True).
 
-    Bilby's time-marginalization FFT maps bin n to absolute time
-    ``start_time + n * T / N`` where ``start_time = epoch`` (the start of the
-    data segment).  The FFT is therefore designed for a waveform reference at
-    ``geocent_time = epoch``, not at the GPS trigger time.  To obtain a
-    comparable result we pass ``geocent_time = epoch`` to bilby.
+    To get exact normalisation agreement we make both sides integrate over the
+    **full segment** [epoch, epoch+duration]:
 
-    The two implementations differ in their prior normalisation conventions
-    (jim: ``-log(N)``; bilby: ``log(prior_width * delta_tc)``) **and** in the
-    exact FFT bin that is nearest the signal peak, leading to a systematic
-    offset of ~7 log-units.  We therefore use an absolute tolerance of 15 log
-    units rather than a relative one.
+    * Jim uses ``tc_range = (-duration/2 - margin, duration/2 + margin)`` so
+      that every FFT bin is in range and the denominator is ``-log(N_fft)``.
+    * Bilby gets a ``Uniform(epoch, epoch+duration)`` prior, which gives the
+      same weight ``log(dt / duration) = -log(N_fft)`` per bin.
+
+    Out-of-band FD strain is zeroed in ``build_bilby_ifo_from_jim`` so that
+    bilby's unmasked FFT sees the same in-band-only data as jim.
     """
 
     def test_log_likelihood_ratio(self, setup):
         from jimgw.core.single_event.likelihood import TransientLikelihoodFD
 
-        tc_range = (-0.1, 0.1)
+        duration = float(setup["jim_ifos"][0].data.duration)
+        epoch = float(setup["jim_ifos"][0].data.epoch)
+        # Cover the full FFT window so jim's denominator is -log(N_fft), matching
+        # bilby's log(dt/duration) = -log(N_fft) normalisation.
+        tc_range = (-duration / 2 - 0.1, duration / 2 + 0.1)
 
         jim_ll = TransientLikelihoodFD(
             detectors=setup["jim_ifos"],
@@ -439,16 +452,10 @@ class TestTimeMarginalizedLikelihood:
 
         priors = bilby.core.prior.PriorDict()
         priors["geocent_time"] = bilby.core.prior.Uniform(
-            minimum=GPS + tc_range[0],
-            maximum=GPS + tc_range[1],
+            minimum=epoch,
+            maximum=epoch + duration,
             name="geocent_time",
         )
-
-        # Bilby's _times = epoch + n*T/N, so it needs a waveform evaluated at
-        # geocent_time = epoch (the segment start) to place the FFT peak within
-        # the prior range [GPS-0.1, GPS+0.1].
-        epoch = float(setup["jim_ifos"][0].data.epoch)
-        bilby_params_timemarg = {**setup["bilby_params"], "geocent_time": epoch}
 
         bilby_ll = bilby.gw.likelihood.GravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
@@ -456,7 +463,7 @@ class TestTimeMarginalizedLikelihood:
             time_marginalization=True,
             jitter_time=False,
             priors=priors,
-        ).log_likelihood_ratio(bilby_params_timemarg)
+        ).log_likelihood_ratio(setup["bilby_params"].copy())
 
         print(
             f"\n[TimeMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
@@ -464,7 +471,7 @@ class TestTimeMarginalizedLikelihood:
         # ~7 unit systematic offset due to different prior normalisation
         # conventions (jim: -log(N); bilby: log(prior*delta_tc)) plus FFT
         # discretisation.  Use absolute tolerance of 15 to cover this.
-        assert abs(float(jim_ll) - float(bilby_ll)) < 15.0, (
+        assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD(marginalize_time) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
         )
@@ -474,8 +481,7 @@ class TestDistanceMarginalizedLikelihood:
     """TransientLikelihoodFD(marginalize_distance=True) vs GravitationalWaveTransient(distance_marginalization=True).
 
     Jim uses direct logsumexp over a fine distance grid;
-    bilby uses a 2-D spline look-up table.  We allow rtol=5e-2 (5 %) to
-    account for the different numerical integration strategies.
+    bilby uses a 2-D spline look-up table.
     """
 
     def test_log_likelihood_ratio(self, setup):
@@ -526,7 +532,7 @@ class TestDistanceMarginalizedLikelihood:
         print(
             f"\n[DistMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
         )
-        assert jnp.isclose(jim_ll, bilby_ll, rtol=5e-2), (
+        assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD(marginalize_distance) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
         )
@@ -597,7 +603,7 @@ class TestPhaseDistanceMarginalizedLikelihood:
         print(
             f"\n[PhaseDistMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
         )
-        assert jnp.isclose(jim_ll, bilby_ll, rtol=5e-2), (
+        assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD(marginalize_phase+distance) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
         )
@@ -610,19 +616,19 @@ class TestPhaseTimeMarginalizedLikelihood:
     must be derived with phase=0 so that the cartesian spins and the phase_c=0
     that TransientLikelihoodFD.evaluate() enforces are consistent.
 
-    Same time-convention caveat as TestTimeMarginalizedLikelihood: bilby's FFT
-    is designed for a waveform at ``geocent_time = epoch``, so we pass that
-    instead of the GPS trigger time.  This introduces a ~7 unit systematic
-    offset (different prior-normalisation conventions), so we use atol=15.
+    Same time-normalisation fix as TestTimeMarginalizedLikelihood: use the full
+    segment as the time prior so jim and bilby share the same -log(N_fft) norm.
     """
 
     def test_log_likelihood_ratio(self, setup):
         from jimgw.core.single_event.likelihood import TransientLikelihoodFD
 
-        tc_range = (-0.1, 0.1)
-
         bilby_params_ph0 = {**setup["bilby_params"], "phase": 0.0}
         jim_params_ph0 = bilby_to_jim_params(bilby_params_ph0)
+
+        duration = float(setup["jim_ifos"][0].data.duration)
+        epoch = float(setup["jim_ifos"][0].data.epoch)
+        tc_range = (-duration / 2 - 0.1, duration / 2 + 0.1)
 
         jim_ll = TransientLikelihoodFD(
             detectors=setup["jim_ifos"],
@@ -637,17 +643,13 @@ class TestPhaseTimeMarginalizedLikelihood:
 
         priors = bilby.core.prior.PriorDict()
         priors["geocent_time"] = bilby.core.prior.Uniform(
-            minimum=GPS + tc_range[0],
-            maximum=GPS + tc_range[1],
+            minimum=epoch,
+            maximum=epoch + duration,
             name="geocent_time",
         )
         priors["phase"] = bilby.core.prior.Uniform(
             minimum=0.0, maximum=2 * np.pi, boundary="periodic", name="phase"
         )
-
-        # See TestTimeMarginalizedLikelihood: bilby needs geocent_time=epoch
-        epoch = float(setup["jim_ifos"][0].data.epoch)
-        bilby_params_epoch = {**bilby_params_ph0, "geocent_time": epoch}
 
         bilby_ll = bilby.gw.likelihood.GravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
@@ -656,13 +658,12 @@ class TestPhaseTimeMarginalizedLikelihood:
             phase_marginalization=True,
             jitter_time=False,
             priors=priors,
-        ).log_likelihood_ratio(bilby_params_epoch)
+        ).log_likelihood_ratio(bilby_params_ph0.copy())
 
         print(
             f"\n[PhaseTimeMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
         )
-        # ~7 unit systematic offset (normalisation + discretisation); use atol=15
-        assert abs(float(jim_ll) - float(bilby_ll)) < 15.0, (
+        assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD(marginalize_time+phase) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
         )
@@ -676,7 +677,7 @@ class TestHeterodynedLikelihood:
     then compared at a slightly perturbed parameter point (to avoid the trivial
     zero at the reference).
 
-    Tolerance: rtol=1e-2 because the binning schemes differ between jim
+    Tolerance: CROSS_VAL_RTOL; the binning schemes differ between jim
     (phase-based) and bilby (chi/epsilon-based).
     """
 
@@ -687,20 +688,24 @@ class TestHeterodynedLikelihood:
         jim_ref_params = setup["jim_params"].copy()
         bilby_ref_params = setup["bilby_params"].copy()
 
+        # Initialise bilby first with its default epsilon so we can read back
+        # the number of bins it chose, then initialise Jim with the same count
+        # for an apples-to-apples comparison.
+        bilby_likelihood = bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
+            interferometers=setup["bilby_ifos"],
+            waveform_generator=setup["wfg"],
+            fiducial_parameters=bilby_ref_params,
+        )
+        n_bins = bilby_likelihood.number_of_bins
+
         jim_likelihood = HeterodynedTransientLikelihoodFD(
             detectors=setup["jim_ifos"],
             waveform=setup["waveform"],
             f_min=F_MIN,
             f_max=F_MAX,
             trigger_time=GPS,
-            n_bins=100,
+            n_bins=n_bins,
             reference_parameters=jim_ref_params,
-        )
-
-        bilby_likelihood = bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
-            interferometers=setup["bilby_ifos"],
-            waveform_generator=setup["wfg"],
-            fiducial_parameters=bilby_ref_params,
         )
 
         # Slightly perturb mass to move away from the fiducial point
@@ -716,7 +721,7 @@ class TestHeterodynedLikelihood:
         print(
             f"\n[Heterodyned] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
         )
-        assert jnp.isclose(jim_ll, bilby_ll, rtol=1e-2), (
+        assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"HeterodynedTransientLikelihoodFD mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
         )
@@ -739,28 +744,32 @@ class TestHeterodynedPhaseMarginalizedLikelihood:
         bilby_ref_params_ph0 = {**bilby_ref_params, "phase": 0.0}
         jim_ref_params = bilby_to_jim_params(bilby_ref_params_ph0)
 
-        jim_likelihood = HeterodynedTransientLikelihoodFD(
-            detectors=setup["jim_ifos"],
-            waveform=setup["waveform"],
-            f_min=F_MIN,
-            f_max=F_MAX,
-            trigger_time=GPS,
-            n_bins=100,
-            reference_parameters=jim_ref_params,
-            marginalize_phase=True,
-        )
-
         priors = bilby.core.prior.PriorDict()
         priors["phase"] = bilby.core.prior.Uniform(
             minimum=0.0, maximum=2 * np.pi, boundary="periodic", name="phase"
         )
 
+        # Initialise bilby first with its default epsilon so we can read back
+        # the number of bins it chose, then initialise Jim with the same count
+        # for an apples-to-apples comparison.
         bilby_likelihood = bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
             waveform_generator=setup["wfg"],
             fiducial_parameters=bilby_ref_params,
             phase_marginalization=True,
             priors=priors,
+        )
+        n_bins = bilby_likelihood.number_of_bins
+
+        jim_likelihood = HeterodynedTransientLikelihoodFD(
+            detectors=setup["jim_ifos"],
+            waveform=setup["waveform"],
+            f_min=F_MIN,
+            f_max=F_MAX,
+            trigger_time=GPS,
+            n_bins=n_bins,
+            reference_parameters=jim_ref_params,
+            marginalize_phase=True,
         )
 
         # Slightly perturb to move away from reference point; keep phase=0 so
@@ -777,7 +786,7 @@ class TestHeterodynedPhaseMarginalizedLikelihood:
         print(
             f"\n[HeterodynedPhaseMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
         )
-        assert jnp.isclose(jim_ll, bilby_ll, rtol=1e-2), (
+        assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"HeterodynedTransientLikelihoodFD(marginalize_phase) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
         )
