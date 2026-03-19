@@ -681,20 +681,24 @@ class TestHeterodynedLikelihood:
         jim_ref_params = setup["jim_params"].copy()
         bilby_ref_params = setup["bilby_params"].copy()
 
+        # Initialise bilby first with its default epsilon so we can read back
+        # the number of bins it chose, then initialise Jim with the same count
+        # for an apples-to-apples comparison.
+        bilby_likelihood = bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
+            interferometers=setup["bilby_ifos"],
+            waveform_generator=setup["wfg"],
+            fiducial_parameters=bilby_ref_params,
+        )
+        n_bins = bilby_likelihood.number_of_bins
+
         jim_likelihood = HeterodynedTransientLikelihoodFD(
             detectors=setup["jim_ifos"],
             waveform=setup["waveform"],
             f_min=F_MIN,
             f_max=F_MAX,
             trigger_time=GPS,
-            n_bins=100,
+            n_bins=n_bins,
             reference_parameters=jim_ref_params,
-        )
-
-        bilby_likelihood = bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
-            interferometers=setup["bilby_ifos"],
-            waveform_generator=setup["wfg"],
-            fiducial_parameters=bilby_ref_params,
         )
 
         # Slightly perturb mass to move away from the fiducial point
@@ -733,27 +737,31 @@ class TestHeterodynedPhaseMarginalizedLikelihood:
         bilby_ref_params_ph0 = {**bilby_ref_params, "phase": 0.0}
         jim_ref_params = bilby_to_jim_params(bilby_ref_params_ph0)
 
-        jim_likelihood = HeterodynedPhaseMarginalizedLikelihoodFD(
-            detectors=setup["jim_ifos"],
-            waveform=setup["waveform"],
-            f_min=F_MIN,
-            f_max=F_MAX,
-            trigger_time=GPS,
-            n_bins=100,
-            reference_parameters=jim_ref_params,
-        )
-
         priors = bilby.core.prior.PriorDict()
         priors["phase"] = bilby.core.prior.Uniform(
             minimum=0.0, maximum=2 * np.pi, boundary="periodic", name="phase"
         )
 
+        # Initialise bilby first with its default epsilon so we can read back
+        # the number of bins it chose, then initialise Jim with the same count
+        # for an apples-to-apples comparison.
         bilby_likelihood = bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
             waveform_generator=setup["wfg"],
             fiducial_parameters=bilby_ref_params,
             phase_marginalization=True,
             priors=priors,
+        )
+        n_bins = bilby_likelihood.number_of_bins
+
+        jim_likelihood = HeterodynedPhaseMarginalizedLikelihoodFD(
+            detectors=setup["jim_ifos"],
+            waveform=setup["waveform"],
+            f_min=F_MIN,
+            f_max=F_MAX,
+            trigger_time=GPS,
+            n_bins=n_bins,
+            reference_parameters=jim_ref_params,
         )
 
         # Slightly perturb to move away from reference point; keep phase=0 so
