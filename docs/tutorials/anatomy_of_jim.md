@@ -7,9 +7,32 @@ This guide aims to give you a high level overview of what are the important comp
 
 ### Data
 
-There should be two main ways to get your data into `jim`, either you fetch it from some public database, or generate synthetic data.
+There are two main ways to get your data into Jim:
+
+1. **Fetch from a public database** — Use `Data.from_gwosc()` to download strain data from the Gravitational Wave Open Science Center (GWOSC):
+
+    ```python
+    from jimgw.core.single_event.data import Data
+    from jimgw.core.single_event.detector import get_H1
+
+    ifo = get_H1()
+    data = Data.from_gwosc("H1", start_time, end_time)
+    ifo.set_data(data)
+    ```
+
+2. **Generate synthetic data** — Create injection data for testing and validation.
 
 ### Model
+
+The waveform model defines how gravitational-wave signals depend on source parameters. Jim uses [ripple](https://github.com/GW-JAX-Team/ripple) waveform models under the hood:
+
+```python
+from jimgw.core.single_event.waveform import RippleIMRPhenomPv2
+
+waveform = RippleIMRPhenomPv2(f_ref=20)
+```
+
+Available waveform models include `RippleIMRPhenomPv2`, and any other waveform implemented in the ripple package.
 
 ## Prior
 
@@ -27,6 +50,22 @@ At its core, `flowMC` is still a MCMC algorithm, so the hyperparameter tuning is
 
 ## Run Manager
 
-While Jim is the main object that will handle most of the work, there are a lot of bookkeeping that needs to be done around a run.
+While Jim is the main object that will handle most of the work, there are a lot of bookkeeping that needs to be done around a run. The `RunManager` class handles:
+
+- Setting up output directories
+- Saving configuration and results
+- Managing checkpoints
+- Post-processing and plotting
 
 ## Analysis
+
+Once sampling is complete, you can extract and analyze the posterior samples:
+
+```python
+# Get posterior samples
+chains = jim.get_samples()
+
+# Compute summary statistics, make corner plots, etc.
+```
+
+For visualization, Jim integrates with standard tools like `corner` and `matplotlib` (available via the `jimGW[visualize]` optional dependency).

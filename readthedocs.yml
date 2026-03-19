@@ -1,13 +1,9 @@
 version: 2
 
-python:
-  install:
-    - requirements: docs/requirements.txt
-
 build:
   os: ubuntu-22.04
   tools:
-    python: "3.11"
+    python: "3.12"
   commands:
     - asdf plugin add uv
     - asdf install uv latest

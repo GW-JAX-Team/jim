@@ -7,13 +7,10 @@ repo_name: GW-JAX-Team/jim
 theme:
     name: material
     features:
-        - navigation  # Sections are included in the navigation on the left.
-        - toc  # Table of contents is integrated on the left; does not appear separately on the right.
-        - header.autohide  # header disappears as you scroll
+        - navigation
+        - toc
+        - header.autohide
     palette:
-        # Light mode / dark mode
-        # We deliberately don't automatically use `media` to check a user's preferences. We default to light mode as
-        # (a) it looks more professional, and (b) is more obvious about the fact that it offers a (dark mode) toggle.
         - scheme: default
           primary: blue
           accent: deep purple
@@ -28,22 +25,21 @@ theme:
              name: Light mode
 
 markdown_extensions:
-    - pymdownx.arithmatex:  # Render LaTeX via MathJax
+    - pymdownx.arithmatex:
         generic: true
-    - pymdownx.superfences  # Seems to enable syntax highlighting when used with the Material theme.
-    - pymdownx.details  
-    - pymdownx.snippets:  # Include one Markdown file into another
+    - pymdownx.superfences
+    - pymdownx.details
+    - pymdownx.snippets:
         base_path: docs
     - admonition
     - toc:
-        permalink: "¤"  # Adds a clickable permalink to each section heading
+        permalink: "¤"
         toc_depth: 4
 
 plugins:
-    - search  # default search plugin; needs manually re-enabling when using any other plugins
-    - autorefs  # Cross-links to headings
-    - mkdocs-jupyter: # Jupyter notebook support
-        # show_input: False
+    - search
+    - autorefs
+    - mkdocs-jupyter:
     - gen-files:
         scripts:
         - docs/gen_ref_pages.py
@@ -52,19 +48,27 @@ plugins:
     - mkdocstrings:
         handlers:
             python:
-              options:
-                    inherited_members: true  # Allow looking up inherited methods
-                    show_root_heading: true  # actually display anything at all...
-                    show_root_full_path: true  # display "diffrax.asdf" not just "asdf"
+                options:
+                    docstring_style: google
+                    inherited_members: true
+                    show_root_heading: true
+                    show_root_full_path: true
                     show_if_no_docstring: true
                     show_signature_annotations: true
-                    show_source: false  # don't include source code
-                    members_order: source  # order methods according to their order of definition in the source code, not alphabetical order
+                    show_source: false
+                    members_order: source
                     heading_level: 4
+
+extra_css:
+  - stylesheets/extra.css
 
 nav:
     - Home: index.md
+    - Getting Started: quickstart.md
+    - Tutorials:
+        - Anatomy of Jim: tutorials/anatomy_of_jim.md
+        - Single Event PE: tutorials/single_event_PE.md
     - Gotchas: gotchas.md
-    - Tutorial: tutorials/
-    - Examples: examples/
-    - API: reference/
+    - Contributing: contributing.md
+    - Changelog: changelog.md
+    - API: api/
