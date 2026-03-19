@@ -468,9 +468,6 @@ class TestTimeMarginalizedLikelihood:
         print(
             f"\n[TimeMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
         )
-        # ~7 unit systematic offset due to different prior normalisation
-        # conventions (jim: -log(N); bilby: log(prior*delta_tc)) plus FFT
-        # discretisation.  Use absolute tolerance of 15 to cover this.
         assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD(marginalize_time) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
