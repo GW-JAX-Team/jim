@@ -1,4 +1,4 @@
-# Jim <img src="https://user-images.githubusercontent.com/4642979/218163532-1c8a58e5-6f36-42de-96d3-f245eee93cf8.png" alt="jim" width="35"/> - A JAX-based gravitational-wave inference toolkit
+# Jim 🚬 - A JAX-based gravitational-wave inference toolkit
 
 [![doc](https://badgen.net/badge/Read/the%20doc/blue)](https://jim.readthedocs.io/en/main/) [![license](https://badgen.net/badge/License/MIT/blue)](https://github.com/GW-JAX-Team/jim/blob/main/LICENSE) [![coverage](https://badgen.net/coveralls/c/github/GW-JAX-Team/jim/main)](https://coveralls.io/github/GW-JAX-Team/jim?branch=main) [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/GW-JAX-Team/jim/main.svg)](https://results.pre-commit.ci/latest/github/GW-JAX-Team/jim/main)
 
