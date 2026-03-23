@@ -26,9 +26,8 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
       - name: Install dependencies
-        run: uv sync --python ${{ matrix.python-version }} --group test
-      - name: Install branch-matched dependencies (flowMC and ripple)
         run: |
+          uv sync --python ${{ matrix.python-version }} --group test
           if [[ "${{ github.ref }}" == "refs/heads/jim-dev" || "${{ github.base_ref }}" == "jim-dev" ]]; then
             uv pip install git+https://github.com/GW-JAX-Team/flowMC.git@flowMC-dev
             uv pip install git+https://github.com/GW-JAX-Team/ripple.git@ripple-dev
@@ -37,7 +36,12 @@ jobs:
             uv pip install git+https://github.com/GW-JAX-Team/ripple.git@main
           fi
       - name: Run tests
-        run: uv run --no-sync pytest --cov=jimgw --cov-report=term-missing tests/unit --ignore=tests/integration --ignore=tests/cross_validation
+        run: |
+          if [[ "${{ matrix.python-version }}" == "3.12" ]]; then
+            uv run --no-sync pytest --cov=jimgw --cov-report=term-missing tests/unit --ignore=tests/integration --ignore=tests/cross_validation
+          else
+            uv run --no-sync pytest tests/unit --ignore=tests/integration --ignore=tests/cross_validation
+          fi
       - name: Upload coverage to Coveralls
         if: matrix.python-version == '3.12'
         env:
@@ -53,9 +57,8 @@ jobs:
         with:
           enable-cache: true
       - name: Install dependencies
-        run: uv sync --python 3.12 --group test
-      - name: Install branch-matched dependencies (flowMC and ripple)
         run: |
+          uv sync --python 3.12 --group test
           if [[ "${{ github.ref }}" == "refs/heads/jim-dev" || "${{ github.base_ref }}" == "jim-dev" ]]; then
             uv pip install git+https://github.com/GW-JAX-Team/flowMC.git@flowMC-dev
             uv pip install git+https://github.com/GW-JAX-Team/ripple.git@ripple-dev
