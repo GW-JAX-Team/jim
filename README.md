@@ -24,9 +24,9 @@ pip install JimGW
 ```
 
 This will install the latest stable release and its dependencies.
-Jim is built on [JAX](https://github.com/google/jax) and [flowMC](https://github.com/GW-JAX-Team/flowMC).
-By default, this installs the CPU version of JAX from [PyPI](https://pypi.org).
-If you have a GPU and want to leverage hardware acceleration, install the CUDA-enabled version:
+Jim is built on [JAX](https://github.com/jax-ml/jax).
+By default, this installs the CPU version of JAX.
+If you have an NVIDIA GPU, install the CUDA-enabled version:
 
 ```bash
 pip install JimGW[cuda]

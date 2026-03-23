@@ -61,11 +61,12 @@ plugins:
 
 nav:
     - Home: index.md
-    - Getting Started: quickstart.md
+    - Installation: installation.md
+    - Quick Start: quickstart.md
     - Tutorials:
-        - Anatomy of Jim: tutorials/anatomy_of_jim.md
-        - Single Event PE: tutorials/single_event_PE.md
-        - Gotchas: gotchas.md
+        - Overview: tutorials/index.md
+    - FAQ:
+        - FAQ: FAQ.md
     - Contributing: contributing.md
     - Changelog: changelog.md
-    - API: api/
+    - API: api/jimgw/*

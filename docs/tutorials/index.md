@@ -1,3 +1,3 @@
-# Quick Start
+# Tutorials
 
 *Coming soon.*

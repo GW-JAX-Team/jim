@@ -1,3 +1,3 @@
-# Quick Start
+# FAQ
 
 *Coming soon.*
