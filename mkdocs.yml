@@ -1,4 +1,4 @@
-site_name: jim
+site_name: Jim
 site_description: A JAX-based gravitational-wave inference toolkit
 site_author: GW JAX Team
 repo_url: https://github.com/GW-JAX-Team/jim
@@ -11,18 +11,18 @@ theme:
         - toc
         - header.autohide
     palette:
-        - scheme: default
-          primary: blue
-          accent: deep purple
-          toggle:
-             icon: material/brightness-5
-             name: Dark mode
         - scheme: slate
           primary: black
           accent: amber
           toggle:
-             icon: material/brightness-2
+             icon: material/brightness-5
              name: Light mode
+        - scheme: default
+          primary: blue
+          accent: deep purple
+          toggle:
+             icon: material/brightness-2
+             name: Dark mode
 
 markdown_extensions:
     - pymdownx.arithmatex:
@@ -59,16 +59,13 @@ plugins:
                     members_order: source
                     heading_level: 4
 
-extra_css:
-  - stylesheets/extra.css
-
 nav:
     - Home: index.md
     - Getting Started: quickstart.md
     - Tutorials:
         - Anatomy of Jim: tutorials/anatomy_of_jim.md
         - Single Event PE: tutorials/single_event_PE.md
-    - Gotchas: gotchas.md
+        - Gotchas: gotchas.md
     - Contributing: contributing.md
     - Changelog: changelog.md
     - API: api/
