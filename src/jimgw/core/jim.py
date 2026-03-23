@@ -178,12 +178,10 @@ class Jim(object):
 
     def add_name(self, x: Float[Array, " n_dims"]) -> dict[str, Float]:
         """
-        Turn an array into a dictionary
+        Turn an array into a dictionary.
 
-        Parameters
-        ----------
-        x : Array
-            An array of parameters. Shape (n_dims,).
+        Args:
+            x (Array): An array of parameters. Shape (n_dims,).
         """
 
         return dict(zip(self.parameter_names, x))
@@ -272,23 +270,18 @@ class Jim(object):
         of the total samples. This is useful for reducing memory usage when plotting
         or analyzing large sample sets.
 
-        Parameters
-        ----------
-        n_samples : int, optional
-            Number of samples to return via uniform random downsampling. If 0, return all samples
-            with transforms applied, by default 0
-        rng_key : Key, optional
-            RNG key for downsampling, by default jax.random.key(21)
-        training : bool, optional
-            Whether to get the training samples or the production samples, by default False
+        Args:
+            n_samples (int, optional): Number of samples to return via uniform random downsampling.
+                If 0, return all samples with transforms applied, by default 0.
+            rng_key (Key, optional): RNG key for downsampling, by default jax.random.key(21).
+            training (bool, optional): Whether to get the training samples or the production
+                samples, by default False.
 
-        Returns
-        -------
-        dict[str, np.ndarray]
-            Dictionary of samples with parameter names as keys and numpy array values.
-            All sample transforms are reversed to return samples in the prior parameter space.
-            Returns numpy arrays for compatibility with plotting libraries and easy serialization.
-
+        Returns:
+            dict[str, np.ndarray]: Dictionary of samples with parameter names as keys and numpy
+                array values. All sample transforms are reversed to return samples in the prior
+                parameter space. Returns numpy arrays for compatibility with plotting libraries
+                and easy serialization.
         """
         if training:
             assert isinstance(

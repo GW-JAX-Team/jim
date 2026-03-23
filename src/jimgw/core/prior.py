@@ -35,21 +35,17 @@ class Prior(eqx.Module):
 
     def __init__(self, parameter_names: list[str]):
         """
-        Parameters
-        ----------
-        parameter_names : list[str]
-            A list of names for the parameters of the prior.
+        Args:
+            parameter_names (list[str]): A list of names for the parameters of the prior.
         """
         self.parameter_names = tuple(parameter_names)
 
     def add_name(self, x: Float[Array, "n_dims"]) -> dict[str, Float]:
         """
-        Turn an array into a dictionary
+        Turn an array into a dictionary.
 
-        Parameters
-        ----------
-        x : Array
-            An array of parameters. Shape (n_dims,).
+        Args:
+            x (Array): An array of parameters. Shape (n_dims,).
         """
 
         return dict(zip(self.parameter_names, x))
@@ -126,18 +122,12 @@ class LogisticDistribution(Prior):
         """
         Sample from a logistic distribution.
 
-        Parameters
-        ----------
-        rng_key : Key
-            A random key to use for sampling.
-        n_samples : int
-            The number of samples to draw.
+        Args:
+            rng_key (Key): A random key to use for sampling.
+            n_samples (int): The number of samples to draw.
 
-        Returns
-        -------
-        samples : dict
-            Samples from the distribution. The keys are the names of the parameters.
-
+        Returns:
+            dict: Samples from the distribution. The keys are the names of the parameters.
         """
         samples = jax.random.uniform(rng_key, (n_samples,), minval=0.0, maxval=1.0)
         samples = logit(samples)
@@ -172,18 +162,12 @@ class StandardNormalDistribution(Prior):
         """
         Sample from a standard normal distribution.
 
-        Parameters
-        ----------
-        rng_key : Key
-            A random key to use for sampling.
-        n_samples : int
-            The number of samples to draw.
+        Args:
+            rng_key (Key): A random key to use for sampling.
+            n_samples (int): The number of samples to draw.
 
-        Returns
-        -------
-        samples : dict
-            Samples from the distribution. The keys are the names of the parameters.
-
+        Returns:
+            dict: Samples from the distribution. The keys are the names of the parameters.
         """
         samples = jax.random.normal(rng_key, (n_samples,))
         return self.add_name(samples[None])
@@ -218,18 +202,12 @@ class UniformDistribution(Prior):
         """
         Sample from a uniform distribution.
 
-        Parameters
-        ----------
-        rng_key : Key
-            A random key to use for sampling.
-        n_samples : int
-            The number of samples to draw.
+        Args:
+            rng_key (Key): A random key to use for sampling.
+            n_samples (int): The number of samples to draw.
 
-        Returns
-        -------
-        samples : dict
-            Samples from the distribution. The keys are the names of the parameters.
-
+        Returns:
+            dict: Samples from the distribution. The keys are the names of the parameters.
         """
         samples = jax.random.uniform(rng_key, (n_samples,), minval=0.0, maxval=1.0)
         return self.add_name(samples[None])

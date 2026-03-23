@@ -274,19 +274,13 @@ class GeocentricArrivalTimeToDetectorArrivalTimeTransform(
     ConditionalBijectiveTransform
 ):
     """
-    Transform the geocentric arrival time to detector arrival time
+    Transform the geocentric arrival time to detector arrival time.
 
     In the geocentric convention, the arrival time of the signal at the
-    center of Earth is gps_time + t_c
+    center of Earth is gps_time + t_c.
 
     In the detector convention, the arrival time of the signal at the
-    detecotr is gps_time + time_delay_from_geo_to_det + t_det
-
-    Parameters
-    ----------
-    name_mapping : tuple[list[str], list[str]]
-            The name mapping between the input and output dictionary.
-
+    detector is gps_time + time_delay_from_geo_to_det + t_det.
     """
 
     gmst: Float
@@ -341,19 +335,13 @@ class GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
     ConditionalBijectiveTransform
 ):
     """
-    Transform the geocentric arrival phase to detector arrival phase
+    Transform the geocentric arrival phase to detector arrival phase.
 
     In the geocentric convention, the arrival phase of the signal at the
-    center of Earth is phase_c / 2 (in ripple, phase_c is the orbital phase)
+    center of Earth is phase_c / 2 (in ripple, phase_c is the orbital phase).
 
     In the detector convention, the arrival phase of the signal at the
-    detecotr is phase_det = phase_c / 2 + arg R_det
-
-    Parameters
-    ----------
-    name_mapping : tuple[list[str], list[str]]
-            The name mapping between the input and output dictionary.
-
+    detector is phase_det = phase_c / 2 + arg R_det.
     """
 
     gmst: Float
@@ -418,13 +406,7 @@ class GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
 @jaxtyped(typechecker=typechecker)
 class DistanceToSNRWeightedDistanceTransform(ConditionalBijectiveTransform):
     """
-    Transform the luminosity distance to network SNR weighted distance
-
-    Parameters
-    ----------
-    name_mapping : tuple[list[str], list[str]]
-            The name mapping between the input and output dictionary.
-
+    Transform the luminosity distance to network SNR weighted distance.
     """
 
     gmst: Float
