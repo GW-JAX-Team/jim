@@ -19,4 +19,3 @@ Jim is a JAX-based toolkit for Bayesian parameter estimation of gravitational-wa
 - **[Quick Start](quickstart.md)** — A basic example to get started
 - **[Tutorials](tutorials/index.md)** — Step-by-step guides and worked examples
 - **[FAQ](FAQ.md)** — Answers to common questions
-- **[API Reference](api/jimgw/)** — Full API documentation
