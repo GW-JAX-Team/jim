@@ -51,6 +51,7 @@ plugins:
             python:
                 options:
                     docstring_style: google
+                    filters: ["!^logger$"]
                     inherited_members: true
                     show_root_heading: true
                     show_root_full_path: true
