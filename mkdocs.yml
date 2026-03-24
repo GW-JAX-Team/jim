@@ -68,5 +68,4 @@ nav:
     - FAQ:
         - FAQ: FAQ.md
     - Contributing: contributing.md
-    - Changelog: changelog.md
     - API: api/jimgw/*
