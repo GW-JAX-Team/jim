@@ -59,7 +59,7 @@ plugins:
                     show_signature_annotations: true
                     show_source: false
                     members_order: source
-                    heading_level: 4
+                    heading_level: 3
 
 nav:
     - Home: index.md
