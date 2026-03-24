@@ -40,6 +40,7 @@ plugins:
     - search
     - autorefs
     - mkdocs-jupyter:
+        include: ["*.ipynb"]
     - gen-files:
         scripts:
         - docs/gen_ref_pages.py

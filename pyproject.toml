@@ -55,7 +55,7 @@ cross-validation = [
 ]
 doc = [
     "mkdocs-gen-files",
-    "mkdocs-jupyter",
+    "mkdocs-jupyter<0.26.0",
     "mkdocs-literate-nav",
     "mkdocs-material",
     "mkdocs",
