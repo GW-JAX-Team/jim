@@ -1,6 +1,6 @@
 # Jim 🚬
 
-### A JAX-based gravitational-wave inference toolkit
+## A JAX-based gravitational-wave inference toolkit
 
 [![doc](https://badgen.net/badge/Read/the%20doc/blue)](https://jim.readthedocs.io/en/main/) [![license](https://badgen.net/badge/License/MIT/blue)](https://github.com/GW-JAX-Team/jim/blob/main/LICENSE) [![coverage](https://badgen.net/coveralls/c/github/GW-JAX-Team/jim/main)](https://coveralls.io/github/GW-JAX-Team/jim?branch=main) [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/GW-JAX-Team/jim/main.svg)](https://results.pre-commit.ci/latest/github/GW-JAX-Team/jim/main)
 
