@@ -72,7 +72,6 @@ nav:
         - Likelihood: tutorials/likelihood.md
         - Prior: tutorials/prior.md
         - Transforms: tutorials/transforms.md
-    - FAQ:
-        - FAQ: FAQ.md
+    - FAQ: FAQ.md
     - Contributing: contributing.md
     - API: api/jimgw/*
