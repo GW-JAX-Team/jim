@@ -83,9 +83,9 @@ prior = CombinePrior([
 Jim uses two kinds of transforms to bridge three parameter spaces:
 
 ```text
-     ┌───────── Likelihood Transforms ────────→ Likelihood space
-Prior space
-     └─────────── Sample Transforms ───────────→ Sampling space
+     ┌───────── Likelihood Transforms ────────→ Likelihood Space
+Prior Space
+     └─────────── Sample Transforms ───────────→ Sampling Space
 ```
 
 - **Likelihood transforms** — map from the prior parameter space to the likelihood parameter space. The likelihood space is fixed by your waveform model (e.g. ripple expects `eta`, Cartesian spins), so the likelihood transforms you need depend on how you define your prior. For example, if your prior is on mass ratio `q` but the waveform expects symmetric mass ratio `eta`, a likelihood transform handles that conversion.

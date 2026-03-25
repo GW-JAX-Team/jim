@@ -1,9 +1,11 @@
 # Transforms
 
-Jim bridges three parameter spaces, and transforms are the glue between them:
+Jim bridges three parameter spaces, and transforms are the connections between them:
 
 ```text
-Sampling space  ──(sample transforms)──→  Prior space  ──(likelihood transforms)──→  Likelihood space
+     ┌───────── Likelihood Transforms ────────→ Likelihood Space
+Prior Space
+     └─────────── Sample Transforms ───────────→ Sampling Space
 ```
 
 - The **likelihood space** is fixed by your waveform model (e.g. ripple expects chirp mass, symmetric mass ratio, Cartesian spins, etc.).
@@ -34,27 +36,15 @@ likelihood_transforms = [
 
 ## Sample Transforms
 
-**Sample transforms** map from the sampling space to the prior space. They let the sampler explore a different parameterisation than the one your prior is defined in, typically one where correlations between parameters are reduced.
+**Sample transforms** map from the prior space to the sampling space. They let the sampler explore a different parameterisation than the one your prior is defined in, typically one where correlations between parameters are reduced.
 
 For example, RA and Dec are strongly correlated for a two-detector network. Transforming to detector-frame coordinates (zenith, azimuth) removes most of that correlation, making sampling much more efficient:
 
 ```python
-from jimgw.core.single_event.transforms import (
-    SkyFrameToDetectorFrameSkyPositionTransform,
-    GeocentricArrivalTimeToDetectorArrivalTimeTransform,
-    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform,
-    DistanceToSNRWeightedDistanceTransform,
-)
+from jimgw.core.single_event.transforms import SkyFrameToDetectorFrameSkyPositionTransform
 
 sample_transforms = [
-    DistanceToSNRWeightedDistanceTransform(gps_time=gps_time, ifos=ifos),
-    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
-        gps_time=gps_time, ifo=ifos[0]
-    ),
     SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps_time, ifos=ifos),
-    GeocentricArrivalTimeToDetectorArrivalTimeTransform(
-        gps_time=gps_time, ifo=ifos[0]
-    ),
 ]
 ```
 
