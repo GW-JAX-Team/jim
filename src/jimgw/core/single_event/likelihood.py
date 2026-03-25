@@ -75,7 +75,7 @@ class SingleEventLikelihood(LikelihoodBase):
         dict and may return a scalar or a dict (the matching key is extracted).
         Callables are applied in insertion order.
         """
-        params = dict(params)  # never mutate the caller's dict
+        params = params.copy()
         for key, value in self.fixed_parameters.items():
             if callable(value):
                 result = value(params)
@@ -208,7 +208,7 @@ class TransientLikelihoodFD(SingleEventLikelihood):
             self._init_distance_marginalization(dist_prior, n_dist_points, ref_dist)
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
-        params = dict(params)
+        params = params.copy()
         for key, value in self.fixed_parameters.items():
             if callable(value):
                 result = value(params)
@@ -649,7 +649,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
             self.B1_array[detector.name] = B1[mask_heterodyne_center]
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
-        params = dict(params)
+        params = params.copy()
         for key, value in self.fixed_parameters.items():
             if callable(value):
                 result = value(params)
