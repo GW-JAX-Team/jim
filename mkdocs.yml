@@ -67,6 +67,12 @@ nav:
     - Quick Start: quickstart.md
     - Tutorials:
         - Overview: tutorials/index.md
+        - Getting Started: tutorials/getting_started.py
+        - Data: tutorials/data.md
+        - Likelihood: tutorials/likelihood.md
+        - Prior: tutorials/prior.md
+        - Transforms: tutorials/transforms.md
+        - Sampler: tutorials/sampler.md
     - FAQ:
         - FAQ: FAQ.md
     - Contributing: contributing.md

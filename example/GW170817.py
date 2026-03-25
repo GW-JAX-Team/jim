@@ -2,6 +2,7 @@ import time
 
 import jax
 import jax.numpy as jnp
+import optax
 
 from jimgw.core.jim import Jim
 from jimgw.core.prior import (
@@ -16,7 +17,6 @@ from jimgw.core.single_event.detector import get_H1, get_L1, get_V1
 from jimgw.core.single_event.likelihood import HeterodynedTransientLikelihoodFD
 from jimgw.core.single_event.data import Data
 from jimgw.core.single_event.waveform import RippleIMRPhenomPv2
-from jimgw.core.transforms import BoundToUnbound
 from jimgw.core.single_event.transforms import (
     SkyFrameToDetectorFrameSkyPositionTransform,
     SphereSpinToCartesianSpinTransform,
@@ -26,6 +26,8 @@ from jimgw.core.single_event.transforms import (
     GeocentricArrivalPhaseToDetectorArrivalPhaseTransform,
 )
 from flowMC.strategy.optimization import optimization_Adam
+
+jax.config.update("jax_enable_x64", True)
 
 ###########################################
 ########## First we grab data #############
@@ -123,71 +125,6 @@ sample_transforms = [
     GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(gps_time=gps, ifo=ifos[0]),
     GeocentricArrivalTimeToDetectorArrivalTimeTransform(gps_time=gps, ifo=ifos[0]),
     SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps, ifos=ifos),
-    BoundToUnbound(
-        name_mapping=(["M_c"], ["M_c_unbounded"]),
-        original_lower_bound=M_c_min,
-        original_upper_bound=M_c_max,
-    ),
-    BoundToUnbound(
-        name_mapping=(["q"], ["q_unbounded"]),
-        original_lower_bound=q_min,
-        original_upper_bound=q_max,
-    ),
-    BoundToUnbound(
-        name_mapping=(["s1_phi"], ["s1_phi_unbounded"]),
-        original_lower_bound=0.0,
-        original_upper_bound=2 * jnp.pi,
-    ),
-    BoundToUnbound(
-        name_mapping=(["s2_phi"], ["s2_phi_unbounded"]),
-        original_lower_bound=0.0,
-        original_upper_bound=2 * jnp.pi,
-    ),
-    BoundToUnbound(
-        name_mapping=(["iota"], ["iota_unbounded"]),
-        original_lower_bound=0.0,
-        original_upper_bound=jnp.pi,
-    ),
-    BoundToUnbound(
-        name_mapping=(["s1_theta"], ["s1_theta_unbounded"]),
-        original_lower_bound=0.0,
-        original_upper_bound=jnp.pi,
-    ),
-    BoundToUnbound(
-        name_mapping=(["s2_theta"], ["s2_theta_unbounded"]),
-        original_lower_bound=0.0,
-        original_upper_bound=jnp.pi,
-    ),
-    BoundToUnbound(
-        name_mapping=(["s1_mag"], ["s1_mag_unbounded"]),
-        original_lower_bound=0.0,
-        original_upper_bound=0.05,
-    ),
-    BoundToUnbound(
-        name_mapping=(["s2_mag"], ["s2_mag_unbounded"]),
-        original_lower_bound=0.0,
-        original_upper_bound=0.05,
-    ),
-    BoundToUnbound(
-        name_mapping=(["phase_det"], ["phase_det_unbounded"]),
-        original_lower_bound=0.0,
-        original_upper_bound=2 * jnp.pi,
-    ),
-    BoundToUnbound(
-        name_mapping=(["psi"], ["psi_unbounded"]),
-        original_lower_bound=0.0,
-        original_upper_bound=jnp.pi,
-    ),
-    BoundToUnbound(
-        name_mapping=(["zenith"], ["zenith_unbounded"]),
-        original_lower_bound=0.0,
-        original_upper_bound=jnp.pi,
-    ),
-    BoundToUnbound(
-        name_mapping=(["azimuth"], ["azimuth_unbounded"]),
-        original_lower_bound=0.0,
-        original_upper_bound=2 * jnp.pi,
-    ),
 ]
 
 likelihood_transforms = [
@@ -209,16 +146,9 @@ likelihood = HeterodynedTransientLikelihoodFD(
     n_steps=50,
 )
 
-mass_matrix = jnp.eye(prior.n_dim)
-# mass_matrix = mass_matrix.at[1, 1].set(1e-3)
-# mass_matrix = mass_matrix.at[9, 9].set(1e-3)
-local_sampler_arg = {"step_size": mass_matrix * 1e-3}
-
 #### The rest of this script is not guaranteed to work ####
 
 Adam_optimizer = optimization_Adam(n_steps=3000, learning_rate=0.01, noise_level=1)
-
-import optax
 
 n_epochs = 20
 n_loop_training = 100
@@ -233,24 +163,27 @@ jim = Jim(
     prior,
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    n_loop_training=n_loop_training,
-    n_loop_production=20,
-    n_local_steps=10,
-    n_global_steps=1000,
     n_chains=500,
+    n_local_steps=100,
+    n_global_steps=1000,
+    n_training_loops=n_loop_training,
+    n_production_loops=10,
     n_epochs=n_epochs,
+    mala_step_size=2e-3,
+    rq_spline_hidden_units=[128, 128],
+    rq_spline_n_bins=10,
+    rq_spline_n_layers=8,
     learning_rate=learning_rate,
+    batch_size=10000,
     n_max_examples=30000,
-    n_NFproposal_batch_size=100000,
-    momentum=0.9,
-    batch_size=30000,
-    use_global=True,
-    keep_quantile=0.0,
-    train_thinning=1,
-    output_thinning=10,
-    local_sampler_arg=local_sampler_arg,
-    # strategies=[Adam_optimizer,"default"],
+    n_NFproposal_batch_size=100,
+    local_thinning=1,
+    global_thinning=100,
+    history_window=200,
+    n_temperatures=0,
+    max_temperature=20.0,
+    n_tempered_steps=10,
+    verbose=True,
 )
 
-
-jim.sample(jax.random.key(42))
+jim.sample()

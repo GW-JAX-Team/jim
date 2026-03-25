@@ -4,7 +4,6 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-
 from jimgw.core.jim import Jim
 from jimgw.core.prior import (
     CombinePrior,
@@ -13,12 +12,10 @@ from jimgw.core.prior import (
     SinePrior,
     PowerLawPrior,
     UniformSpherePrior,
-    RayleighPrior,
 )
 from jimgw.core.single_event.detector import get_H1, get_L1
 from jimgw.core.single_event.likelihood import TransientLikelihoodFD
 from jimgw.core.single_event.waveform import RippleIMRPhenomPv2
-from jimgw.core.transforms import PeriodicTransform
 from jimgw.core.single_event.transforms import (
     SkyFrameToDetectorFrameSkyPositionTransform,
     SphereSpinToCartesianSpinTransform,
@@ -132,51 +129,16 @@ prior = [
     CosinePrior(parameter_names=["dec"]),
 ]
 
-prior += [
-    RayleighPrior(1.5, parameter_names=["periodic_1"]),
-    RayleighPrior(1.5, parameter_names=["periodic_2"]),
-    RayleighPrior(1.5, parameter_names=["periodic_3"]),
-    RayleighPrior(1.5, parameter_names=["periodic_4"]),
-    RayleighPrior(1.5, parameter_names=["periodic_5"]),
-]
-
 prior = CombinePrior(prior)
 
 # Defining Transforms
 sample_transforms = [
-    DistanceToSNRWeightedDistanceTransform(
-        gps_time=gps_time, ifos=ifos
-    ),
+    DistanceToSNRWeightedDistanceTransform(gps_time=gps_time, ifos=ifos),
     GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
         gps_time=gps_time, ifo=ifos[0]
     ),
     SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps_time, ifos=ifos),
-    GeocentricArrivalTimeToDetectorArrivalTimeTransform(
-        gps_time=gps_time, ifo=ifos[0]
-    ),
-    PeriodicTransform(
-        name_mapping=(["periodic_1", "s1_phi"], ["s1_phi_x", "s1_phi_y"]),
-        xmin=0.0,
-        xmax=2 * jnp.pi,
-    ),
-    PeriodicTransform(
-        name_mapping=(["periodic_2", "s2_phi"], ["s2_phi_x", "s2_phi_y"]),
-        xmin=0.0,
-        xmax=2 * jnp.pi,
-    ),
-    PeriodicTransform(
-        name_mapping=(["periodic_3", "ra"], ["ra_x", "ra_y"]), xmin=0.0, xmax=2 * jnp.pi
-    ),
-    PeriodicTransform(
-        name_mapping=(["periodic_4", "phase_det"], ["phase_det_x", "phase_det_y"]),
-        xmin=0.0,
-        xmax=2 * jnp.pi,
-    ),
-    PeriodicTransform(
-        name_mapping=(["periodic_5", "psi"], ["psi_base_x", "psi_base_y"]),
-        xmin=0.0,
-        xmax=jnp.pi,
-    ),
+    GeocentricArrivalTimeToDetectorArrivalTimeTransform(gps_time=gps_time, ifo=ifos[0]),
 ]
 
 likelihood_transforms = [
@@ -227,6 +189,10 @@ jim = Jim(
 
 jim.sample()
 
+end_time = time.time()
+print("Sampling Done!")
+print("Total time taken: ", end_time - total_time_start)
+
 resources = jim.sampler.resources
 logprob_train = resources["log_prob_training"].data
 logprob_prod = resources["log_prob_production"].data
@@ -238,11 +204,6 @@ print("Mean acceptance (Training): ", jnp.mean(acceptance_train))
 print("Mean acceptance (Production): ", jnp.mean(acceptance_prod))
 
 tempered_log_pdf = resources["tempered_logpdf"]
-
-end_time = time.time()
-print("Total time taken: ", end_time - total_time_start)
-
-print("Sampling Done!")
 
 print("Preparing samples")
 samples = jim.get_samples()
@@ -259,14 +220,5 @@ jnp.savez(
     log_prob=log_poste,
     tempered_log_pdf=tempered_log_pdf,
 )
-
-print("Preparing NF samples")
-nf_samples, _ = jim.sampler.resources["global_sampler"].sample_flow(
-    jax.random.key(123), 5000
-)
-nf_samples = jax.vmap(jim.add_name)(nf_samples)
-for transform in reversed(sample_transforms):
-    nf_samples = jax.vmap(transform.backward)(nf_samples)
-jnp.savez(outdir / "nf_samples.npz", **nf_samples)
 
 print("DONE!")
