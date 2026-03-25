@@ -493,7 +493,10 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         detectors: Sequence[Detector],
         waveform: Waveform,
         fixed_parameters: Optional[
-            dict[str, Float | Callable[[dict[str, Float]], Float]]
+            dict[
+                str,
+                Float | Callable[[dict[str, Float]], Float | dict[str, Float]],
+            ]
         ] = None,
         f_min: float | dict[str, float] = 0.0,
         f_max: float | dict[str, float] = float("inf"),
