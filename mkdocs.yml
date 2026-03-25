@@ -67,7 +67,7 @@ nav:
     - Quick Start: quickstart.md
     - Tutorials:
         - Overview: tutorials/index.md
-        - Getting Started: tutorials/getting_started.py
+        - Getting Started: tutorials/getting_started.ipynb
         - Data: tutorials/data.md
         - Likelihood: tutorials/likelihood.md
         - Prior: tutorials/prior.md
