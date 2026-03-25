@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from flowMC.strategy.optimization import AdamOptimization
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, Float
-from typing import Optional
+from typing import Callable, Optional
 from scipy.interpolate import interp1d
 from jimgw.core.utils import log_i0
 from jimgw.core.prior import Prior
@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 class SingleEventLikelihood(LikelihoodBase):
     detectors: Sequence[Detector]
     waveform: Waveform
-    fixed_parameters: dict[str, Float] = {}
+    fixed_parameters: dict[
+        str, Float | Callable[[dict[str, Float]], Float | dict[str, Float]]
+    ] = {}
 
     @property
     def duration(self) -> Float:
@@ -40,7 +42,12 @@ class SingleEventLikelihood(LikelihoodBase):
         self,
         detectors: Sequence[Detector],
         waveform: Waveform,
-        fixed_parameters: Optional[dict[str, Float]] = None,
+        fixed_parameters: Optional[
+            dict[
+                str,
+                Float | Callable[[dict[str, Float]], Float | dict[str, Float]],
+            ]
+        ] = None,
     ) -> None:
         # Check that all detectors have initialized data and PSD
         for detector in detectors:
@@ -62,11 +69,19 @@ class SingleEventLikelihood(LikelihoodBase):
         self.fixed_parameters = fixed_parameters if fixed_parameters is not None else {}
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
-        """Evaluate the likelihood for a given set of parameters.
+        """Apply ``fixed_parameters`` overrides and evaluate the likelihood.
 
-        This is a template method that calls the core likelihood evaluation method
+        Constants are injected directly; callables receive the current params
+        dict and may return a scalar or a dict (the matching key is extracted).
+        Callables are applied in insertion order.
         """
-        params.update(self.fixed_parameters)
+        params = dict(params)  # never mutate the caller's dict
+        for key, value in self.fixed_parameters.items():
+            if callable(value):
+                result = value(params)
+                params[key] = result[key] if isinstance(result, dict) else result
+            else:
+                params[key] = value
         return self._likelihood(params, data)
 
     @abstractmethod
@@ -99,7 +114,10 @@ class TransientLikelihoodFD(SingleEventLikelihood):
     Args:
         detectors: List of detector objects containing data and metadata.
         waveform: Waveform model to evaluate.
-        fixed_parameters: Dictionary of fixed parameter values.
+        fixed_parameters: Parameters held constant during sampling.  Values
+            may be constants or callables ``f(params) -> Float | dict``;
+            callables are applied in insertion order.  See the likelihood
+            tutorial for details and examples.
         f_min: Minimum frequency for likelihood evaluation.
             Can be a single float or a per-detector dictionary.
         f_max: Maximum frequency for likelihood evaluation.
@@ -127,7 +145,12 @@ class TransientLikelihoodFD(SingleEventLikelihood):
         self,
         detectors: Sequence[Detector],
         waveform: Waveform,
-        fixed_parameters: Optional[dict[str, Float]] = None,
+        fixed_parameters: Optional[
+            dict[
+                str,
+                Float | Callable[[dict[str, Float]], Float | dict[str, Float]],
+            ]
+        ] = None,
         f_min: float | dict[str, float] = 0.0,
         f_max: float | dict[str, float] = float("inf"),
         trigger_time: Float = 0,
@@ -185,7 +208,13 @@ class TransientLikelihoodFD(SingleEventLikelihood):
             self._init_distance_marginalization(dist_prior, n_dist_points, ref_dist)
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
-        params = {**params, **self.fixed_parameters}
+        params = dict(params)
+        for key, value in self.fixed_parameters.items():
+            if callable(value):
+                result = value(params)
+                params[key] = result[key] if isinstance(result, dict) else result
+            else:
+                params[key] = value
         params["trigger_time"] = self.trigger_time
         params["gmst"] = self.gmst
         if self.marginalize_time:
@@ -429,7 +458,11 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
     Args:
         detectors: List of detector objects containing data and metadata.
         waveform: Waveform model to evaluate.
-        fixed_parameters: Dictionary of fixed parameter values.
+        fixed_parameters: Dictionary of fixed parameter values.  Each value
+            may be a constant ``Float``, a callable returning a scalar, **or**
+            a callable returning a ``dict`` (e.g. ``transform.backward``).
+            See :class:`TransientLikelihoodFD` for a detailed description and
+            example.
         f_min: Minimum frequency for likelihood evaluation.
         f_max: Maximum frequency for likelihood evaluation.
         trigger_time: GPS time of the event trigger.
@@ -459,7 +492,9 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         self,
         detectors: Sequence[Detector],
         waveform: Waveform,
-        fixed_parameters: Optional[dict[str, Float]] = None,
+        fixed_parameters: Optional[
+            dict[str, Float | Callable[[dict[str, Float]], Float]]
+        ] = None,
         f_min: float | dict[str, float] = 0.0,
         f_max: float | dict[str, float] = float("inf"),
         trigger_time: float = 0,
@@ -611,7 +646,13 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
             self.B1_array[detector.name] = B1[mask_heterodyne_center]
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
-        params = {**params, **self.fixed_parameters}
+        params = dict(params)
+        for key, value in self.fixed_parameters.items():
+            if callable(value):
+                result = value(params)
+                params[key] = result[key] if isinstance(result, dict) else result
+            else:
+                params[key] = value
         params["trigger_time"] = self.trigger_time
         params["gmst"] = self.gmst
         if self.marginalize_phase:

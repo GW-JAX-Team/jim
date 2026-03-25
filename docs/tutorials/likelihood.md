@@ -85,6 +85,57 @@ likelihood = TransientLikelihoodFD(
 
 These values are automatically merged with the sampled parameters at evaluation time.
 
+#### Derived fixed parameters (callables)
+
+Sometimes the value you want to fix is not a constant but depends on other sampled parameters. A common example: you want to fix the detector arrival time `t_det` rather than the geocentric coalescence time `t_c`. The two are related by
+
+$$t_c = t_{\text{det}} - \Delta t(\text{ra}, \text{dec})$$
+
+so `t_c` depends on sky location, which is sampled. Passing a plain number for `"t_c"` would not capture this.
+
+For this case every value in `fixed_parameters` may also be a **callable** `f(params) -> value`. The callable receives the full parameter dict at evaluation time and must return either a scalar or a full dict. When a dict is returned, Jim extracts only the value for the key being fixed.
+
+The cleanest way to express this is to reuse the same transform you already define for Jim's likelihood-transform pipeline and pass its `backward` method directly:
+
+```python
+from jimgw.core.single_event.transforms import (
+    GeocentricArrivalTimeToDetectorArrivalTimeTransform,
+)
+
+# Maps t_det -> t_c, conditional on (ra, dec)
+transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+    gps_time=trigger_time, ifo=H1
+)
+
+likelihood = TransientLikelihoodFD(
+    detectors=[H1, L1],
+    waveform=waveform,
+    trigger_time=gps_time,
+    f_min=20.0,
+    f_max=1024.0,
+    # transform.backward returns a dict; Jim extracts params["t_c"] automatically
+    fixed_parameters={"t_c": transform.backward},
+)
+```
+
+Alternatively use a plain lambda:
+
+```python
+from jimgw.core.single_event.gps_times import greenwich_mean_sidereal_time
+
+gmst = greenwich_mean_sidereal_time(trigger_time)
+t_det_value = 0.0  # the value you are fixing
+
+likelihood = TransientLikelihoodFD(
+    ...,
+    fixed_parameters={
+        "t_c": lambda p: t_det_value - H1.delay_from_geocenter(p["ra"], p["dec"], gmst),
+    },
+)
+```
+
+Both forms are `jax.jit`-compatible. Callables are evaluated in **insertion order**, so later entries in `fixed_parameters` can read values written by earlier ones.
+
 ## HeterodynedTransientLikelihoodFD
 
 For faster evaluation, `HeterodynedTransientLikelihoodFD` uses the heterodyne (relative binning) technique. The interface is analogous:
