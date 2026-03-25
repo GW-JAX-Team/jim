@@ -3,20 +3,33 @@
 Jim bridges three parameter spaces, and transforms are the connections between them:
 
 ```text
-     ┌───────── Likelihood Transforms ────────→ Likelihood Space
+     ┌───────── Likelihood Transforms ──────────→ Likelihood Space
 Prior Space
-     └─────────── Sample Transforms ───────────→ Sampling Space
+     └──────────── Sample Transforms ────────────→ Sampling Space
 ```
 
-- The **likelihood space** is fixed by your waveform model (e.g. ripple expects chirp mass, symmetric mass ratio, Cartesian spins, etc.).
-- The **prior space** is where you define your prior distributions. You are free to choose whichever parameterisation is most natural (e.g. mass ratio `q` instead of `eta`, spin magnitude + angles instead of Cartesian components).
-- The **sampling space** is where the sampler actually explores. You can pick a parameterisation that reduces correlations and makes sampling easier (e.g. detector-frame sky coordinates, SNR-weighted distance).
+- The **likelihood space** is fixed by your waveform model. For example, ripple waveforms expect `(M_c, eta, s1_z, s2_z, ...)`.
+- The **prior space** is where you define your priors. You are free to use whichever parameterisation is most natural.
+- The **sampling space** is where the sampler explores. You can choose a parameterisation that reduces correlations between parameters or reduces multimodality in the posterior.
+
+Of the three spaces, only the **likelihood space** is fixed — it is determined by what your waveform model expects as input. The **prior space** and **sampling space** are both your choices, and the transforms you need follow from those choices:
+
+- **Likelihood transforms** bridge the gap from your prior space to the likelihood space required by the waveform model.
+- **Sample transforms** bridge the gap from your prior space to the sampling space you want the sampler to explore.
+
+For example, if your prior is on mass ratio `q` but the waveform expects `eta`:
+
+- `MassRatioToSymmetricMassRatioTransform` (`q → eta`) belongs in `likelihood_transforms`.
+
+If instead your prior is on `q` but you want the sampler to explore in `eta`:
+
+- `MassRatioToSymmetricMassRatioTransform` (`q → eta`) belongs in `sample_transforms`.
 
 ## Likelihood Transforms
 
-**Likelihood transforms** map from the prior parameter space to the likelihood parameter space. Because the likelihood space is dictated by the waveform model, the transforms you need depend on how you define your prior.
+Likelihood transforms map from the **prior space** to the **likelihood space**. They are applied just before the waveform model is called, so they handle whatever parameter conversions the waveform model requires.
 
-For example, if your prior is on mass ratio `q` but the waveform expects symmetric mass ratio `eta`, a likelihood transform handles the conversion. Similarly, if your prior uses spin magnitudes and angles but the waveform expects Cartesian spin components, a likelihood transform takes care of that.
+Likelihood transforms do **not** need to be invertible.
 
 ```python
 from jimgw.core.single_event.transforms import (
@@ -24,6 +37,8 @@ from jimgw.core.single_event.transforms import (
     SphereSpinToCartesianSpinTransform,
 )
 
+# Prior is on (M_c, q, s1_mag, s1_theta, s1_phi, ...)
+# Waveform expects (M_c, eta, s1_x, s1_y, s1_z, ...)
 likelihood_transforms = [
     MassRatioToSymmetricMassRatioTransform,
     SphereSpinToCartesianSpinTransform("s1"),
@@ -31,67 +46,51 @@ likelihood_transforms = [
 ]
 ```
 
-!!! note
-    `MassRatioToSymmetricMassRatioTransform` is a module-level instance (not a class), so you use it directly without calling it.
-
 ## Sample Transforms
 
-**Sample transforms** map from the prior space to the sampling space. They let the sampler explore a different parameterisation than the one your prior is defined in, typically one where correlations between parameters are reduced.
+Sample transforms map from the **prior space** to the **sampling space**. Jim applies them to prior samples to obtain the initial positions in sampling space, and applies their inverses to proposed sampling-space points when evaluating the prior.
 
-For example, RA and Dec are strongly correlated for a two-detector network. Transforming to detector-frame coordinates (zenith, azimuth) removes most of that correlation, making sampling much more efficient:
+Sample transforms **must be bijective** (invertible), because Jim needs both forward and inverse directions.
 
 ```python
 from jimgw.core.single_event.transforms import SkyFrameToDetectorFrameSkyPositionTransform
 
+# Sampler explores (zenith, azimuth) in detector frame instead of (ra, dec)
 sample_transforms = [
     SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps_time, ifos=ifos),
 ]
 ```
 
-These transforms must be **bijective** (invertible), because the sampler needs to map back and forth between the sampling space and the prior space.
+## Available Transforms
 
-### Available Sample Transforms
+All transforms are importable from `jimgw.core.single_event.transforms`.
 
-| Transform | What it does |
-|---|---|
-| `SkyFrameToDetectorFrameSkyPositionTransform` | (ra, dec) → (zenith, azimuth) in a detector-pair frame |
-| `GeocentricArrivalTimeToDetectorArrivalTimeTransform` | t_c → t_det (geocentric to detector arrival time) |
-| `GeocentricArrivalPhaseToDetectorArrivalPhaseTransform` | phase_c → phase_det |
-| `DistanceToSNRWeightedDistanceTransform` | d_L → d_hat (SNR-weighted distance) |
-| `SphereSpinToCartesianSpinTransform` | (mag, theta, phi) → (x, y, z) for spin vectors |
+### Mass transforms
 
-## Likelihood Transforms
+| Transform | Mapping | Notes |
+| --- | --- | --- |
+| `MassRatioToSymmetricMassRatioTransform` | `q → eta` | Module-level instance |
+| `SymmetricMassRatioToMassRatioTransform` | `eta → q` | Module-level instance |
+| `ComponentMassesToChirpMassMassRatioTransform` | `(m1, m2) → (M_c, q)` | Module-level instance |
+| `ComponentMassesToChirpMassSymmetricMassRatioTransform` | `(m1, m2) → (M_c, eta)` | Module-level instance |
+| `ChirpMassMassRatioToComponentMassesTransform` | `(M_c, q) → (m1, m2)` | Module-level instance |
+| `ChirpMassSymmetricMassRatioToComponentMassesTransform` | `(M_c, eta) → (m1, m2)` | Module-level instance |
 
-**Likelihood transforms** (`NtoMTransform`) are applied just before the likelihood is called. They compute derived quantities that the waveform model expects but that you don't want the sampler to explore directly. Unlike sample transforms, they do not need to be invertible.
+### Spin transforms
 
-A common example is converting mass ratio `q` to symmetric mass ratio `eta`:
+| Transform | Mapping | Notes |
+| --- | --- | --- |
+| `SphereSpinToCartesianSpinTransform(label)` | `(mag, theta, phi) → (x, y, z)` | Instantiate with spin label e.g. `"s1"` |
+| `SpinAnglesToCartesianSpinTransform(freq_ref)` | Full precessing spin angles → Cartesian | Instantiate with reference frequency |
 
-```python
-from jimgw.core.single_event.transforms import (
-    MassRatioToSymmetricMassRatioTransform,
-    SphereSpinToCartesianSpinTransform,
-)
+### Sky and extrinsic transforms
 
-likelihood_transforms = [
-    MassRatioToSymmetricMassRatioTransform,
-    SphereSpinToCartesianSpinTransform("s1"),
-    SphereSpinToCartesianSpinTransform("s2"),
-]
-```
-
-!!! note
-    `MassRatioToSymmetricMassRatioTransform` is a module-level instance (not a class), so you use it directly without calling it.
-
-## When to Use Which
-
-| Situation | Transform type |
-|---|---|
-| Prior uses different parameters than the waveform model expects | Likelihood transform |
-| You want the sampler to explore a better-conditioned space | Sample transform |
-| The mapping does not need to be invertible | Likelihood transform |
-| The mapping must be invertible | Sample transform |
-
-A typical CBC analysis uses **both**: likelihood transforms to convert from the prior parameterisation to what the waveform model expects (e.g. q → eta, spin angles → Cartesian spins), and sample transforms to put the sampler in a well-conditioned space (e.g. detector-frame sky position, SNR-weighted distance).
+| Transform | Mapping | Notes |
+| --- | --- | --- |
+| `SkyFrameToDetectorFrameSkyPositionTransform(gps_time, ifos)` | `(ra, dec) → (zenith, azimuth)` | Reduces ra/dec correlation for detector networks |
+| `GeocentricArrivalTimeToDetectorArrivalTimeTransform(gps_time, ifo)` | `t_c → t_det` | Conditional on ra, dec |
+| `GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(gps_time, ifo)` | `phase_c → phase_det` | Conditional on ra, dec, psi, iota |
+| `DistanceToSNRWeightedDistanceTransform` | `d_L → d_hat` | SNR-weighted distance parameterisation |
 
 ## Passing Transforms to Jim
 
@@ -108,3 +107,5 @@ jim = Jim(
     ...
 )
 ```
+
+Either list can be empty. If `sample_transforms=[]`, the sampler operates directly in the prior space. If `likelihood_transforms=[]`, the waveform is called with the prior parameters unchanged.
