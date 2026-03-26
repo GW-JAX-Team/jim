@@ -395,8 +395,8 @@ class TestDistanceTransform:
             trigger_time=1126259462.4,
             ifos=[H1, L1],
         )
-        forward_transform_output, _ = jax.vmap(distance_transform.transform)(inputs)
-        output, _ = jax.vmap(distance_transform.inverse)(forward_transform_output)
+        forward_transform_output = jax.vmap(distance_transform.forward)(inputs)
+        output = jax.vmap(distance_transform.backward)(forward_transform_output)
         assert np.allclose(output["d_L"], dL)
         # default atol: 1e-8, rtol: 1e-5
 
@@ -434,10 +434,10 @@ class TestDistanceTransform:
             ).transform
         )
         jitted_output, jitted_jacobian = jit_transform(sample_dict)
-        non_jitted_output, _ = DistanceToSNRWeightedDistanceTransform(
+        non_jitted_output = DistanceToSNRWeightedDistanceTransform(
             trigger_time=1126259462.4,
             ifos=[H1, L1],
-        ).transform(sample_dict)
+        ).forward(sample_dict)
 
         # Assert that the jitted and non-jitted results agree
         assert common_keys_allclose(jitted_output, non_jitted_output)
@@ -479,10 +479,10 @@ class TestDistanceTransform:
             ).inverse
         )
         jitted_output, jitted_jacobian = jit_inverse_transform(sample_dict)
-        non_jitted_output, _ = DistanceToSNRWeightedDistanceTransform(
+        non_jitted_output = DistanceToSNRWeightedDistanceTransform(
             trigger_time=1126259462.4,
             ifos=[H1, L1],
-        ).inverse(sample_dict)
+        ).backward(sample_dict)
 
         assert common_keys_allclose(jitted_output, non_jitted_output)
         # Also check that the jitted jacobian contains no NaNs
@@ -541,8 +541,8 @@ class TestSphereSpinToCartesianSpinTransform:
 
         inputs = {"s1_mag": s1_mag, "s1_theta": s1_theta, "s1_phi": s1_phi}
         transform = SphereSpinToCartesianSpinTransform("s1")
-        forward_transform_output, _ = jax.vmap(transform.transform)(inputs)
-        output, _ = jax.vmap(transform.inverse)(forward_transform_output)
+        forward_transform_output = jax.vmap(transform.forward)(inputs)
+        output = jax.vmap(transform.backward)(forward_transform_output)
 
         assert common_keys_allclose(output, inputs)
         # default atol: 1e-8, rtol: 1e-5
@@ -571,7 +571,7 @@ class TestSphereSpinToCartesianSpinTransform:
             lambda data: SphereSpinToCartesianSpinTransform("s1").transform(data)
         )
         jitted_output, jitted_jacobian = jit_transform(sample_dict)
-        non_jitted_output, _ = SphereSpinToCartesianSpinTransform("s1").transform(
+        non_jitted_output = SphereSpinToCartesianSpinTransform("s1").forward(
             sample_dict
         )
 
@@ -598,7 +598,7 @@ class TestSphereSpinToCartesianSpinTransform:
             lambda data: SphereSpinToCartesianSpinTransform("s1").inverse(data)
         )
         jitted_output, jitted_jacobian = jit_inverse_transform(sample_dict)
-        non_jitted_output, _ = SphereSpinToCartesianSpinTransform("s1").inverse(
+        non_jitted_output = SphereSpinToCartesianSpinTransform("s1").backward(
             sample_dict
         )
 
@@ -664,12 +664,12 @@ class TestSpinAnglesToCartesianSpinTransform:
         fRefs = jax.random.uniform(subkeys[6], (n,), minval=10, maxval=100)
 
         for fRef, sample in zip(fRefs, samples):
-            jimgw_spins, _ = SpinAnglesToCartesianSpinTransform(freq_ref=fRef).inverse(
+            jimgw_spins = SpinAnglesToCartesianSpinTransform(freq_ref=fRef).backward(
                 dict(zip(self.backward_keys, sample))
             )
-            jimgw_spins, _ = SpinAnglesToCartesianSpinTransform(
+            jimgw_spins = SpinAnglesToCartesianSpinTransform(
                 freq_ref=fRef
-            ).transform(jimgw_spins)
+            ).forward(jimgw_spins)
             jimgw_spins = jnp.array(list(jimgw_spins.values()))
             # default atol: 1e-8, rtol: 1e-5
             assert np.allclose(jimgw_spins, jnp.array([*sample[7:], *sample[:7]]))
@@ -710,9 +710,9 @@ class TestSpinAnglesToCartesianSpinTransform:
             ).transform(data)
         )
         jitted_spins, jitted_jacobian = jit_transform(sample_dict)
-        non_jitted_spins, _ = SpinAnglesToCartesianSpinTransform(
+        non_jitted_spins = SpinAnglesToCartesianSpinTransform(
             freq_ref=freq_ref_sample
-        ).transform(sample_dict)
+        ).forward(sample_dict)
 
         assert common_keys_allclose(jitted_spins, non_jitted_spins)
         # Also check that the jitted jacobian contains no NaNs
@@ -760,9 +760,9 @@ class TestSpinAnglesToCartesianSpinTransform:
             ).inverse(data)
         )
         jitted_spins, jitted_jacobian = jit_inverse_transform(sample_dict)
-        non_jitted_spins, _ = SpinAnglesToCartesianSpinTransform(
+        non_jitted_spins = SpinAnglesToCartesianSpinTransform(
             freq_ref=freq_ref_sample
-        ).inverse(sample_dict)
+        ).backward(sample_dict)
 
         assert common_keys_allclose(jitted_spins, non_jitted_spins)
         # Also check that the jitted jacobian contains no NaNs
@@ -793,8 +793,8 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
                     trigger_time=time,
                     ifos=list(ifo_pair),
                 )
-                forward_transform_output, _ = jax.vmap(transform.inverse)(inputs)
-                outputs, _ = jax.vmap(transform.transform)(forward_transform_output)
+                forward_transform_output = jax.vmap(transform.backward)(inputs)
+                outputs = jax.vmap(transform.forward)(forward_transform_output)
 
                 # default atol: 1e-8, rtol: 1e-5
                 assert common_keys_allclose(outputs, inputs)
@@ -818,9 +818,9 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
             ).transform(data)
         )
         jitted_output, jitted_jacobian = jit_transform(sample_dict)
-        non_jitted_output, _ = SkyFrameToDetectorFrameSkyPositionTransform(
+        non_jitted_output = SkyFrameToDetectorFrameSkyPositionTransform(
             **class_args
-        ).transform(sample_dict)
+        ).forward(sample_dict)
 
         # Assert that the jitted and non-jitted results agree
         assert common_keys_allclose(jitted_output, non_jitted_output)
@@ -849,9 +849,9 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
             ).inverse(data)
         )
         jitted_output, jitted_jacobian = jit_inverse_transform(sample_dict)
-        non_jitted_output, _ = SkyFrameToDetectorFrameSkyPositionTransform(
+        non_jitted_output = SkyFrameToDetectorFrameSkyPositionTransform(
             **class_args
-        ).inverse(sample_dict)
+        ).backward(sample_dict)
 
         # Assert that the jitted and non-jitted results agree
         assert common_keys_allclose(jitted_output, non_jitted_output)
@@ -945,10 +945,10 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
         }
 
         # Forward then inverse
-        forward_output, _ = transform.transform(original.copy())
+        forward_output = transform.forward(original.copy())
         forward_output["ra"] = original["ra"]  # Add back conditional params
         forward_output["dec"] = original["dec"]
-        recovered, _ = transform.inverse(forward_output)
+        recovered = transform.backward(forward_output)
 
         assert np.allclose(recovered["t_c"], original["t_c"], rtol=1e-10)
 
@@ -972,9 +972,9 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
         )
 
         jitted_output, jitted_jacobian = jit_transform(sample_dict)
-        non_jitted_output, _ = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+        non_jitted_output = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
             **class_args
-        ).transform(sample_dict)
+        ).forward(sample_dict)
 
         assert common_keys_allclose(jitted_output, non_jitted_output)
         assert_all_finite(jitted_jacobian)
@@ -999,9 +999,9 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
         )
 
         jitted_output, jitted_jacobian = jit_inverse_transform(sample_dict)
-        non_jitted_output, _ = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+        non_jitted_output = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
             **class_args
-        ).inverse(sample_dict)
+        ).backward(sample_dict)
 
         assert common_keys_allclose(jitted_output, non_jitted_output)
         assert_all_finite(jitted_jacobian)
@@ -1023,7 +1023,7 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
                 trigger_time=gps_time,
                 ifo=ifo,
             )
-            output, _ = transform.transform(sample_dict.copy())
+            output = transform.forward(sample_dict.copy())
             assert "t_det" in output
             assert np.isfinite(output["t_det"])
 
@@ -1142,9 +1142,9 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
         )
 
         jitted_output, jitted_jacobian = jit_transform(sample_dict)
-        non_jitted_output, _ = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+        non_jitted_output = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
             **class_args
-        ).transform(sample_dict)
+        ).forward(sample_dict)
 
         assert common_keys_allclose(jitted_output, non_jitted_output)
         assert_all_finite(jitted_jacobian)
@@ -1171,9 +1171,9 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
         )
 
         jitted_output, jitted_jacobian = jit_inverse_transform(sample_dict)
-        non_jitted_output, _ = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
+        non_jitted_output = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
             **class_args
-        ).inverse(sample_dict)
+        ).backward(sample_dict)
 
         assert common_keys_allclose(jitted_output, non_jitted_output)
         assert_all_finite(jitted_jacobian)
@@ -1197,7 +1197,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
                 trigger_time=gps_time,
                 ifo=ifo,
             )
-            output, _ = transform.transform(sample_dict.copy())
+            output = transform.forward(sample_dict.copy())
             assert "phase_det" in output
             assert np.isfinite(output["phase_det"])
             assert 0.0 <= output["phase_det"] < 2.0 * jnp.pi
@@ -1221,7 +1221,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
             "iota": 2.5,
         }
 
-        output, _ = transform.transform(sample_dict)
+        output = transform.forward(sample_dict)
         assert 0.0 <= output["phase_det"] < 2.0 * jnp.pi
 
         # Test inverse with phase_det near 2π
@@ -1233,7 +1233,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
             "iota": 2.5,
         }
 
-        output_inv, _ = transform.inverse(sample_dict_inv)
+        output_inv = transform.backward(sample_dict_inv)
         assert 0.0 <= output_inv["phase_c"] < 2.0 * jnp.pi
 
 
@@ -1292,10 +1292,10 @@ class TestMassTransforms:
             "m_2": 25.0,
         }
 
-        forward_output, _ = ComponentMassesToChirpMassMassRatioTransform.transform(
+        forward_output = ComponentMassesToChirpMassMassRatioTransform.forward(
             original
         )
-        recovered, _ = ComponentMassesToChirpMassMassRatioTransform.inverse(
+        recovered = ComponentMassesToChirpMassMassRatioTransform.backward(
             forward_output
         )
 
@@ -1355,10 +1355,10 @@ class TestMassTransforms:
             "m_2": 25.0,
         }
 
-        forward_output, _ = (
-            ComponentMassesToChirpMassSymmetricMassRatioTransform.transform(original)
+        forward_output = (
+            ComponentMassesToChirpMassSymmetricMassRatioTransform.forward(original)
         )
-        recovered, _ = ComponentMassesToChirpMassSymmetricMassRatioTransform.inverse(
+        recovered = ComponentMassesToChirpMassSymmetricMassRatioTransform.backward(
             forward_output
         )
 
@@ -1399,8 +1399,8 @@ class TestMassTransforms:
         """Test forward-inverse roundtrip consistency."""
         original = {"q": 0.75}
 
-        forward_output, _ = MassRatioToSymmetricMassRatioTransform.transform(original)
-        recovered, _ = MassRatioToSymmetricMassRatioTransform.inverse(forward_output)
+        forward_output = MassRatioToSymmetricMassRatioTransform.forward(original)
+        recovered = MassRatioToSymmetricMassRatioTransform.backward(forward_output)
 
         assert np.allclose(recovered["q"], original["q"])
 
@@ -1484,11 +1484,11 @@ class TestMassTransforms:
         """Test mass ratio transform with equal masses (q=1, eta=0.25)."""
         sample_dict = {"q": 1.0}
 
-        output, _ = MassRatioToSymmetricMassRatioTransform.transform(sample_dict)
+        output = MassRatioToSymmetricMassRatioTransform.forward(sample_dict)
 
         # For equal masses, eta should be exactly 0.25
         assert np.allclose(output["eta"], 0.25)
 
         # Test inverse
-        recovered, _ = MassRatioToSymmetricMassRatioTransform.inverse(output)
+        recovered = MassRatioToSymmetricMassRatioTransform.backward(output)
         assert np.allclose(recovered["q"], 1.0)

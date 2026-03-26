@@ -309,7 +309,7 @@ class TestFullTransform:
             jim_transform = SkyFrameToDetectorFrameSkyPositionTransform(
                 trigger_time=gps_time, ifos=jim_ifos
             )
-            jim_outputs, _ = jim_transform.inverse(dict(zenith=zenith, azimuth=azimuth))
+            jim_outputs = jim_transform.backward(dict(zenith=zenith, azimuth=azimuth))
             bilby_ra, bilby_dec = bilby_zenith_azimuth_to_ra_dec(
                 zenith[0], azimuth[0], gps_time, bilby_ifos
             )
