@@ -13,7 +13,7 @@ from jimgw.core.single_event.data import Data, PowerSpectrum
 from jimgw.core.single_event.transforms import (
     GeocentricArrivalTimeToDetectorArrivalTimeTransform,
 )
-from jimgw.core.single_event.gps_times import (
+from jimgw.core.single_event.time_utils import (
     greenwich_mean_sidereal_time as compute_gmst,
 )
 from jimgw.core.prior import PowerLawPrior, UniformPrior
@@ -1371,7 +1371,7 @@ class TestCallableFixedParameters:
 
         # --- dict-returning transform form ---
         transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
-            gps_time=gps, ifo=ifos[0]
+            trigger_time=gps, ifo=ifos[0]
         )
         transform_likelihood = TransientLikelihoodFD(
             detectors=ifos,
@@ -1464,7 +1464,7 @@ class TestCallableFixedParameters:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
 
         transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
-            gps_time=gps, ifo=ifos[0]
+            trigger_time=gps, ifo=ifos[0]
         )
 
         gmst = compute_gmst(gps)
