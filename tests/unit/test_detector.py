@@ -23,8 +23,8 @@ DURATION = 4.0
 F_MIN, F_MAX = 20.0, 1024.0
 SAMPLING_FREQUENCY = F_MAX * 2
 
-# Likelihood-space (fully expanded) parameters used as the injection baseline.
-BASELINE_PARAMS = {
+# Likelihood-space (fully expanded) parameters used as the reference injection.
+REFERENCE_PARAMS = {
     "M_c": 28.0,
     "eta": 0.24,
     "s1_x": 0.0,
@@ -51,9 +51,9 @@ def make_detector():
     return det
 
 
-def inject_baseline(det, trigger_time=GPS_TIME, **overrides):
-    """Inject the baseline signal (zero noise) into *det*."""
-    params = {**BASELINE_PARAMS, **overrides}
+def inject_reference(det, trigger_time=GPS_TIME, **overrides):
+    """Inject the reference signal (zero noise) into *det*."""
+    params = {**REFERENCE_PARAMS, **overrides}
     det.inject_signal(
         duration=DURATION,
         sampling_frequency=SAMPLING_FREQUENCY,
@@ -79,7 +79,7 @@ class TestInjectSignal:
     def test_zero_noise_creates_data(self):
         """Data object is populated after a zero-noise injection."""
         det = make_detector()
-        inject_baseline(det)
+        inject_reference(det)
 
         assert det.data is not None
         assert len(det.data.td) == int(DURATION * SAMPLING_FREQUENCY)
@@ -88,14 +88,14 @@ class TestInjectSignal:
     def test_zero_noise_signal_nonzero_in_band(self):
         """Injected signal is non-zero inside the frequency band."""
         det = make_detector()
-        inject_baseline(det)
+        inject_reference(det)
 
         assert jnp.any(jnp.abs(det.sliced_fd_data) > 0)
 
     def test_zero_noise_frequency_bounds_respected(self):
         """Sliced frequencies lie within the requested band."""
         det = make_detector()
-        inject_baseline(det)
+        inject_reference(det)
 
         assert jnp.all(det.sliced_frequencies >= F_MIN)
         assert jnp.all(det.sliced_frequencies <= F_MAX)
@@ -103,10 +103,10 @@ class TestInjectSignal:
     def test_noisy_injection_differs_from_zero_noise(self):
         """Adding noise produces data that differs from the zero-noise case."""
         det_clean = make_detector()
-        inject_baseline(det_clean)
+        inject_reference(det_clean)
 
         det_noisy = make_detector()
-        params = dict(BASELINE_PARAMS)
+        params = dict(REFERENCE_PARAMS)
         det_noisy.inject_signal(
             duration=DURATION,
             sampling_frequency=SAMPLING_FREQUENCY,
@@ -131,13 +131,13 @@ class TestInjectSignal:
     def test_likelihood_transforms_q_to_eta(self):
         """likelihood_transforms=[MassRatioToSymmetricMassRatioTransform] converts
         q -> eta, producing the same injection as passing eta directly."""
-        det_baseline = make_detector()
-        inject_baseline(det_baseline)
+        det_reference = make_detector()
+        inject_reference(det_reference)
 
         q_params = MassRatioToSymmetricMassRatioTransform.backward(
-            {"eta": jnp.array(BASELINE_PARAMS["eta"])}
+            {"eta": jnp.array(REFERENCE_PARAMS["eta"])}
         )
-        params = {k: v for k, v in BASELINE_PARAMS.items() if k != "eta"}
+        params = {k: v for k, v in REFERENCE_PARAMS.items() if k != "eta"}
         params["q"] = q_params["q"]
 
         det = make_detector()
@@ -152,21 +152,21 @@ class TestInjectSignal:
         )
 
         assert jnp.allclose(
-            det.sliced_fd_data, det_baseline.sliced_fd_data, rtol=1e-6, atol=1e-30
+            det.sliced_fd_data, det_reference.sliced_fd_data, rtol=1e-6, atol=1e-30
         )
 
     def test_likelihood_transforms_spin_cartesian(self):
         """likelihood_transforms with SphereSpinToCartesianSpinTransform converts
         spherical spins to Cartesian, producing the same injection."""
-        det_baseline = make_detector()
-        inject_baseline(det_baseline)
+        det_reference = make_detector()
+        inject_reference(det_reference)
 
         s1_transform = SphereSpinToCartesianSpinTransform("s1")
         s2_transform = SphereSpinToCartesianSpinTransform("s2")
 
         params = {
             k: v
-            for k, v in BASELINE_PARAMS.items()
+            for k, v in REFERENCE_PARAMS.items()
             if not k.startswith("s1_") and not k.startswith("s2_")
         }
         params.update({"s1_mag": 0.0, "s1_theta": 0.0, "s1_phi": 0.0})
@@ -184,7 +184,7 @@ class TestInjectSignal:
         )
 
         assert jnp.allclose(
-            det.sliced_fd_data, det_baseline.sliced_fd_data, rtol=1e-6, atol=1e-30
+            det.sliced_fd_data, det_reference.sliced_fd_data, rtol=1e-6, atol=1e-30
         )
 
     # ------------------------------------------------------------------
@@ -193,18 +193,18 @@ class TestInjectSignal:
 
     def test_sample_transforms_inverse_applied(self):
         """sample_transforms + likelihood_transforms round-trip through sampling
-        space back to likelihood space, recovering the baseline injection.
+        space back to likelihood space, recovering the reference injection.
 
         Setup: sampler works in eta-space (output of q->eta).  We pass eta in
         params; backward() maps it to q; likelihood_transform maps q->eta.
         """
-        det_baseline = make_detector()
-        inject_baseline(det_baseline)
+        det_reference = make_detector()
+        inject_reference(det_reference)
 
         q_eta = MassRatioToSymmetricMassRatioTransform
 
-        sampling_params = dict(BASELINE_PARAMS)
-        sampling_params["eta"] = jnp.array(BASELINE_PARAMS["eta"])
+        sampling_params = dict(REFERENCE_PARAMS)
+        sampling_params["eta"] = jnp.array(REFERENCE_PARAMS["eta"])
 
         det = make_detector()
         det.inject_signal(
@@ -219,7 +219,7 @@ class TestInjectSignal:
         )
 
         assert jnp.allclose(
-            det.sliced_fd_data, det_baseline.sliced_fd_data, rtol=1e-6, atol=1e-30
+            det.sliced_fd_data, det_reference.sliced_fd_data, rtol=1e-6, atol=1e-30
         )
 
 
