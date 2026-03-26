@@ -31,13 +31,18 @@ jax.config.update("jax_enable_x64", True)
 class TestSpinAnglesToCartesianSpinTransformBilby:
     """Cross-validation tests comparing Jim spin transforms to bilby."""
 
-    def test_forward_spin_transform(self):
-        """Test transformation from spin angles to cartesian spins against bilby.
+    def test_transform_roundtrip(self):
+        """Test spin angle ↔ Cartesian spin transforms against bilby.
 
-        This test generates random spin angle parameters, transforms them using
-        both Jim and bilby, and compares the results.
+        1. Generate random spin angles.
+        2. bilby: angles → Cartesian (reference).
+        3. Jim forward: angles → Cartesian — assert matches bilby.
+        4. Jim inverse: reference Cartesian → recovered angles.
+        5. bilby forward on recovered angles → reproduced Cartesian.
+        6. Assert reproduced Cartesian ≈ reference Cartesian.
         """
         from bilby.gw.conversion import bilby_to_lalsimulation_spins
+        from bilby.gw.utils import solar_mass as MSUN_SI
         from jimgw.core.single_event.transforms import (
             SpinAnglesToCartesianSpinTransform,
         )
@@ -47,7 +52,7 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
         key = jax.random.key(42)
         subkeys = jax.random.split(key, 11)
 
-        # Generate random spin angle parameters
+        # Step 1: generate random angles and masses
         theta_jn = jax.random.uniform(subkeys[0], (n_samples,), minval=0, maxval=jnp.pi)
         phi_jl = jax.random.uniform(
             subkeys[1], (n_samples,), minval=0, maxval=2 * jnp.pi
@@ -65,10 +70,10 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
             subkeys[9], (n_samples,), minval=0, maxval=2 * jnp.pi
         )
 
-        # Test with different reference frequencies
         for f_ref in [10.0, 20.0, 50.0]:
-            # Get bilby results
             m1, m2 = Mc_q_to_m1_m2(M_c, q)
+
+            # Step 2: bilby reference forward pass
             bilby_results = []
             for i in range(n_samples):
                 iota_b, s1x, s1y, s1z, s2x, s2y, s2z = bilby_to_lalsimulation_spins(
@@ -79,8 +84,8 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
                     phi_12=float(phi_12[i]),
                     a_1=float(a_1[i]),
                     a_2=float(a_2[i]),
-                    mass_1=float(m1[i]),
-                    mass_2=float(m2[i]),
+                    mass_1=float(m1[i]) * MSUN_SI,
+                    mass_2=float(m2[i]) * MSUN_SI,
                     reference_frequency=f_ref,
                     phase=float(phase_c[i]),
                 )
@@ -95,13 +100,14 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
                         "s2_z": s2z,
                     }
                 )
-
-            bilby_spins = {
-                key: jnp.array([r[key] for r in bilby_results])
-                for key in bilby_results[0].keys()
+            bilby_cartesian = {
+                k: jnp.array([r[k] for r in bilby_results])
+                for k in bilby_results[0].keys()
             }
 
-            # Get Jim results
+            transform = SpinAnglesToCartesianSpinTransform(freq_ref=f_ref)
+
+            # Step 3: Jim forward — assert matches bilby
             input_dict = {
                 "theta_jn": theta_jn,
                 "phi_jl": phi_jl,
@@ -114,92 +120,50 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
                 "q": q,
                 "phase_c": phase_c,
             }
-            transform = SpinAnglesToCartesianSpinTransform(freq_ref=f_ref)
-            jimgw_spins, jacobian = jax.vmap(transform.transform)(input_dict)
-
-            # Compare results
-            assert common_keys_allclose(jimgw_spins, bilby_spins), (
-                f"Jim and bilby spin transforms disagree at f_ref={f_ref}"
+            jimgw_cartesian, fwd_jacobian = jax.vmap(transform.transform)(input_dict)
+            assert common_keys_allclose(jimgw_cartesian, bilby_cartesian), (
+                f"Jim forward and bilby disagree at f_ref={f_ref}"
             )
-            assert not jnp.isnan(jacobian).any(), "Jacobian contains NaN values"
+            assert not jnp.isnan(fwd_jacobian).any(), "Forward Jacobian contains NaN values"
 
-    def test_backward_spin_transform(self):
-        """Test transformation from cartesian spins to spin angles against bilby.
+            # Step 4: Jim inverse on bilby reference Cartesian → recovered angles
+            cartesian_with_masses = {**bilby_cartesian, "M_c": M_c, "q": q, "phase_c": phase_c}
+            recovered_angles, inv_jacobian = jax.vmap(transform.inverse)(
+                cartesian_with_masses
+            )
+            assert not jnp.isnan(inv_jacobian).any(), "Inverse Jacobian contains NaN values"
 
-        This test generates random Cartesian spin parameters, transforms them using
-        both Jim and bilby, and compares the results.
-        """
-        from bilby.gw.conversion import lalsimulation_spins_to_bilby
-        from jimgw.core.single_event.transforms import (
-            SpinAnglesToCartesianSpinTransform,
-        )
-        from jimgw.core.single_event.utils import Mc_q_to_m1_m2
-
-        n_samples = 50
-        key = jax.random.key(123)
-        subkeys = jax.random.split(key, 8)
-
-        # Generate random cartesian spin parameters
-        S1 = jax.random.uniform(subkeys[0], (3, n_samples), minval=-1, maxval=1)
-        S2 = jax.random.uniform(subkeys[1], (3, n_samples), minval=-1, maxval=1)
-        a1 = jax.random.uniform(subkeys[2], (n_samples,), minval=0.01, maxval=0.99)
-        a2 = jax.random.uniform(subkeys[3], (n_samples,), minval=0.01, maxval=0.99)
-        S1 = S1 * a1 / jnp.linalg.norm(S1, axis=0)
-        S2 = S2 * a2 / jnp.linalg.norm(S2, axis=0)
-
-        iota = jax.random.uniform(
-            subkeys[4], (n_samples,), minval=0.1, maxval=jnp.pi - 0.1
-        )
-        M_c = jax.random.uniform(subkeys[5], (n_samples,), minval=5, maxval=50)
-        q = jax.random.uniform(subkeys[6], (n_samples,), minval=0.125, maxval=1)
-        phase_c = jax.random.uniform(
-            subkeys[7], (n_samples,), minval=0, maxval=2 * jnp.pi
-        )
-
-        # Test with different reference frequencies
-        for f_ref in [10.0, 20.0, 50.0]:
-            # Get bilby results
-            m1, m2 = Mc_q_to_m1_m2(M_c, q)
-            bilby_results = []
+            # Step 5–6: bilby forward on recovered angles → reproduced Cartesian
+            reprod_results = []
             for i in range(n_samples):
-                result = lalsimulation_spins_to_bilby(
-                    incl=float(iota[i]),
-                    spin1x=float(S1[0, i]),
-                    spin1y=float(S1[1, i]),
-                    spin1z=float(S1[2, i]),
-                    spin2x=float(S2[0, i]),
-                    spin2y=float(S2[1, i]),
-                    spin2z=float(S2[2, i]),
-                    mass_1=float(m1[i]),
-                    mass_2=float(m2[i]),
+                iota_b, s1x, s1y, s1z, s2x, s2y, s2z = bilby_to_lalsimulation_spins(
+                    theta_jn=float(recovered_angles["theta_jn"][i]),
+                    phi_jl=float(recovered_angles["phi_jl"][i]),
+                    tilt_1=float(recovered_angles["tilt_1"][i]),
+                    tilt_2=float(recovered_angles["tilt_2"][i]),
+                    phi_12=float(recovered_angles["phi_12"][i]),
+                    a_1=float(recovered_angles["a_1"][i]),
+                    a_2=float(recovered_angles["a_2"][i]),
+                    mass_1=float(m1[i]) * MSUN_SI,
+                    mass_2=float(m2[i]) * MSUN_SI,
                     reference_frequency=f_ref,
                     phase=float(phase_c[i]),
                 )
-                bilby_results.append(result)
-
-            bilby_spins = {
-                key: jnp.array([r[key] for r in bilby_results])
-                for key in bilby_results[0].keys()
+                reprod_results.append(
+                    {
+                        "iota": iota_b,
+                        "s1_x": s1x,
+                        "s1_y": s1y,
+                        "s1_z": s1z,
+                        "s2_x": s2x,
+                        "s2_y": s2y,
+                        "s2_z": s2z,
+                    }
+                )
+            reprod_cartesian = {
+                k: jnp.array([r[k] for r in reprod_results])
+                for k in reprod_results[0].keys()
             }
-
-            # Get Jim results
-            input_dict = {
-                "iota": iota,
-                "s1_x": S1[0],
-                "s1_y": S1[1],
-                "s1_z": S1[2],
-                "s2_x": S2[0],
-                "s2_y": S2[1],
-                "s2_z": S2[2],
-                "M_c": M_c,
-                "q": q,
-                "phase_c": phase_c,
-            }
-            transform = SpinAnglesToCartesianSpinTransform(freq_ref=f_ref)
-            jimgw_spins, jacobian = jax.vmap(transform.inverse)(input_dict)
-
-            # Compare results
-            assert common_keys_allclose(jimgw_spins, bilby_spins), (
-                f"Jim and bilby backward spin transforms disagree at f_ref={f_ref}"
+            assert common_keys_allclose(reprod_cartesian, bilby_cartesian), (
+                f"Round-trip (bilby → Jim inverse → bilby) fails at f_ref={f_ref}"
             )
-            assert not jnp.isnan(jacobian).any(), "Jacobian contains NaN values"

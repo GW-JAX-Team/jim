@@ -27,7 +27,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          uv sync --python ${{ matrix.python-version }} --group test
+          uv sync --python ${{ matrix.python-version }} --group test --group cross-validation
           if [[ "${{ github.ref }}" == "refs/heads/jim-dev" || "${{ github.base_ref }}" == "jim-dev" ]]; then
             uv pip install git+https://github.com/GW-JAX-Team/flowMC.git@flowMC-dev
             uv pip install git+https://github.com/GW-JAX-Team/ripple.git@ripple-dev
@@ -38,9 +38,9 @@ jobs:
       - name: Run tests
         run: |
           if [[ "${{ matrix.python-version }}" == "3.12" ]]; then
-            uv run --no-sync pytest --cov=jimgw --cov-report=term-missing tests/unit --ignore=tests/integration --ignore=tests/cross_validation
+            uv run --no-sync pytest --cov=jimgw --cov-report=term-missing tests/unit tests/cross_validation --ignore=tests/integration
           else
-            uv run --no-sync pytest tests/unit --ignore=tests/integration --ignore=tests/cross_validation
+            uv run --no-sync pytest tests/unit tests/cross_validation --ignore=tests/integration
           fi
       - name: Upload coverage to Coveralls
         if: matrix.python-version == '3.12'
