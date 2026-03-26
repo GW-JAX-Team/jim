@@ -27,12 +27,12 @@ SAMPLING_FREQUENCY = F_MAX * 2
 REFERENCE_PARAMS = {
     "M_c": 28.0,
     "eta": 0.24,
-    "s1_x": 0.0,
-    "s1_y": 0.0,
-    "s1_z": 0.0,
-    "s2_x": 0.0,
-    "s2_y": 0.0,
-    "s2_z": 0.0,
+    "s1_x": 0.3,
+    "s1_y": 0.2,
+    "s1_z": 0.1,
+    "s2_x": -0.1,
+    "s2_y": 0.2,
+    "s2_z": -0.3,
     "d_L": 440.0,
     "phase_c": 0.0,
     "iota": 0.0,
@@ -164,13 +164,15 @@ class TestInjectSignal:
         s1_transform = SphereSpinToCartesianSpinTransform("s1")
         s2_transform = SphereSpinToCartesianSpinTransform("s2")
 
+        # Convert reference Cartesian spins to spherical for the transform input
+        spherical_s1 = s1_transform.backward(REFERENCE_PARAMS)
+        spherical_s2 = s2_transform.backward(REFERENCE_PARAMS)
+
         params = {
-            k: v
-            for k, v in REFERENCE_PARAMS.items()
-            if not k.startswith("s1_") and not k.startswith("s2_")
+            **{k: v for k, v in REFERENCE_PARAMS.items() if not k.startswith("s1_") and not k.startswith("s2_")},
+            **spherical_s1,
+            **spherical_s2,
         }
-        params.update({"s1_mag": 0.0, "s1_theta": 0.0, "s1_phi": 0.0})
-        params.update({"s2_mag": 0.0, "s2_theta": 0.0, "s2_phi": 0.0})
 
         det = make_detector()
         det.inject_signal(
