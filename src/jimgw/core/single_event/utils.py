@@ -1,8 +1,33 @@
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Complex
+from typing import Callable
 
 from jimgw.core.constants import MTSUN
 from jimgw.core.utils import safe_arctan2, carte_to_spherical_angles
+
+
+def apply_fixed_parameters(
+    params: dict[str, Float],
+    fixed_parameters: dict[str, Float | Callable],
+) -> dict[str, Float]:
+    """Merge ``fixed_parameters`` into *params*, resolving callables.
+
+    For each entry in ``fixed_parameters``:
+    - If the value is callable, it is called with the current *params* dict.
+      If the result is a dict, the value stored under the matching key is used;
+      otherwise the scalar result is used directly.
+    - If the value is not callable it is inserted as-is.
+
+    *params* is mutated in-place; callers that need to preserve the original
+    should copy before calling.
+    """
+    for key, value in fixed_parameters.items():
+        if callable(value):
+            result = value(params)
+            params[key] = result[key] if isinstance(result, dict) else result
+        else:
+            params[key] = value
+    return params
 
 
 def complex_inner_product(

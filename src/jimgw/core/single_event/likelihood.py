@@ -11,7 +11,11 @@ from jimgw.core.base import LikelihoodBase
 from jimgw.core.transforms import BijectiveTransform, NtoMTransform
 from jimgw.core.single_event.detector import Detector
 from jimgw.core.single_event.waveform import Waveform
-from jimgw.core.single_event.utils import inner_product, complex_inner_product
+from jimgw.core.single_event.utils import (
+    inner_product,
+    complex_inner_product,
+    apply_fixed_parameters,
+)
 from jimgw.core.single_event.gps_times import (
     greenwich_mean_sidereal_time as compute_gmst,
 )
@@ -76,12 +80,7 @@ class SingleEventLikelihood(LikelihoodBase):
         Callables are applied in insertion order.
         """
         params = params.copy()
-        for key, value in self.fixed_parameters.items():
-            if callable(value):
-                result = value(params)
-                params[key] = result[key] if isinstance(result, dict) else result
-            else:
-                params[key] = value
+        apply_fixed_parameters(params, self.fixed_parameters)
         return self._likelihood(params, data)
 
     @abstractmethod
@@ -209,12 +208,7 @@ class TransientLikelihoodFD(SingleEventLikelihood):
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params = params.copy()
-        for key, value in self.fixed_parameters.items():
-            if callable(value):
-                result = value(params)
-                params[key] = result[key] if isinstance(result, dict) else result
-            else:
-                params[key] = value
+        apply_fixed_parameters(params, self.fixed_parameters)
         params["trigger_time"] = self.trigger_time
         params["gmst"] = self.gmst
         if self.marginalize_time:
@@ -561,6 +555,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
 
         if reference_parameters:
             self.reference_parameters = reference_parameters.copy()
+            apply_fixed_parameters(self.reference_parameters, self.fixed_parameters)
             logger.info(
                 f"Reference parameters provided, which are {self.reference_parameters}"
             )
@@ -650,12 +645,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params = params.copy()
-        for key, value in self.fixed_parameters.items():
-            if callable(value):
-                result = value(params)
-                params[key] = result[key] if isinstance(result, dict) else result
-            else:
-                params[key] = value
+        apply_fixed_parameters(params, self.fixed_parameters)
         params["trigger_time"] = self.trigger_time
         params["gmst"] = self.gmst
         if self.marginalize_phase:
@@ -819,7 +809,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
             named_params = transform.backward(named_params)
         for transform in likelihood_transforms:
             named_params = transform.forward(named_params)
-        named_params.update(self.fixed_parameters)
+        named_params = apply_fixed_parameters(named_params, self.fixed_parameters)
         return named_params
 
     def _matched_filter_log_likelihood(
@@ -829,7 +819,8 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
 
         Used internally by the optimizer to find reference parameters.
         """
-        params = {**params, **self.fixed_parameters}
+        params = params.copy()
+        apply_fixed_parameters(params, self.fixed_parameters)
         params["trigger_time"] = self.trigger_time
         params["gmst"] = self.gmst
         waveform_sky = self.waveform(self.frequencies, params)
