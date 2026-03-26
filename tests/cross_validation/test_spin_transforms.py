@@ -11,7 +11,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from tests.utils import check_bilby_available, common_keys_allclose
+from tests.utils import assert_all_finite, check_bilby_available, common_keys_allclose
 
 # Check if bilby is available before running tests
 try:
@@ -124,14 +124,14 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
             assert common_keys_allclose(jimgw_cartesian, bilby_cartesian), (
                 f"Jim forward and bilby disagree at f_ref={f_ref}"
             )
-            assert not jnp.isnan(fwd_jacobian).any(), "Forward Jacobian contains NaN values"
+            assert_all_finite(fwd_jacobian)
 
             # Step 4: Jim inverse on bilby reference Cartesian → recovered angles
             cartesian_with_masses = {**bilby_cartesian, "M_c": M_c, "q": q, "phase_c": phase_c}
             recovered_angles, inv_jacobian = jax.vmap(transform.inverse)(
                 cartesian_with_masses
             )
-            assert not jnp.isnan(inv_jacobian).any(), "Inverse Jacobian contains NaN values"
+            assert_all_finite(inv_jacobian)
 
             # Step 5–6: bilby forward on recovered angles → reproduced Cartesian
             reprod_results = []

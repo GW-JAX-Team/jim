@@ -17,6 +17,7 @@ from jimgw.core.single_event.time_utils import (
     greenwich_mean_sidereal_time as compute_gmst,
 )
 from jimgw.core.prior import PowerLawPrior, UniformPrior
+from tests.utils import assert_all_finite
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
@@ -1310,7 +1311,7 @@ class TestCallableFixedParameters:
         result = likelihood.evaluate(dict(params), {})
         ref_result = ref_likelihood.evaluate(dict(ref_params), {})
 
-        assert jnp.isfinite(result), "Callable fixed_parameters result should be finite"
+        assert_all_finite(result)
         assert jnp.allclose(result, ref_result), (
             f"Callable ({result}) should match constant ({ref_result})"
         )

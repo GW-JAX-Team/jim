@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 from itertools import combinations
 
-from tests.utils import check_bilby_available
+from tests.utils import assert_all_finite, check_bilby_available
 
 # Check if bilby is available before running tests
 try:
@@ -120,7 +120,7 @@ class TestSkyFrameToDetectorFrameHighLevel:
                 assert jnp.allclose(jim_ra_dec["dec"], bilby_dec), (
                     f"Jim and bilby dec disagree for {ifo_names} at gps={gps_time}"
                 )
-                assert not jnp.isnan(inv_jacobian).any(), "Inverse Jacobian contains NaN"
+                assert_all_finite(inv_jacobian)
 
                 # Step 4: Jim forward (ra/dec → zenith/azimuth) recovers original
                 jim_zenith_azimuth, fwd_jacobian = jax.vmap(transform.transform)(
@@ -132,7 +132,7 @@ class TestSkyFrameToDetectorFrameHighLevel:
                 assert jnp.allclose(jim_zenith_azimuth["azimuth"], jnp.array(azimuth)), (
                     f"Jim forward azimuth round-trip failed for {ifo_names} at gps={gps_time}"
                 )
-                assert not jnp.isnan(fwd_jacobian).any(), "Forward Jacobian contains NaN"
+                assert_all_finite(fwd_jacobian)
 
 
 class TestThetaPhiToRaDec:

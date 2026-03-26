@@ -31,7 +31,7 @@ from jimgw.core.single_event.transforms import (
 )
 
 from jimgw.core.single_event.detector import get_detector_preset
-from tests.utils import common_keys_allclose
+from tests.utils import assert_all_finite, common_keys_allclose
 
 jax.config.update("jax_enable_x64", True)
 
@@ -350,7 +350,7 @@ class TestDistanceTransform:
         )
 
         assert np.isfinite(output["d_hat"])
-        assert not jnp.isnan(jacobian).any()
+        assert_all_finite(jacobian)
 
     def test_backward_distance_transform(self):
         """
@@ -370,7 +370,7 @@ class TestDistanceTransform:
             }
         )
         assert np.isfinite(output["d_L"])
-        assert not jnp.isnan(jacobian).any()
+        assert_all_finite(jacobian)
 
     def test_forward_backward_consistency(self):
         """
@@ -443,7 +443,7 @@ class TestDistanceTransform:
         assert common_keys_allclose(jitted_output, non_jitted_output)
 
         # Also check that the jitted jacobian contains no NaNs
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
     def test_jitted_backward_transform(self):
         """
@@ -486,7 +486,7 @@ class TestDistanceTransform:
 
         assert common_keys_allclose(jitted_output, non_jitted_output)
         # Also check that the jitted jacobian contains no NaNs
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
 
 class TestSphereSpinToCartesianSpinTransform:
@@ -506,7 +506,7 @@ class TestSphereSpinToCartesianSpinTransform:
             & np.isfinite(output["s1_y"])
             & np.isfinite(output["s1_z"])
         )
-        assert not jnp.isnan(jacobian).any()
+        assert_all_finite(jacobian)
 
     def test_backward_transform(self):
         """
@@ -524,7 +524,7 @@ class TestSphereSpinToCartesianSpinTransform:
             & np.isfinite(output["s1_theta"])
             & np.isfinite(output["s1_phi"])
         )
-        assert not jnp.isnan(jacobian).any()
+        assert_all_finite(jacobian)
 
     def test_forward_backward_consistency(self):
         """
@@ -578,7 +578,7 @@ class TestSphereSpinToCartesianSpinTransform:
         # Assert that the jitted and non-jitted results agree
         assert common_keys_allclose(jitted_output, non_jitted_output)
         # Also check that the jitted jacobian contains no NaNs
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
     def test_jitted_backward_transform(self):
         """
@@ -605,7 +605,7 @@ class TestSphereSpinToCartesianSpinTransform:
         # Assert that the jitted and non-jitted results agree
         assert common_keys_allclose(jitted_output, non_jitted_output)
         # Also check that the jitted jacobian contains no NaNs
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
 
 class TestSpinAnglesToCartesianSpinTransform:
@@ -716,7 +716,7 @@ class TestSpinAnglesToCartesianSpinTransform:
 
         assert common_keys_allclose(jitted_spins, non_jitted_spins)
         # Also check that the jitted jacobian contains no NaNs
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
     def test_jitted_backward_transform(self):
         """
@@ -766,7 +766,7 @@ class TestSpinAnglesToCartesianSpinTransform:
 
         assert common_keys_allclose(jitted_spins, non_jitted_spins)
         # Also check that the jitted jacobian contains no NaNs
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
 
 class TestSkyFrameToDetectorFrameSkyPositionTransform:
@@ -825,7 +825,7 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
         # Assert that the jitted and non-jitted results agree
         assert common_keys_allclose(jitted_output, non_jitted_output)
         # Also check that the jitted jacobian contains no NaNs
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
     def test_jitted_backward_transform(self):
         """
@@ -856,7 +856,7 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
         # Assert that the jitted and non-jitted results agree
         assert common_keys_allclose(jitted_output, non_jitted_output)
         # Also check that the jitted jacobian contains no NaNs
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
 
 class TestHelperFunctions:
@@ -977,7 +977,7 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
         ).transform(sample_dict)
 
         assert common_keys_allclose(jitted_output, non_jitted_output)
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
     def test_jitted_backward_transform(self):
         """
@@ -1004,7 +1004,7 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
         ).inverse(sample_dict)
 
         assert common_keys_allclose(jitted_output, non_jitted_output)
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
     def test_multiple_detectors(self):
         """
@@ -1147,7 +1147,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
         ).transform(sample_dict)
 
         assert common_keys_allclose(jitted_output, non_jitted_output)
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
     def test_jitted_backward_transform(self):
         """
@@ -1176,7 +1176,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
         ).inverse(sample_dict)
 
         assert common_keys_allclose(jitted_output, non_jitted_output)
-        assert not jnp.isnan(jitted_jacobian).any()
+        assert_all_finite(jitted_jacobian)
 
     def test_multiple_detectors(self):
         """

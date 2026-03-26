@@ -11,6 +11,7 @@ from jimgw.core.single_event.transforms import (
     MassRatioToSymmetricMassRatioTransform,
     SphereSpinToCartesianSpinTransform,
 )
+from tests.utils import assert_all_in_range
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
@@ -97,8 +98,7 @@ class TestInjectSignal:
         det = make_detector()
         inject_reference(det)
 
-        assert jnp.all(det.sliced_frequencies >= F_MIN)
-        assert jnp.all(det.sliced_frequencies <= F_MAX)
+        assert_all_in_range(det.sliced_frequencies, F_MIN, F_MAX)
 
     def test_noisy_injection_differs_from_zero_noise(self):
         """Adding noise produces data that differs from the zero-noise case."""
