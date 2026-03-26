@@ -30,7 +30,7 @@ All fixtures are stored in NumPy's `.npz` format using `jnp.savez()`. They conta
 
 - `td`: Time-domain data array
 - `dt`: Time step (sampling interval)
-- `epoch`: GPS time of first sample
+- `segment_start_time`: GPS time of first sample
 - `name`: Detector name (e.g., "H1")
 
 **PSD files:**

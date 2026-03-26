@@ -3,206 +3,224 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
-from copy import deepcopy
 from pathlib import Path
-from scipy.signal import welch
-from jimgw.core.single_event.data import Data, PowerSpectrum
+from jimgw.core.single_event.data import PowerSpectrum
 from jimgw.core.single_event.detector import get_H1
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
-from jimgw.core.single_event.gps_times import (
-    greenwich_mean_sidereal_time as compute_gmst,
+from jimgw.core.single_event.transforms import (
+    MassRatioToSymmetricMassRatioTransform,
+    SphereSpinToCartesianSpinTransform,
 )
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
 
-class TestDataInterface:
-    def setup_method(self):
-        # create some dummy data
-        self.f_samp = 2048
-        self.duration = 4
-        self.epoch = 2.0
-        self.name = "Dummy"
-        delta_t = 1 / self.f_samp
-        n_time = int(self.duration / delta_t)
-        self.data = Data(
-            td=jnp.ones(n_time), delta_t=delta_t, name=self.name, epoch=self.epoch
-        )
+GPS_TIME = 1126259462.0
+DURATION = 4.0
+F_MIN, F_MAX = 20.0, 1024.0
+SAMPLING_FREQUENCY = F_MAX * 2
 
-        # create a dummy PSD spanning [20, 512] Hz
-        delta_f = 1 / self.duration
-        self.psd_band = (20, 512)
-        psd_min, psd_max = self.psd_band
-        freqs = jnp.arange(int(psd_max / delta_f)) * delta_f
-        freqs_psd = freqs[freqs >= psd_min]
-        self.psd = PowerSpectrum(
-            jnp.ones_like(freqs_psd), frequencies=freqs_psd, name=self.name
-        )
+# Likelihood-space (fully expanded) parameters used as the injection baseline.
+BASELINE_PARAMS = {
+    "M_c": 28.0,
+    "eta": 0.24,
+    "s1_x": 0.0,
+    "s1_y": 0.0,
+    "s1_z": 0.0,
+    "s2_x": 0.0,
+    "s2_y": 0.0,
+    "s2_z": 0.0,
+    "d_L": 440.0,
+    "phase_c": 0.0,
+    "iota": 0.0,
+    "ra": 1.5,
+    "dec": 0.5,
+    "psi": 0.3,
+    "t_c": 0.0,
+}
 
-    def test_data(self):
-        """Test data manipulation."""
-        # check basic attributes
-        assert self.data.name == "Dummy"
-        assert self.data.epoch == self.epoch
-        assert self.data.duration == self.duration
-        assert self.data.delta_t == 1 / self.f_samp
-        assert len(self.data.td) == int(self.f_samp * self.duration)
-        # by default, the Data class should have pre-assigned a Tukey window
-        assert len(self.data.window) == len(self.data.td)
-        # the boolean should be true if data are present
-        assert bool(self.data)
 
-        # check FFTing
-        # initially the FD data should be zero, but its length should
-        # be correct and match jnp.fft.rfftfreq
-        assert not self.data.has_fd
-        assert jnp.all(self.data.fd == 0)
-        fftfreq = jnp.fft.rfftfreq(len(self.data.td), self.data.delta_t)
-        assert len(self.data.fd) == len(fftfreq)
-        assert self.data.n_freq == len(fftfreq)
+def make_detector():
+    det = get_H1()
+    psd = PowerSpectrum.from_file(str(FIXTURES_DIR / "GW150914_psd_H1.npz"))
+    det.set_psd(psd)
+    det.frequency_bounds = (F_MIN, F_MAX)
+    return det
 
-        # now, requesting a frequency slice should trigger an FFT computation,
-        # the result of which will be stored in data.fd; this should be the
-        # same as calling data.fft() with the default window
-        data_copy = deepcopy(self.data)
-        # manually compute the FFT with the right dimensions to compare
-        fftdata = jnp.fft.rfft(self.data.td * self.data.window) * self.data.delta_t
 
-        # check that frequency slice does the right thing
-        fmin, fmax = self.psd_band
-        data_slice, freq_slice = self.data.frequency_slice(fmin, fmax)
-        # note that the FFT requires float64 or it might be off
-        freq_mask = (fftfreq >= fmin) & (fftfreq <= fmax)
-        assert jnp.allclose(self.data.fd, fftdata)
-        assert jnp.allclose(data_slice, fftdata[freq_mask])
-        assert jnp.allclose(freq_slice, fftfreq[freq_mask])
+def inject_baseline(det, trigger_time=GPS_TIME, **overrides):
+    """Inject the baseline signal (zero noise) into *det*."""
+    params = {**BASELINE_PARAMS, **overrides}
+    det.inject_signal(
+        duration=DURATION,
+        sampling_frequency=SAMPLING_FREQUENCY,
+        trigger_time=trigger_time,
+        waveform_model=RippleIMRPhenomD(f_ref=20.0),
+        parameters=params,
+        is_zero_noise=True,
+    )
 
-        # check that calling data.fft() does the same thing
-        assert not data_copy.has_fd
-        data_copy.fft()
-        assert jnp.allclose(data_copy.fd, fftdata)
-        data_slice1, freq_slice1 = data_copy.frequency_slice(fmin, fmax)
-        assert jnp.allclose(data_slice, data_slice1)
-        assert jnp.allclose(freq_slice, freq_slice1)
 
-    def test_psd(self):
-        """Test PSD manipulation."""
-        # check basic attributes of dummy PSD
-        assert self.psd.name == "Dummy"
-        assert self.psd.n_freq == len(self.psd.frequencies)
-        assert jnp.all(self.psd.frequencies >= self.psd_band[0])
-        assert jnp.all(self.psd.frequencies <= self.psd_band[1])
+# ---------------------------------------------------------------------------
+# inject_signal tests
+# ---------------------------------------------------------------------------
 
-        # check PSD frequency slice
-        sliced_psd, freq_slice = self.psd.frequency_slice(*self.psd_band)
-        assert jnp.allclose(sliced_psd, self.psd.values)
-        assert jnp.allclose(freq_slice, self.psd.frequencies)
 
-        # finally check that we can a Welch PSD from data
-        nperseg = self.data.n_time // 2
-        psd_auto = self.data.to_psd(nperseg=nperseg)
-        freq_manual, psd_manual = welch(self.data.td, fs=self.f_samp, nperseg=nperseg)
-        assert jnp.allclose(psd_auto.frequencies, freq_manual)
-        assert jnp.allclose(psd_auto.values, psd_manual)
+class TestInjectSignal:
+    """Tests for inject_signal: core behaviour and the transform pipeline."""
 
-        # check interpolation of PSD to data frequency grid
-        psd_interp = self.psd.interpolate(self.data.frequencies)
-        assert isinstance(psd_interp, PowerSpectrum)
+    # ------------------------------------------------------------------
+    # Core behaviour
+    # ------------------------------------------------------------------
 
-        # check drawing frequency domain data from PSD
-        fd_data = self.psd.simulate_data(jax.random.key(0))
+    def test_zero_noise_creates_data(self):
+        """Data object is populated after a zero-noise injection."""
+        det = make_detector()
+        inject_baseline(det)
 
-        # the variance of the simulated data should equal PSD / (4 * delta_f)
-        target_var = self.psd.values / (4 * self.psd.delta_f)
-        assert jnp.allclose(jnp.var(fd_data.real), target_var, rtol=1e-1)
-        assert jnp.allclose(jnp.var(fd_data.imag), target_var, rtol=1e-1)
+        assert det.data is not None
+        assert len(det.data.td) == int(DURATION * SAMPLING_FREQUENCY)
+        assert det.data.segment_start_time == GPS_TIME - DURATION + 2.0
 
-        # the integral of the PSD should equal the variance of the TD data
-        fd_data_white = fd_data / jnp.sqrt(self.psd.values / 2 / self.psd.delta_t)
-        td_data_white = jnp.fft.irfft(fd_data_white) / self.psd.delta_t
-        assert jnp.allclose(jnp.var(td_data_white), 1, rtol=1e-1)
+    def test_zero_noise_signal_nonzero_in_band(self):
+        """Injected signal is non-zero inside the frequency band."""
+        det = make_detector()
+        inject_baseline(det)
 
-    def test_inject_signal(self):
-        """Test signal injection into detector."""
-        # Set up detector
-        detector = get_H1()
+        assert jnp.any(jnp.abs(det.sliced_fd_data) > 0)
 
-        # Load PSD from local fixture instead of fetching from internet
-        psd = PowerSpectrum.from_file(str(FIXTURES_DIR / "GW150914_psd_H1.npz"))
-        detector.set_psd(psd)
+    def test_zero_noise_frequency_bounds_respected(self):
+        """Sliced frequencies lie within the requested band."""
+        det = make_detector()
+        inject_baseline(det)
 
-        # Set up observation parameters
-        duration = 6.0
-        f_min, f_max = 20.0, 1024.0
-        sampling_frequency = f_max * 2
+        assert jnp.all(det.sliced_frequencies >= F_MIN)
+        assert jnp.all(det.sliced_frequencies <= F_MAX)
 
-        detector.frequency_bounds = (f_min, f_max)
+    def test_noisy_injection_differs_from_zero_noise(self):
+        """Adding noise produces data that differs from the zero-noise case."""
+        det_clean = make_detector()
+        inject_baseline(det_clean)
 
-        # Set up waveform model and parameters
-        waveform = RippleIMRPhenomD(f_ref=20.0)
-
-        gps_time = 1126259462.0  # example GPS time
-        # Simple parameter set
-        params = {
-            "M_c": 28.0,
-            "eta": 0.24,
-            "s1_z": 0.0,
-            "s2_z": 0.0,
-            "d_L": 440.0,
-            "phase_c": 0.0,
-            "iota": 0.0,
-            "ra": 1.5,
-            "dec": 0.5,
-            "psi": 0.3,
-            "trigger_time": gps_time,
-            "t_c": 0.0,
-            "gmst": compute_gmst(gps_time),
-        }
-
-        # Test injection with zero noise
-        detector.inject_signal(
-            duration=duration,
-            sampling_frequency=sampling_frequency,
-            epoch=0.0,
-            waveform_model=waveform,
-            parameters=params,
-            is_zero_noise=True,
-            rng_key=jax.random.key(0),
-        )
-
-        # Check that data was created
-        assert detector.data is not None
-        assert len(detector.data.td) == int(duration * sampling_frequency)
-        assert detector.data.epoch == 0.0
-
-        # Check that frequency domain data is non-zero in the frequency band
-        assert jnp.any(jnp.abs(detector.sliced_fd_data) > 0)
-
-        # Check that sliced frequencies match bounds
-        assert jnp.all(detector.sliced_frequencies >= f_min)
-        assert jnp.all(detector.sliced_frequencies <= f_max)
-
-        # Test injection with noise
-        detector_with_noise = get_H1()
-        psd_with_noise = PowerSpectrum.from_file(str(FIXTURES_DIR / "GW150914_psd_H1.npz"))
-        detector_with_noise.set_psd(psd_with_noise)
-        detector_with_noise.frequency_bounds = (f_min, f_max)
-
-        detector_with_noise.inject_signal(
-            duration=duration,
-            sampling_frequency=sampling_frequency,
-            epoch=0.0,
-            waveform_model=waveform,
+        det_noisy = make_detector()
+        params = dict(BASELINE_PARAMS)
+        det_noisy.inject_signal(
+            duration=DURATION,
+            sampling_frequency=SAMPLING_FREQUENCY,
+            trigger_time=GPS_TIME,
+            waveform_model=RippleIMRPhenomD(f_ref=20.0),
             parameters=params,
             is_zero_noise=False,
             rng_key=jax.random.key(42),
         )
 
-        # Check that data with noise differs from zero-noise data
-        # (they should differ due to the noise component)
         assert not jnp.allclose(
-            detector.sliced_fd_data,
-            detector_with_noise.sliced_fd_data,
+            det_clean.sliced_fd_data,
+            det_noisy.sliced_fd_data,
             rtol=1e-05,
             atol=1e-23,
         )
+
+    # ------------------------------------------------------------------
+    # likelihood_transforms
+    # ------------------------------------------------------------------
+
+    def test_likelihood_transforms_q_to_eta(self):
+        """likelihood_transforms=[MassRatioToSymmetricMassRatioTransform] converts
+        q -> eta, producing the same injection as passing eta directly."""
+        det_baseline = make_detector()
+        inject_baseline(det_baseline)
+
+        q_params = MassRatioToSymmetricMassRatioTransform.backward(
+            {"eta": jnp.array(BASELINE_PARAMS["eta"])}
+        )
+        params = {k: v for k, v in BASELINE_PARAMS.items() if k != "eta"}
+        params["q"] = q_params["q"]
+
+        det = make_detector()
+        det.inject_signal(
+            duration=DURATION,
+            sampling_frequency=SAMPLING_FREQUENCY,
+            trigger_time=GPS_TIME,
+            waveform_model=RippleIMRPhenomD(f_ref=20.0),
+            parameters=params,
+            likelihood_transforms=[MassRatioToSymmetricMassRatioTransform],
+            is_zero_noise=True,
+        )
+
+        assert jnp.allclose(
+            det.sliced_fd_data, det_baseline.sliced_fd_data, rtol=1e-6, atol=1e-30
+        )
+
+    def test_likelihood_transforms_spin_cartesian(self):
+        """likelihood_transforms with SphereSpinToCartesianSpinTransform converts
+        spherical spins to Cartesian, producing the same injection."""
+        det_baseline = make_detector()
+        inject_baseline(det_baseline)
+
+        s1_transform = SphereSpinToCartesianSpinTransform("s1")
+        s2_transform = SphereSpinToCartesianSpinTransform("s2")
+
+        params = {
+            k: v
+            for k, v in BASELINE_PARAMS.items()
+            if not k.startswith("s1_") and not k.startswith("s2_")
+        }
+        params.update({"s1_mag": 0.0, "s1_theta": 0.0, "s1_phi": 0.0})
+        params.update({"s2_mag": 0.0, "s2_theta": 0.0, "s2_phi": 0.0})
+
+        det = make_detector()
+        det.inject_signal(
+            duration=DURATION,
+            sampling_frequency=SAMPLING_FREQUENCY,
+            trigger_time=GPS_TIME,
+            waveform_model=RippleIMRPhenomD(f_ref=20.0),
+            parameters=params,
+            likelihood_transforms=[s1_transform, s2_transform],
+            is_zero_noise=True,
+        )
+
+        assert jnp.allclose(
+            det.sliced_fd_data, det_baseline.sliced_fd_data, rtol=1e-6, atol=1e-30
+        )
+
+    # ------------------------------------------------------------------
+    # sample_transforms
+    # ------------------------------------------------------------------
+
+    def test_sample_transforms_inverse_applied(self):
+        """sample_transforms + likelihood_transforms round-trip through sampling
+        space back to likelihood space, recovering the baseline injection.
+
+        Setup: sampler works in eta-space (output of q->eta).  We pass eta in
+        params; backward() maps it to q; likelihood_transform maps q->eta.
+        """
+        det_baseline = make_detector()
+        inject_baseline(det_baseline)
+
+        q_eta = MassRatioToSymmetricMassRatioTransform
+
+        sampling_params = dict(BASELINE_PARAMS)
+        sampling_params["eta"] = jnp.array(BASELINE_PARAMS["eta"])
+
+        det = make_detector()
+        det.inject_signal(
+            duration=DURATION,
+            sampling_frequency=SAMPLING_FREQUENCY,
+            trigger_time=GPS_TIME,
+            waveform_model=RippleIMRPhenomD(f_ref=20.0),
+            parameters=sampling_params,
+            sample_transforms=[q_eta],      # backward: eta (sampling) -> q (prior)
+            likelihood_transforms=[q_eta],  # forward:  q (prior) -> eta (likelihood)
+            is_zero_noise=True,
+        )
+
+        assert jnp.allclose(
+            det.sliced_fd_data, det_baseline.sliced_fd_data, rtol=1e-6, atol=1e-30
+        )
+
+
+

@@ -43,7 +43,7 @@ H1.set_data(data)
 
 ### Load from File
 
-Use `Data.from_file()` to read a locally saved `.npz` file. The file must contain the keys `td` (time-domain strain), `dt` (time step in seconds), and `epoch` (GPS start time):
+Use `Data.from_file()` to read a locally saved `.npz` file. The file must contain the keys `td` (time-domain strain), `dt` (time step in seconds), and `segment_start_time` (GPS start time):
 
 ```python
 data = Data.from_file("path/to/data.npz")
@@ -63,7 +63,7 @@ n = int(duration * sampling_frequency)
 frequencies = jnp.fft.rfftfreq(n, 1.0 / sampling_frequency)
 
 fd_strain = jnp.zeros(len(frequencies), dtype=jnp.complex128)  # replace with your data
-data = Data.from_fd(fd_strain, frequencies, epoch=0.0)
+data = Data.from_fd(fd_strain, frequencies, segment_start_time=0.0)
 H1.set_data(data)
 ```
 
@@ -118,14 +118,13 @@ H1.set_psd(PowerSpectrum.from_file("path/to/psd.npz"))
 
 ## Injecting a Simulated Signal
 
-For testing and validation, you can inject a waveform directly into a detector. Set the PSD and frequency bounds first:
+For testing and validation, you can inject a waveform directly into a detector. Set the PSD and frequency bounds first, then call `inject_signal`.
+
+### Basic injection
 
 ```python
 import jax
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
-from jimgw.core.single_event.gps_times import (
-    greenwich_mean_sidereal_time as compute_gmst,
-)
 
 gps_time = 1126259462.0
 
@@ -139,14 +138,12 @@ injection_params = {
     "d_L": 440.0, "t_c": 0.0,
     "phase_c": 0.0, "iota": 0.0,
     "psi": 0.3, "ra": 1.5, "dec": 0.5,
-    "trigger_time": gps_time,
-    "gmst": compute_gmst(gps_time),
 }
 
 H1.inject_signal(
     duration=4.0,
     sampling_frequency=2048.0,
-    epoch=0.0,
+    trigger_time=gps_time,
     waveform_model=waveform,
     parameters=injection_params,
     rng_key=jax.random.key(0),
@@ -154,3 +151,53 @@ H1.inject_signal(
 ```
 
 Set `is_zero_noise=True` to get a noiseless injection.
+
+### Injecting in prior space via transforms
+
+`inject_signal` accepts the same `likelihood_transforms` and `sample_transforms` lists that you pass to `Jim`. This lets you specify injection parameters in your natural prior space (e.g. mass ratio `q` and spherical spins) without manually converting to the likelihood space first:
+
+```python
+from jimgw.core.single_event.transforms import (
+    MassRatioToSymmetricMassRatioTransform,
+    SphereSpinToCartesianSpinTransform,
+)
+
+# Parameters in prior space — q and spherical spins
+injection_params = {
+    "M_c": 28.0,
+    "q": 0.83,                              # prior uses q, waveform needs eta
+    "s1_mag": 0.3, "s1_theta": 0.5, "s1_phi": 1.2,  # spherical spins
+    "s2_mag": 0.1, "s2_theta": 1.0, "s2_phi": 2.4,
+    "d_L": 440.0, "t_c": 0.0,
+    "phase_c": 0.0, "iota": 0.0,
+    "psi": 0.3, "ra": 1.5, "dec": 0.5,
+}
+
+H1.inject_signal(
+    duration=4.0,
+    sampling_frequency=2048.0,
+    trigger_time=gps_time,
+    waveform_model=waveform,
+    parameters=injection_params,
+    likelihood_transforms=[
+        MassRatioToSymmetricMassRatioTransform,
+        SphereSpinToCartesianSpinTransform("s1"),
+        SphereSpinToCartesianSpinTransform("s2"),
+    ],
+    is_zero_noise=True,
+)
+```
+
+The transforms are applied in the same order as when evaluating the likelihood, so you can pass the exact same `likelihood_transforms` list that you give to `Jim`.
+
+If you are working in sampling space (i.e. your injection parameters are already in the transformed sampling parameterisation), pass `sample_transforms` as well. The sample transforms are inverted first (sampling → prior), then the likelihood transforms are applied forward (prior → likelihood):
+
+```python
+H1.inject_signal(
+    ...,
+    trigger_time=gps_time,
+    parameters=sampling_space_params,
+    sample_transforms=sample_transforms,    # inverted: sampling → prior
+    likelihood_transforms=likelihood_transforms,  # forward: prior → likelihood
+)
+```

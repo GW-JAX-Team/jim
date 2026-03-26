@@ -336,7 +336,7 @@ class TestDistanceTransform:
         Test transformation from distance to SNR-weighted distance (boundaries excluded)
         """
         output, jacobian = DistanceToSNRWeightedDistanceTransform(
-            gps_time=1126259462.4,
+            trigger_time=1126259462.4,
             ifos=[H1, L1],
         ).transform(
             {
@@ -357,7 +357,7 @@ class TestDistanceTransform:
         Test transformation from SNR-weighted distance to distance (boundaries excluded)
         """
         output, jacobian = DistanceToSNRWeightedDistanceTransform(
-            gps_time=1126259462.4,
+            trigger_time=1126259462.4,
             ifos=[H1, L1],
         ).inverse(
             {
@@ -392,7 +392,7 @@ class TestDistanceTransform:
         param_name = ["d_L", "M_c", "ra", "dec", "psi", "iota"]
         inputs = dict(zip(param_name, inputs))
         distance_transform = DistanceToSNRWeightedDistanceTransform(
-            gps_time=1126259462.4,
+            trigger_time=1126259462.4,
             ifos=[H1, L1],
         )
         forward_transform_output, _ = jax.vmap(distance_transform.transform)(inputs)
@@ -429,13 +429,13 @@ class TestDistanceTransform:
         # Create a JIT compiled version of the transform.
         jit_transform = jax.jit(
             DistanceToSNRWeightedDistanceTransform(
-                gps_time=1126259462.4,
+                trigger_time=1126259462.4,
                 ifos=[H1, L1],
             ).transform
         )
         jitted_output, jitted_jacobian = jit_transform(sample_dict)
         non_jitted_output, _ = DistanceToSNRWeightedDistanceTransform(
-            gps_time=1126259462.4,
+            trigger_time=1126259462.4,
             ifos=[H1, L1],
         ).transform(sample_dict)
 
@@ -474,13 +474,13 @@ class TestDistanceTransform:
         # Create a JIT compiled version of the transform.
         jit_inverse_transform = jax.jit(
             DistanceToSNRWeightedDistanceTransform(
-                gps_time=1126259462.4,
+                trigger_time=1126259462.4,
                 ifos=[H1, L1],
             ).inverse
         )
         jitted_output, jitted_jacobian = jit_inverse_transform(sample_dict)
         non_jitted_output, _ = DistanceToSNRWeightedDistanceTransform(
-            gps_time=1126259462.4,
+            trigger_time=1126259462.4,
             ifos=[H1, L1],
         ).inverse(sample_dict)
 
@@ -790,7 +790,7 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
                     ),
                 }
                 transform = SkyFrameToDetectorFrameSkyPositionTransform(
-                    gps_time=time,
+                    trigger_time=time,
                     ifos=list(ifo_pair),
                 )
                 forward_transform_output, _ = jax.vmap(transform.inverse)(inputs)
@@ -809,7 +809,7 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
             "ra": jax.random.uniform(subkeys[0], (1,), minval=0, maxval=2 * jnp.pi)[0],
             "dec": jax.random.uniform(subkeys[1], (1,), minval=0, maxval=jnp.pi)[0],
         }
-        class_args = dict(gps_time=1126259642.4, ifos=[H1, L1])
+        class_args = dict(trigger_time=1126259642.4, ifos=[H1, L1])
 
         # Create a JIT compiled version of the transform.
         jit_transform = jax.jit(
@@ -840,7 +840,7 @@ class TestSkyFrameToDetectorFrameSkyPositionTransform:
                 subkeys[1], (1,), minval=0, maxval=2 * jnp.pi
             )[0],
         }
-        class_args = dict(gps_time=1126259642.4, ifos=[H1, L1])
+        class_args = dict(trigger_time=1126259642.4, ifos=[H1, L1])
 
         # Create a JIT compiled version of the transform.
         jit_inverse_transform = jax.jit(
@@ -885,7 +885,7 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
         """
         gps_time = 1126259462.4  # GW150914
         transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
-            gps_time=gps_time,
+            trigger_time=gps_time,
             ifo=H1,
         )
 
@@ -910,7 +910,7 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
         """
         gps_time = 1126259462.4
         transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
-            gps_time=gps_time,
+            trigger_time=gps_time,
             ifo=L1,
         )
 
@@ -933,7 +933,7 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
         """
         gps_time = 1126259462.4
         transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
-            gps_time=gps_time,
+            trigger_time=gps_time,
             ifo=H1,
         )
 
@@ -963,7 +963,7 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
             "dec": -0.5,
         }
 
-        class_args = dict(gps_time=gps_time, ifo=H1)
+        class_args = dict(trigger_time=gps_time, ifo=H1)
 
         jit_transform = jax.jit(
             lambda data: GeocentricArrivalTimeToDetectorArrivalTimeTransform(
@@ -990,7 +990,7 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
             "dec": 0.3,
         }
 
-        class_args = dict(gps_time=gps_time, ifo=L1)
+        class_args = dict(trigger_time=gps_time, ifo=L1)
 
         jit_inverse_transform = jax.jit(
             lambda data: GeocentricArrivalTimeToDetectorArrivalTimeTransform(
@@ -1020,7 +1020,7 @@ class TestGeocentricArrivalTimeToDetectorArrivalTimeTransform:
         # Test with H1, L1, and V1
         for ifo in [H1, L1, V1]:
             transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
-                gps_time=gps_time,
+                trigger_time=gps_time,
                 ifo=ifo,
             )
             output, _ = transform.transform(sample_dict.copy())
@@ -1035,7 +1035,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
         """
         gps_time = 1126259462.4  # GW150914
         transform = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
-            gps_time=gps_time,
+            trigger_time=gps_time,
             ifo=H1,
         )
 
@@ -1064,7 +1064,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
         """
         gps_time = 1126259462.4
         transform = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
-            gps_time=gps_time,
+            trigger_time=gps_time,
             ifo=L1,
         )
 
@@ -1092,7 +1092,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
         """
         gps_time = 1126259462.4
         transform = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
-            gps_time=gps_time,
+            trigger_time=gps_time,
             ifo=H1,
         )
 
@@ -1133,7 +1133,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
             "iota": 2.5,
         }
 
-        class_args = dict(gps_time=gps_time, ifo=H1)
+        class_args = dict(trigger_time=gps_time, ifo=H1)
 
         jit_transform = jax.jit(
             lambda data: GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
@@ -1162,7 +1162,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
             "iota": 1.5,
         }
 
-        class_args = dict(gps_time=gps_time, ifo=L1)
+        class_args = dict(trigger_time=gps_time, ifo=L1)
 
         jit_inverse_transform = jax.jit(
             lambda data: GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
@@ -1194,7 +1194,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
         # Test with H1, L1, and V1
         for ifo in [H1, L1, V1]:
             transform = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
-                gps_time=gps_time,
+                trigger_time=gps_time,
                 ifo=ifo,
             )
             output, _ = transform.transform(sample_dict.copy())
@@ -1208,7 +1208,7 @@ class TestGeocentricArrivalPhaseToDetectorArrivalPhaseTransform:
         """
         gps_time = 1126259462.4
         transform = GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
-            gps_time=gps_time,
+            trigger_time=gps_time,
             ifo=H1,
         )
 

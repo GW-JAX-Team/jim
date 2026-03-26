@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Sequence
 import logging
 import time
 
@@ -19,6 +19,9 @@ from jimgw.core.constants import (
 from jimgw.core.single_event.polarization import Polarization
 from jimgw.core.single_event.data import Data, PowerSpectrum
 from jimgw.core.single_event.utils import inner_product, complex_inner_product
+from jimgw.core.single_event.time_utils import (
+    greenwich_mean_sidereal_time as compute_gmst,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +57,9 @@ class Detector(ABC):
     _sliced_psd: Float[Array, " n_sample"] = jnp.array([])
 
     @property
-    def epoch(self) -> Float:
-        """The epoch of the data."""
-        return self.data.epoch
+    def segment_start_time(self) -> Float:
+        """GPS start time of the data segment."""
+        return self.data.segment_start_time
 
     @property
     def times(self) -> Float[Array, " n_sample"]:
@@ -402,7 +405,7 @@ class GroundBased2G(Detector):
         ra, dec, psi, gmst = params["ra"], params["dec"], params["psi"], params["gmst"]
         antenna_pattern = self.antenna_pattern(ra, dec, psi, gmst)
         time_shift = self.delay_from_geocenter(ra, dec, gmst)
-        time_shift += params["trigger_time"] - self.epoch + params["t_c"]
+        time_shift += params["trigger_time"] - self.segment_start_time + params["t_c"]
 
         h_detector = jax.tree_util.tree_map(
             lambda h, antenna: h * antenna,
@@ -583,9 +586,12 @@ class GroundBased2G(Detector):
         self,
         duration: float,
         sampling_frequency: float,
-        epoch: float,
+        trigger_time: float,
         waveform_model,
         parameters: dict[str, float],
+        sample_transforms: Sequence = [],
+        likelihood_transforms: Sequence = [],
+        segment_start_time: Optional[float] = None,
         is_zero_noise: bool = False,
         rng_key: Optional[Key] = None,
     ) -> None:
@@ -594,12 +600,48 @@ class GroundBased2G(Detector):
         Note: The power spectral density must be set beforehand.
 
         Args:
+            duration (float): Duration of the data segment in seconds.
+            sampling_frequency (float): Sampling frequency in Hz.
+            trigger_time (float): GPS time of the event trigger. Used to stamp
+                ``trigger_time`` and derive ``gmst`` for the waveform projection,
+                mirroring the behaviour of ``TransientLikelihoodFD``.
             waveform_model: The waveform model to be injected.
-            parameters (dict): Dictionary of parameters for the waveform model.
+            parameters (dict): Dictionary of source parameters. Can be provided
+                in any parameter space; use ``sample_transforms`` and
+                ``likelihood_transforms`` to convert to likelihood space.
+            sample_transforms (Sequence, optional): Bijective sample transforms
+                (same list passed to Jim). Applied in reverse using ``.backward()``
+                to map from sampling space to prior space. Defaults to [].
+            likelihood_transforms (Sequence, optional): Likelihood transforms
+                (same list passed to Jim). Applied forward using ``.forward()``
+                to map from prior space to likelihood space. Defaults to [].
+            segment_start_time (Optional[float], optional): GPS start time of the
+                data buffer in seconds. If None, defaults to
+                ``trigger_time - duration + 2.0`` (2 s of data after the trigger).
+                Defaults to None.
 
         Returns:
             None
         """
+        # Derive segment_start_time if not provided
+        if segment_start_time is None:
+            segment_start_time = trigger_time - duration + 2.0
+
+        # Make a copy of the parameters to avoid modifying the original dictionary
+        params = parameters.copy()
+
+        # Apply sample transforms in reverse (sampling space -> prior space)
+        for transform in reversed(sample_transforms):
+            params = transform.backward(params)
+
+        # Apply likelihood transforms (prior space -> likelihood space)
+        for transform in likelihood_transforms:
+            params = transform.forward(params)
+
+        # Stamp trigger_time and gmst — mirrors TransientLikelihoodFD.evaluate()
+        params["trigger_time"] = float(trigger_time)
+        params["gmst"] = compute_gmst(trigger_time)
+
         # 1. Set empty data to initialise the detector
         # n_times = int(duration * sampling_frequency)
         n_times = int(jnp.round(duration * sampling_frequency))
@@ -608,13 +650,13 @@ class GroundBased2G(Detector):
                 name=f"{self.name}_empty",
                 td=jnp.zeros(n_times),
                 delta_t=1 / sampling_frequency,
-                epoch=epoch,
+                segment_start_time=segment_start_time,
             )
         )
 
         # 2. Compute the projected strain from parameters
-        polarisations = waveform_model(self.frequencies, parameters)
-        projected_strain = self.fd_response(self.frequencies, polarisations, parameters)
+        polarisations = waveform_model(self.frequencies, params)
+        projected_strain = self.fd_response(self.frequencies, polarisations, params)
 
         # 3. Set the new data
         strain_data = jnp.where(self.frequency_mask, projected_strain, 0.0 + 0.0j)
@@ -636,7 +678,7 @@ class GroundBased2G(Detector):
                 name=f"{self.name}_injected",
                 fd_strain=strain_data,
                 frequencies=self.frequencies,
-                epoch=self.data.epoch,
+                segment_start_time=self.data.segment_start_time,
             )
         )
 

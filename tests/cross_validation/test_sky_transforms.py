@@ -106,7 +106,7 @@ class TestSkyFrameToDetectorFrameHighLevel:
                 bilby_dec = jnp.array(bilby_dec)
 
                 transform = SkyFrameToDetectorFrameSkyPositionTransform(
-                    gps_time=gps_time,
+                    trigger_time=gps_time,
                     ifos=list(ifo_pair),
                 )
 
@@ -257,7 +257,7 @@ class TestGMST:
 
     def test_gmst(self):
         """Compare Jim's GMST with bilby_cython's implementation."""
-        from jimgw.core.single_event.gps_times import greenwich_mean_sidereal_time as jim_gmst
+        from jimgw.core.single_event.time_utils import greenwich_mean_sidereal_time as jim_gmst
         from bilby_cython.time import greenwich_mean_sidereal_time
 
         tol_diff = 0
@@ -307,7 +307,7 @@ class TestFullTransform:
             azimuth = jax.random.uniform(subkeys[1], (1,), minval=0, maxval=2 * jnp.pi)
 
             jim_transform = SkyFrameToDetectorFrameSkyPositionTransform(
-                gps_time=gps_time, ifos=jim_ifos
+                trigger_time=gps_time, ifos=jim_ifos
             )
             jim_outputs, _ = jim_transform.inverse(dict(zenith=zenith, azimuth=azimuth))
             bilby_ra, bilby_dec = bilby_zenith_azimuth_to_ra_dec(
