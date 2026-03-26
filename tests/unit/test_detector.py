@@ -164,9 +164,10 @@ class TestInjectSignal:
         s1_transform = SphereSpinToCartesianSpinTransform("s1")
         s2_transform = SphereSpinToCartesianSpinTransform("s2")
 
-        # Convert reference Cartesian spins to spherical for the transform input
-        spherical_s1 = s1_transform.backward(REFERENCE_PARAMS)
-        spherical_s2 = s2_transform.backward(REFERENCE_PARAMS)
+        # Convert reference Cartesian spins to spherical — pass only the keys
+        # each transform cares about to avoid cross-contamination of s1_*/s2_* keys.
+        spherical_s1 = s1_transform.backward({k: v for k, v in REFERENCE_PARAMS.items() if k.startswith("s1_")})
+        spherical_s2 = s2_transform.backward({k: v for k, v in REFERENCE_PARAMS.items() if k.startswith("s2_")})
 
         params = {
             **{k: v for k, v in REFERENCE_PARAMS.items() if not k.startswith("s1_") and not k.startswith("s2_")},
