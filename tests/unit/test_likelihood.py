@@ -10,6 +10,12 @@ from jimgw.core.single_event.likelihood import (
 from jimgw.core.single_event.detector import get_H1, get_L1
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
 from jimgw.core.single_event.data import Data, PowerSpectrum
+from jimgw.core.single_event.transforms import (
+    GeocentricArrivalTimeToDetectorArrivalTimeTransform,
+)
+from jimgw.core.single_event.gps_times import (
+    greenwich_mean_sidereal_time as compute_gmst,
+)
 from jimgw.core.prior import PowerLawPrior, UniformPrior
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -1219,4 +1225,283 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), (
             "Phase+distance-marginalized likelihood should be finite with different f_min"
+        )
+
+
+class TestCallableFixedParameters:
+    """Tests for the callable-value support in fixed_parameters.
+
+    A value in ``fixed_parameters`` may be a callable
+    ``(params: dict) -> Float`` instead of a plain constant.  The callable
+    is invoked at each ``evaluate`` call with the *current* parameter dict
+    (before the override is applied), which allows derived quantities that
+    depend on other sampled parameters to be fixed.
+    """
+
+    def test_constant_callable_matches_constant(self, detectors_and_waveform):
+        """A callable that ignores params and returns a constant must give the
+        same result as passing the constant directly."""
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+
+        const_likelihood = TransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            fixed_parameters={"s1_z": 0.0, "s2_z": 0.0},
+        )
+        callable_likelihood = TransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            fixed_parameters={
+                "s1_z": lambda p: 0.0,
+                "s2_z": lambda p: 0.0,
+            },
+        )
+
+        params = example_params(const_likelihood.gmst)
+        # Remove the keys that are being fixed so both paths exercise the fix
+        params_without = {k: v for k, v in params.items() if k not in ("s1_z", "s2_z")}
+
+        result_const = const_likelihood.evaluate(dict(params_without), {})
+        result_callable = callable_likelihood.evaluate(dict(params_without), {})
+
+        assert jnp.allclose(result_const, result_callable), (
+            f"Constant ({result_const}) and callable ({result_callable}) fixed_parameters "
+            "should give the same result"
+        )
+
+    def test_callable_reads_sampled_params(self, detectors_and_waveform):
+        """A callable fixed parameter can compute its value from the sampled dict.
+
+        We use an identity-like callable for ``s1_z`` that reads a helper
+        key ``_s1_z_raw`` from the param dict.  The result should equal
+        evaluating with ``s1_z`` set explicitly.
+        """
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+
+        likelihood = TransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            # fix s1_z by reading a helper key from the params dict
+            fixed_parameters={"s1_z": lambda p: p["_s1_z_raw"]},
+        )
+
+        params = example_params(likelihood.gmst)
+        params["_s1_z_raw"] = 0.0  # helper value injected into the dict
+
+        # Reference: simply pass s1_z = 0.0 directly
+        ref_likelihood = TransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+        )
+        ref_params = example_params(ref_likelihood.gmst)
+
+        result = likelihood.evaluate(dict(params), {})
+        ref_result = ref_likelihood.evaluate(dict(ref_params), {})
+
+        assert jnp.isfinite(result), "Callable fixed_parameters result should be finite"
+        assert jnp.allclose(result, ref_result), (
+            f"Callable ({result}) should match constant ({ref_result})"
+        )
+
+    def test_callable_fixed_parameter_does_not_mutate_input(self, detectors_and_waveform):
+        """evaluate() must not mutate the caller's params dict.
+
+        TransientLikelihoodFD.evaluate() copies the dict internally, so
+        passing params directly should leave it unchanged.
+        """
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+
+        likelihood = TransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            fixed_parameters={"s1_z": lambda p: 0.5},
+        )
+
+        params = example_params(likelihood.gmst)
+        keys_before = set(params.keys())
+        values_before = {k: float(v) for k, v in params.items()}
+
+        # Pass the original dict directly — evaluate() must NOT mutate it
+        likelihood.evaluate(params, {})
+
+        assert set(params.keys()) == keys_before, (
+            "evaluate() must not add or remove keys from the caller's dict"
+        )
+        for k, v in values_before.items():
+            assert float(params[k]) == v, (
+                f"evaluate() must not modify params['{k}'] (was {v}, now {float(params[k])})"
+            )
+
+    def test_callable_jit_compatible(self, detectors_and_waveform):
+        """Callable fixed_parameters — including dict-returning transforms — must
+        work under jax.jit for both scalar-lambda and transform.backward forms."""
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+
+        # --- scalar-lambda form ---
+        lambda_likelihood = TransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            fixed_parameters={"s1_z": lambda p: 0.0, "s2_z": lambda p: 0.0},
+        )
+        params = example_params(lambda_likelihood.gmst)
+        result_lambda = lambda_likelihood.evaluate(dict(params), {})
+        result_lambda_jit = jax.jit(lambda_likelihood.evaluate)(dict(params), {})
+        assert jnp.isfinite(result_lambda_jit), "JIT scalar-lambda result must be finite"
+        assert jnp.allclose(result_lambda, result_lambda_jit), (
+            "JIT and eager scalar-lambda results must match"
+        )
+
+        # --- dict-returning transform form ---
+        transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+            gps_time=gps, ifo=ifos[0]
+        )
+        transform_likelihood = TransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            fixed_parameters={"t_c": transform.backward},
+        )
+        params_with_tdet = dict(example_params(transform_likelihood.gmst))
+        params_with_tdet["t_det"] = 0.0
+        result_transform = transform_likelihood.evaluate(dict(params_with_tdet), {})
+        result_transform_jit = jax.jit(transform_likelihood.evaluate)(
+            dict(params_with_tdet), {}
+        )
+        assert jnp.isfinite(result_transform_jit), "JIT transform.backward result must be finite"
+        assert jnp.allclose(result_transform, result_transform_jit), (
+            "JIT and eager transform.backward results must match"
+        )
+
+    def test_callables_evaluated_in_insertion_order_with_chaining(self, detectors_and_waveform):
+        """Later callables in fixed_parameters see values set by earlier ones.
+
+        The loop applies overrides in insertion order and mutates the working
+        copy as it goes, so the second callable can read what the first one wrote.
+        """
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+
+        seen_s1_z_in_s2_callable = []
+
+        def set_nonzero_s1_z(p):
+            return 0.5  # override to a non-default value
+
+        def read_s1_z_for_s2(p):
+            # By the time this callable runs, s1_z should already be 0.5
+            seen_s1_z_in_s2_callable.append(float(p["s1_z"]))
+            return float(p["s1_z"])  # set s2_z = s1_z (chained)
+
+        likelihood = TransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            fixed_parameters={"s1_z": set_nonzero_s1_z, "s2_z": read_s1_z_for_s2},
+        )
+
+        params = example_params(likelihood.gmst)  # s1_z=0.0, s2_z=0.0 originally
+        likelihood.evaluate(dict(params), {})
+
+        assert len(seen_s1_z_in_s2_callable) == 1, "s2_z callable must have been invoked once"
+        assert seen_s1_z_in_s2_callable[0] == 0.5, (
+            f"s2_z callable should see s1_z=0.5 (set by first callable), "
+            f"but saw {seen_s1_z_in_s2_callable[0]}"
+        )
+
+    def test_heterodyned_callable_fixed_parameter(self, detectors_and_waveform):
+        """Callable fixed_parameters must work in HeterodynedTransientLikelihoodFD."""
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        base = TransientLikelihoodFD(
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
+        )
+        ref_params = example_params(base.gmst)
+
+        likelihood = HeterodynedTransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            reference_parameters=ref_params,
+            fixed_parameters={"s1_z": lambda p: 0.0, "s2_z": lambda p: 0.0},
+        )
+
+        params = example_params(likelihood.gmst)
+        result = likelihood.evaluate(params, {})
+
+        assert jnp.isfinite(result), (
+            "Heterodyned likelihood with callable fixed_parameters should be finite"
+        )
+
+    def test_transform_forward_as_callable(self, detectors_and_waveform):
+        """transform.backward can be passed directly as a callable value.
+
+        ``GeocentricArrivalTimeToDetectorArrivalTimeTransform.backward`` maps
+        ``t_det -> t_c`` (given sampled ra, dec).  Passing it as the callable
+        for ``"t_c"`` should produce the same result as computing ``t_c``
+        explicitly via an equivalent lambda.
+        """
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+
+        transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
+            gps_time=gps, ifo=ifos[0]
+        )
+
+        gmst = compute_gmst(gps)
+        t_det_fixed = 0.0
+
+        lambda_likelihood = TransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            fixed_parameters={
+                "t_c": lambda p: t_det_fixed
+                - ifos[0].delay_from_geocenter(p["ra"], p["dec"], gmst),
+            },
+        )
+
+        # Subject: use transform.backward directly — returns a dict, key "t_c" extracted
+        transform_likelihood = TransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            fixed_parameters={"t_c": transform.backward},
+        )
+
+        # Params include t_det so the transform can invert it, plus all other required keys
+        params = example_params(lambda_likelihood.gmst)
+        params["t_det"] = t_det_fixed
+
+        result_lambda = lambda_likelihood.evaluate(dict(params), {})
+        result_transform = transform_likelihood.evaluate(dict(params), {})
+
+        assert jnp.isfinite(result_lambda), "Lambda fixed t_c result should be finite"
+        assert jnp.isfinite(result_transform), "Transform.backward fixed t_c result should be finite"
+        assert jnp.allclose(result_lambda, result_transform, atol=1e-6), (
+            f"Lambda ({result_lambda}) and transform.backward ({result_transform}) "
+            "approaches must give the same likelihood"
         )
