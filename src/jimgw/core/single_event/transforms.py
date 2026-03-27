@@ -23,7 +23,7 @@ from jimgw.core.single_event.utils import (
     cartesian_spin_to_spin_angles,
     carte_to_spherical_angles,
 )
-from jimgw.core.single_event.gps_times import (
+from jimgw.core.single_event.time_utils import (
     greenwich_mean_sidereal_time as compute_gmst,
 )
 
@@ -241,13 +241,13 @@ class SkyFrameToDetectorFrameSkyPositionTransform(BijectiveTransform):
 
     def __init__(
         self,
-        gps_time: Float,
+        trigger_time: Float,
         ifos: Sequence[GroundBased2G],
     ):
         name_mapping = (["ra", "dec"], ["zenith", "azimuth"])
         super().__init__(name_mapping)
 
-        self.gmst = compute_gmst(gps_time)
+        self.gmst = compute_gmst(trigger_time)
         delta_x = ifos[0].vertex - ifos[1].vertex
         self.rotation = euler_rotation(delta_x)
         self.rotation_inv = jnp.linalg.inv(self.rotation)
@@ -277,10 +277,10 @@ class GeocentricArrivalTimeToDetectorArrivalTimeTransform(
     Transform the geocentric arrival time to detector arrival time.
 
     In the geocentric convention, the arrival time of the signal at the
-    center of Earth is gps_time + t_c.
+    center of Earth is trigger_time + t_c.
 
     In the detector convention, the arrival time of the signal at the
-    detector is gps_time + time_delay_from_geo_to_det + t_det.
+    detector is trigger_time + time_delay_from_geo_to_det + t_det.
     """
 
     gmst: Float
@@ -291,14 +291,14 @@ class GeocentricArrivalTimeToDetectorArrivalTimeTransform(
 
     def __init__(
         self,
-        gps_time: Float,
+        trigger_time: Float,
         ifo: GroundBased2G,
     ):
         name_mapping = (["t_c"], ["t_det"])
         conditional_names = ["ra", "dec"]
         super().__init__(name_mapping, conditional_names)
 
-        self.gmst = compute_gmst(gps_time)
+        self.gmst = compute_gmst(trigger_time)
         self.ifo = ifo
 
         assert "t_c" in name_mapping[0] and "t_det" in name_mapping[1]
@@ -352,14 +352,14 @@ class GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
 
     def __init__(
         self,
-        gps_time: Float,
+        trigger_time: Float,
         ifo: GroundBased2G,
     ):
         name_mapping = (["phase_c"], ["phase_det"])
         conditional_names = ["ra", "dec", "psi", "iota"]
         super().__init__(name_mapping, conditional_names)
 
-        self.gmst = compute_gmst(gps_time)
+        self.gmst = compute_gmst(trigger_time)
         self.ifo = ifo
 
         assert "phase_c" in name_mapping[0] and "phase_det" in name_mapping[1]
@@ -417,14 +417,14 @@ class DistanceToSNRWeightedDistanceTransform(ConditionalBijectiveTransform):
 
     def __init__(
         self,
-        gps_time: Float,
+        trigger_time: Float,
         ifos: Sequence[GroundBased2G],
     ):
         name_mapping = (["d_L"], ["d_hat"])
         conditional_names = ["M_c", "ra", "dec", "psi", "iota"]
         super().__init__(name_mapping, conditional_names)
 
-        self.gmst = compute_gmst(gps_time)
+        self.gmst = compute_gmst(trigger_time)
         self.ifos = ifos
 
         assert "d_L" in name_mapping[0] and "d_hat" in name_mapping[1]

@@ -24,10 +24,6 @@ from jimgw.core.single_event.transforms import (
     GeocentricArrivalTimeToDetectorArrivalTimeTransform,
     GeocentricArrivalPhaseToDetectorArrivalPhaseTransform,
 )
-from jimgw.core.single_event.gps_times import (
-    greenwich_mean_sidereal_time as compute_gmst,
-)
-
 jax.config.update("jax_enable_x64", True)
 
 #################################################
@@ -49,9 +45,9 @@ rng_key = jax.random.key(int(total_time_start))
 rng_key, *sub_key = jax.random.split(rng_key, 2)
 
 gps_time = total_time_start - 1000
-gmst = compute_gmst(gps_time)
 random_samples = jax.random.uniform(sub_key[0], 3, maxval=jnp.pi)
 
+# Injection parameters in likelihood space.
 injection_parameters = {
     "M_c": 30.0,
     "eta": 0.21,
@@ -69,23 +65,10 @@ injection_parameters = {
     "phase_c": jnp.pi - 0.3,
     "t_c": 0.1,
 }
-injection_parameters["gmst"] = compute_gmst(gps_time)
-
-_inj_params = injection_parameters.copy()
-q_eta_transform = MassRatioToSymmetricMassRatioTransform
-s1_transform = SphereSpinToCartesianSpinTransform("s1")
-s2_transform = SphereSpinToCartesianSpinTransform("s2")
-_inj_params = q_eta_transform.backward(_inj_params)
-_inj_params = s1_transform.backward(_inj_params)
-_inj_params = s2_transform.backward(_inj_params)
-injection_parameters.update(_inj_params)
 
 print("The injection parameters are")
 for key, value in injection_parameters.items():
     print(f"-- {key + ':':10} {float(value):> 13.6f}")
-injection_parameters = {
-    key: jnp.array(value) for key, value in injection_parameters.items()
-}
 
 f_min = 30.0
 f_max = 1024.0
@@ -95,16 +78,22 @@ sampling_frequency = f_max * 2
 # initialize waveform
 PhenomPv2 = RippleIMRPhenomPv2(f_ref=20)
 
+likelihood_transforms = [
+    MassRatioToSymmetricMassRatioTransform,
+    SphereSpinToCartesianSpinTransform("s1"),
+    SphereSpinToCartesianSpinTransform("s2"),
+]
+
 ifos = [get_H1(), get_L1()]
 for ifo in ifos:
     ifo.load_and_set_psd()
     ifo.frequency_bounds = (f_min, f_max)
     ifo.inject_signal(
-        duration,
-        sampling_frequency,
-        0.0,
-        PhenomPv2,
-        injection_parameters,
+        duration=duration,
+        sampling_frequency=sampling_frequency,
+        trigger_time=gps_time,
+        waveform_model=PhenomPv2,
+        parameters=injection_parameters,
         is_zero_noise=False,
     )
 
@@ -133,18 +122,12 @@ prior = CombinePrior(prior)
 
 # Defining Transforms
 sample_transforms = [
-    DistanceToSNRWeightedDistanceTransform(gps_time=gps_time, ifos=ifos),
+    DistanceToSNRWeightedDistanceTransform(trigger_time=gps_time, ifos=ifos),
     GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
-        gps_time=gps_time, ifo=ifos[0]
+        trigger_time=gps_time, ifo=ifos[0]
     ),
-    SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps_time, ifos=ifos),
-    GeocentricArrivalTimeToDetectorArrivalTimeTransform(gps_time=gps_time, ifo=ifos[0]),
-]
-
-likelihood_transforms = [
-    MassRatioToSymmetricMassRatioTransform,
-    SphereSpinToCartesianSpinTransform("s1"),
-    SphereSpinToCartesianSpinTransform("s2"),
+    SkyFrameToDetectorFrameSkyPositionTransform(trigger_time=gps_time, ifos=ifos),
+    GeocentricArrivalTimeToDetectorArrivalTimeTransform(trigger_time=gps_time, ifo=ifos[0]),
 ]
 
 

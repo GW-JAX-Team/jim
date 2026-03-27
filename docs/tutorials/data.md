@@ -43,7 +43,7 @@ H1.set_data(data)
 
 ### Load from File
 
-Use `Data.from_file()` to read a locally saved `.npz` file. The file must contain the keys `td` (time-domain strain), `dt` (time step in seconds), and `epoch` (GPS start time):
+Use `Data.from_file()` to read a locally saved `.npz` file. The file must contain the keys `td` (time-domain strain), `dt` (time step in seconds), and `start_time` (GPS start time):
 
 ```python
 data = Data.from_file("path/to/data.npz")
@@ -63,7 +63,7 @@ n = int(duration * sampling_frequency)
 frequencies = jnp.fft.rfftfreq(n, 1.0 / sampling_frequency)
 
 fd_strain = jnp.zeros(len(frequencies), dtype=jnp.complex128)  # replace with your data
-data = Data.from_fd(fd_strain, frequencies, epoch=0.0)
+data = Data.from_fd(fd_strain, frequencies, start_time=0.0)
 H1.set_data(data)
 ```
 
@@ -118,14 +118,11 @@ H1.set_psd(PowerSpectrum.from_file("path/to/psd.npz"))
 
 ## Injecting a Simulated Signal
 
-For testing and validation, you can inject a waveform directly into a detector. Set the PSD and frequency bounds first:
+For testing and validation, you can inject a waveform directly into a detector. Set the PSD and frequency bounds first, then call `inject_signal`.
 
 ```python
 import jax
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
-from jimgw.core.single_event.gps_times import (
-    greenwich_mean_sidereal_time as compute_gmst,
-)
 
 gps_time = 1126259462.0
 
@@ -139,14 +136,12 @@ injection_params = {
     "d_L": 440.0, "t_c": 0.0,
     "phase_c": 0.0, "iota": 0.0,
     "psi": 0.3, "ra": 1.5, "dec": 0.5,
-    "trigger_time": gps_time,
-    "gmst": compute_gmst(gps_time),
 }
 
 H1.inject_signal(
     duration=4.0,
     sampling_frequency=2048.0,
-    epoch=0.0,
+    trigger_time=gps_time,
     waveform_model=waveform,
     parameters=injection_params,
     rng_key=jax.random.key(0),

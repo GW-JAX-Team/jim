@@ -16,7 +16,7 @@ from jimgw.core.single_event.utils import (
     complex_inner_product,
     apply_fixed_parameters,
 )
-from jimgw.core.single_event.gps_times import (
+from jimgw.core.single_event.time_utils import (
     greenwich_mean_sidereal_time as compute_gmst,
 )
 import logging

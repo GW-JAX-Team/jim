@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 from itertools import combinations
 
-from tests.utils import check_bilby_available
+from tests.utils import assert_all_finite, check_bilby_available
 
 # Check if bilby is available before running tests
 try:
@@ -106,7 +106,7 @@ class TestSkyFrameToDetectorFrameHighLevel:
                 bilby_dec = jnp.array(bilby_dec)
 
                 transform = SkyFrameToDetectorFrameSkyPositionTransform(
-                    gps_time=gps_time,
+                    trigger_time=gps_time,
                     ifos=list(ifo_pair),
                 )
 
@@ -120,7 +120,7 @@ class TestSkyFrameToDetectorFrameHighLevel:
                 assert jnp.allclose(jim_ra_dec["dec"], bilby_dec), (
                     f"Jim and bilby dec disagree for {ifo_names} at gps={gps_time}"
                 )
-                assert not jnp.isnan(inv_jacobian).any(), "Inverse Jacobian contains NaN"
+                assert_all_finite(inv_jacobian)
 
                 # Step 4: Jim forward (ra/dec → zenith/azimuth) recovers original
                 jim_zenith_azimuth, fwd_jacobian = jax.vmap(transform.transform)(
@@ -132,7 +132,7 @@ class TestSkyFrameToDetectorFrameHighLevel:
                 assert jnp.allclose(jim_zenith_azimuth["azimuth"], jnp.array(azimuth)), (
                     f"Jim forward azimuth round-trip failed for {ifo_names} at gps={gps_time}"
                 )
-                assert not jnp.isnan(fwd_jacobian).any(), "Forward Jacobian contains NaN"
+                assert_all_finite(fwd_jacobian)
 
 
 class TestThetaPhiToRaDec:
@@ -257,7 +257,7 @@ class TestGMST:
 
     def test_gmst(self):
         """Compare Jim's GMST with bilby_cython's implementation."""
-        from jimgw.core.single_event.gps_times import greenwich_mean_sidereal_time as jim_gmst
+        from jimgw.core.single_event.time_utils import greenwich_mean_sidereal_time as jim_gmst
         from bilby_cython.time import greenwich_mean_sidereal_time
 
         tol_diff = 0
@@ -307,9 +307,9 @@ class TestFullTransform:
             azimuth = jax.random.uniform(subkeys[1], (1,), minval=0, maxval=2 * jnp.pi)
 
             jim_transform = SkyFrameToDetectorFrameSkyPositionTransform(
-                gps_time=gps_time, ifos=jim_ifos
+                trigger_time=gps_time, ifos=jim_ifos
             )
-            jim_outputs, _ = jim_transform.inverse(dict(zenith=zenith, azimuth=azimuth))
+            jim_outputs = jim_transform.backward(dict(zenith=zenith, azimuth=azimuth))
             bilby_ra, bilby_dec = bilby_zenith_azimuth_to_ra_dec(
                 zenith[0], azimuth[0], gps_time, bilby_ifos
             )

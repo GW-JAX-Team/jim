@@ -57,7 +57,7 @@ from jimgw.core.single_event.transforms import SkyFrameToDetectorFrameSkyPositio
 
 # Sampler explores (zenith, azimuth) in detector frame instead of (ra, dec)
 sample_transforms = [
-    SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps_time, ifos=ifos),
+    SkyFrameToDetectorFrameSkyPositionTransform(trigger_time=gps_time, ifos=ifos),
 ]
 ```
 
@@ -87,9 +87,9 @@ All transforms are importable from `jimgw.core.single_event.transforms`.
 
 | Transform | Mapping | Notes |
 | --- | --- | --- |
-| `SkyFrameToDetectorFrameSkyPositionTransform(gps_time, ifos)` | `(ra, dec) → (zenith, azimuth)` | Reduces ra/dec correlation for detector networks |
-| `GeocentricArrivalTimeToDetectorArrivalTimeTransform(gps_time, ifo)` | `t_c → t_det` | Conditional on ra, dec |
-| `GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(gps_time, ifo)` | `phase_c → phase_det` | Conditional on ra, dec, psi, iota |
+| `SkyFrameToDetectorFrameSkyPositionTransform(trigger_time, ifos)` | `(ra, dec) → (zenith, azimuth)` | Reduces ra/dec correlation for detector networks |
+| `GeocentricArrivalTimeToDetectorArrivalTimeTransform(trigger_time, ifo)` | `t_c → t_det` | Conditional on ra, dec |
+| `GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(trigger_time, ifo)` | `phase_c → phase_det` | Conditional on ra, dec, psi, iota |
 | `DistanceToSNRWeightedDistanceTransform` | `d_L → d_hat` | SNR-weighted distance parameterisation |
 
 ## Passing Transforms to Jim
