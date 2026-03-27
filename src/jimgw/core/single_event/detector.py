@@ -616,6 +616,10 @@ class GroundBased2G(Detector):
         # Derive start_time if not provided
         if start_time is None:
             start_time = trigger_time - duration + 2.0
+            logger.info(
+                "start_time not provided. Defaulting to trigger_time - duration + 2.0 = %.3f s.",
+                start_time,
+            )
 
         # Make a copy of the parameters to avoid modifying the original dictionary
         params = parameters.copy()
