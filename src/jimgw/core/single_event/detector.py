@@ -57,9 +57,9 @@ class Detector(ABC):
     _sliced_psd: Float[Array, " n_sample"] = jnp.array([])
 
     @property
-    def segment_start_time(self) -> Float:
+    def start_time(self) -> Float:
         """GPS start time of the data segment."""
-        return self.data.segment_start_time
+        return self.data.start_time
 
     @property
     def times(self) -> Float[Array, " n_sample"]:
@@ -405,7 +405,7 @@ class GroundBased2G(Detector):
         ra, dec, psi, gmst = params["ra"], params["dec"], params["psi"], params["gmst"]
         antenna_pattern = self.antenna_pattern(ra, dec, psi, gmst)
         time_shift = self.delay_from_geocenter(ra, dec, gmst)
-        time_shift += params["trigger_time"] - self.segment_start_time + params["t_c"]
+        time_shift += params["trigger_time"] - self.start_time + params["t_c"]
 
         h_detector = jax.tree_util.tree_map(
             lambda h, antenna: h * antenna,
@@ -591,7 +591,7 @@ class GroundBased2G(Detector):
         parameters: dict[str, float],
         sample_transforms: Sequence = [],
         likelihood_transforms: Sequence = [],
-        segment_start_time: Optional[float] = None,
+        start_time: Optional[float] = None,
         is_zero_noise: bool = False,
         rng_key: Optional[Key] = None,
     ) -> None:
@@ -615,7 +615,7 @@ class GroundBased2G(Detector):
             likelihood_transforms (Sequence, optional): Likelihood transforms
                 (same list passed to Jim). Applied forward using ``.forward()``
                 to map from prior space to likelihood space. Defaults to [].
-            segment_start_time (Optional[float], optional): GPS start time of the
+            start_time (Optional[float], optional): GPS start time of the
                 data buffer in seconds. If None, defaults to
                 ``trigger_time - duration + 2.0`` (2 s of data after the trigger).
                 Defaults to None.
@@ -623,9 +623,9 @@ class GroundBased2G(Detector):
         Returns:
             None
         """
-        # Derive segment_start_time if not provided
-        if segment_start_time is None:
-            segment_start_time = trigger_time - duration + 2.0
+        # Derive start_time if not provided
+        if start_time is None:
+            start_time = trigger_time - duration + 2.0
 
         # Make a copy of the parameters to avoid modifying the original dictionary
         params = parameters.copy()
@@ -650,7 +650,7 @@ class GroundBased2G(Detector):
                 name=f"{self.name}_empty",
                 td=jnp.zeros(n_times),
                 delta_t=1 / sampling_frequency,
-                segment_start_time=segment_start_time,
+                start_time=start_time,
             )
         )
 
@@ -678,7 +678,7 @@ class GroundBased2G(Detector):
                 name=f"{self.name}_injected",
                 fd_strain=strain_data,
                 frequencies=self.frequencies,
-                segment_start_time=self.data.segment_start_time,
+                start_time=self.data.start_time,
             )
         )
 

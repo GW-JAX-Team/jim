@@ -160,7 +160,7 @@ def build_bilby_ifo_from_jim(jim_ifo, f_min: float, f_max: float):
     frequencies_full = np.array(jim_ifo.data.frequencies, dtype=float)
     duration = float(jim_ifo.data.duration)
     sampling_frequency = float(jim_ifo.data.sampling_frequency)
-    segment_start_time = float(jim_ifo.data.segment_start_time)
+    start_time = float(jim_ifo.data.start_time)
 
     # Zero out contributions outside [f_min, f_max].  Bilby's time-marginalization
     # FFT runs over the *full* one-sided frequency array without a frequency mask,
@@ -179,7 +179,7 @@ def build_bilby_ifo_from_jim(jim_ifo, f_min: float, f_max: float):
         frequency_domain_strain=fd_strain_full,
         sampling_frequency=sampling_frequency,
         duration=duration,
-        start_time=segment_start_time,
+        start_time=start_time,
     )
     bilby_ifo.power_spectral_density = (
         bilby.gw.detector.PowerSpectralDensity.from_power_spectral_density_array(
@@ -420,11 +420,11 @@ class TestTimeMarginalizedLikelihood:
     """TransientLikelihoodFD(marginalize_time=True) vs GravitationalWaveTransient(time_marginalization=True).
 
     To get exact normalisation agreement we make both sides integrate over the
-    **full segment** [segment_start_time, segment_start_time+duration]:
+    **full segment** [start_time, start_time+duration]:
 
     * Jim uses ``tc_range = (-duration/2 - margin, duration/2 + margin)`` so
       that every FFT bin is in range and the denominator is ``-log(N_fft)``.
-    * Bilby gets a ``Uniform(segment_start_time, segment_start_time+duration)`` prior, which gives the
+    * Bilby gets a ``Uniform(start_time, start_time+duration)`` prior, which gives the
       same weight ``log(dt / duration) = -log(N_fft)`` per bin.
 
     Out-of-band FD strain is zeroed in ``build_bilby_ifo_from_jim`` so that
@@ -435,7 +435,7 @@ class TestTimeMarginalizedLikelihood:
         from jimgw.core.single_event.likelihood import TransientLikelihoodFD
 
         duration = float(setup["jim_ifos"][0].data.duration)
-        segment_start_time = float(setup["jim_ifos"][0].data.segment_start_time)
+        start_time = float(setup["jim_ifos"][0].data.start_time)
         # Cover the full FFT window so jim's denominator is -log(N_fft), matching
         # bilby's log(dt/duration) = -log(N_fft) normalisation.
         tc_range = (-duration / 2 - 0.1, duration / 2 + 0.1)
@@ -452,8 +452,8 @@ class TestTimeMarginalizedLikelihood:
 
         priors = bilby.core.prior.PriorDict()
         priors["geocent_time"] = bilby.core.prior.Uniform(
-            minimum=segment_start_time,
-            maximum=segment_start_time + duration,
+            minimum=start_time,
+            maximum=start_time + duration,
             name="geocent_time",
         )
 
@@ -624,7 +624,7 @@ class TestPhaseTimeMarginalizedLikelihood:
         jim_params_ph0 = bilby_to_jim_params(bilby_params_ph0)
 
         duration = float(setup["jim_ifos"][0].data.duration)
-        segment_start_time = float(setup["jim_ifos"][0].data.segment_start_time)
+        start_time = float(setup["jim_ifos"][0].data.start_time)
         tc_range = (-duration / 2 - 0.1, duration / 2 + 0.1)
 
         jim_ll = TransientLikelihoodFD(
@@ -640,8 +640,8 @@ class TestPhaseTimeMarginalizedLikelihood:
 
         priors = bilby.core.prior.PriorDict()
         priors["geocent_time"] = bilby.core.prior.Uniform(
-            minimum=segment_start_time,
-            maximum=segment_start_time + duration,
+            minimum=start_time,
+            maximum=start_time + duration,
             name="geocent_time",
         )
         priors["phase"] = bilby.core.prior.Uniform(

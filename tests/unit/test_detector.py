@@ -84,7 +84,7 @@ class TestInjectSignal:
 
         assert det.data is not None
         assert len(det.data.td) == int(DURATION * SAMPLING_FREQUENCY)
-        assert det.data.segment_start_time == GPS_TIME - DURATION + 2.0
+        assert det.data.start_time == GPS_TIME - DURATION + 2.0
 
     def test_zero_noise_signal_nonzero_in_band(self):
         """Injected signal is non-zero inside the frequency band."""

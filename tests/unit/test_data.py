@@ -14,18 +14,18 @@ class TestData:
     def setup_method(self):
         self.f_samp = 2048
         self.duration = 4
-        self.segment_start_time = 2.0
+        self.start_time = 2.0
         self.name = "Dummy"
         delta_t = 1 / self.f_samp
         n_time = int(self.duration / delta_t)
         self.data = Data(
-            td=jnp.ones(n_time), delta_t=delta_t, name=self.name, segment_start_time=self.segment_start_time
+            td=jnp.ones(n_time), delta_t=delta_t, name=self.name, start_time=self.start_time
         )
 
     def test_basic_attributes(self):
         """Basic attributes are set correctly on construction."""
         assert self.data.name == "Dummy"
-        assert self.data.segment_start_time == self.segment_start_time
+        assert self.data.start_time == self.start_time
         assert self.data.duration == self.duration
         assert self.data.delta_t == 1 / self.f_samp
         assert len(self.data.td) == int(self.f_samp * self.duration)
@@ -85,7 +85,7 @@ class TestPowerSpectrum:
         delta_t = 1 / self.f_samp
         n_time = int(self.duration / delta_t)
         self.data = Data(
-            td=jnp.ones(n_time), delta_t=delta_t, name=self.name, segment_start_time=0.0
+            td=jnp.ones(n_time), delta_t=delta_t, name=self.name, start_time=0.0
         )
 
         delta_f = 1 / self.duration

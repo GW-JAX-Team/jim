@@ -43,7 +43,7 @@ H1.set_data(data)
 
 ### Load from File
 
-Use `Data.from_file()` to read a locally saved `.npz` file. The file must contain the keys `td` (time-domain strain), `dt` (time step in seconds), and `segment_start_time` (GPS start time):
+Use `Data.from_file()` to read a locally saved `.npz` file. The file must contain the keys `td` (time-domain strain), `dt` (time step in seconds), and `start_time` (GPS start time):
 
 ```python
 data = Data.from_file("path/to/data.npz")
@@ -63,7 +63,7 @@ n = int(duration * sampling_frequency)
 frequencies = jnp.fft.rfftfreq(n, 1.0 / sampling_frequency)
 
 fd_strain = jnp.zeros(len(frequencies), dtype=jnp.complex128)  # replace with your data
-data = Data.from_fd(fd_strain, frequencies, segment_start_time=0.0)
+data = Data.from_fd(fd_strain, frequencies, start_time=0.0)
 H1.set_data(data)
 ```
 
