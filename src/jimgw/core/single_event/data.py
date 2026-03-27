@@ -323,9 +323,7 @@ class Data(ABC):
             "Generated frequencies do not match the input frequencies"
         )
         # Create a Data object
-        data = cls(
-            data_td_full, delta_t, start_time=start_time, name=name
-        )
+        data = cls(data_td_full, delta_t, start_time=start_time, name=name)
         data.fd = data_fd_full
 
         # Ensures the newly constructed Data in FD faithfully
