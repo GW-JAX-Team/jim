@@ -47,18 +47,16 @@ rng_key, *sub_key = jax.random.split(rng_key, 2)
 gps_time = total_time_start - 1000
 random_samples = jax.random.uniform(sub_key[0], 3, maxval=jnp.pi)
 
-# Injection parameters in prior space (q, spherical spins).
-# inject_signal will apply likelihood_transforms to convert to likelihood space,
-# so there is no need to manually expand eta, Cartesian spins, or compute gmst.
+# Injection parameters in likelihood space.
 injection_parameters = {
     "M_c": 30.0,
-    "q": 0.83,
-    "s1_mag": jnp.sqrt(0.1**2 + 0.1**2 + 0.3**2),
-    "s1_theta": jnp.arccos(0.3 / jnp.sqrt(0.1**2 + 0.1**2 + 0.3**2)),
-    "s1_phi": jnp.arctan2(-0.1, 0.1) % (2 * jnp.pi),
-    "s2_mag": jnp.sqrt(0.2**2 + 0.1**2 + 0.2**2),
-    "s2_theta": jnp.arccos(-0.2 / jnp.sqrt(0.2**2 + 0.1**2 + 0.2**2)),
-    "s2_phi": jnp.arctan2(-0.1, 0.2) % (2 * jnp.pi),
+    "eta": 0.21,
+    "s1_x": 0.1,
+    "s1_y": -0.1,
+    "s1_z": 0.3,
+    "s2_x": 0.2,
+    "s2_y": -0.1,
+    "s2_z": -0.2,
     "ra": random_samples[0] * 2.0,
     "dec": random_samples[1] - jnp.pi / 2,
     "psi": random_samples[2] - jnp.pi / 2,
@@ -96,7 +94,6 @@ for ifo in ifos:
         trigger_time=gps_time,
         waveform_model=PhenomPv2,
         parameters=injection_parameters,
-        likelihood_transforms=likelihood_transforms,
         is_zero_noise=False,
     )
 

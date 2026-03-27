@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence
+from typing import Optional
 import logging
 import time
 
@@ -589,8 +589,6 @@ class GroundBased2G(Detector):
         trigger_time: float,
         waveform_model,
         parameters: dict[str, float],
-        sample_transforms: Sequence = [],
-        likelihood_transforms: Sequence = [],
         start_time: Optional[float] = None,
         is_zero_noise: bool = False,
         rng_key: Optional[Key] = None,
@@ -606,15 +604,7 @@ class GroundBased2G(Detector):
                 ``trigger_time`` and derive ``gmst`` for the waveform projection,
                 mirroring the behaviour of ``TransientLikelihoodFD``.
             waveform_model: The waveform model to be injected.
-            parameters (dict): Dictionary of source parameters. Can be provided
-                in any parameter space; use ``sample_transforms`` and
-                ``likelihood_transforms`` to convert to likelihood space.
-            sample_transforms (Sequence, optional): Bijective sample transforms
-                (same list passed to Jim). Applied in reverse using ``.backward()``
-                to map from sampling space to prior space. Defaults to [].
-            likelihood_transforms (Sequence, optional): Likelihood transforms
-                (same list passed to Jim). Applied forward using ``.forward()``
-                to map from prior space to likelihood space. Defaults to [].
+            parameters (dict): Dictionary of likelihood-space source parameters.
             start_time (Optional[float], optional): GPS start time of the
                 data buffer in seconds. If None, defaults to
                 ``trigger_time - duration + 2.0`` (2 s of data after the trigger).
@@ -629,14 +619,6 @@ class GroundBased2G(Detector):
 
         # Make a copy of the parameters to avoid modifying the original dictionary
         params = parameters.copy()
-
-        # Apply sample transforms in reverse (sampling space -> prior space)
-        for transform in reversed(sample_transforms):
-            params = transform.backward(params)
-
-        # Apply likelihood transforms (prior space -> likelihood space)
-        for transform in likelihood_transforms:
-            params = transform.forward(params)
 
         # Stamp trigger_time and gmst — mirrors TransientLikelihoodFD.evaluate()
         params["trigger_time"] = float(trigger_time)

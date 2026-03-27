@@ -7,10 +7,6 @@ from pathlib import Path
 from jimgw.core.single_event.data import PowerSpectrum
 from jimgw.core.single_event.detector import get_H1
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
-from jimgw.core.single_event.transforms import (
-    MassRatioToSymmetricMassRatioTransform,
-    SphereSpinToCartesianSpinTransform,
-)
 from tests.utils import assert_all_in_range
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -122,107 +118,6 @@ class TestInjectSignal:
             det_noisy.sliced_fd_data,
             rtol=1e-05,
             atol=1e-23,
-        )
-
-    # ------------------------------------------------------------------
-    # likelihood_transforms
-    # ------------------------------------------------------------------
-
-    def test_likelihood_transforms_q_to_eta(self):
-        """likelihood_transforms=[MassRatioToSymmetricMassRatioTransform] converts
-        q -> eta, producing the same injection as passing eta directly."""
-        det_reference = make_detector()
-        inject_reference(det_reference)
-
-        q_params = MassRatioToSymmetricMassRatioTransform.backward(
-            {"eta": jnp.array(REFERENCE_PARAMS["eta"])}
-        )
-        params = {k: v for k, v in REFERENCE_PARAMS.items() if k != "eta"}
-        params["q"] = q_params["q"]
-
-        det = make_detector()
-        det.inject_signal(
-            duration=DURATION,
-            sampling_frequency=SAMPLING_FREQUENCY,
-            trigger_time=GPS_TIME,
-            waveform_model=RippleIMRPhenomD(f_ref=20.0),
-            parameters=params,
-            likelihood_transforms=[MassRatioToSymmetricMassRatioTransform],
-            is_zero_noise=True,
-        )
-
-        assert jnp.allclose(
-            det.sliced_fd_data, det_reference.sliced_fd_data, rtol=1e-6, atol=1e-30
-        )
-
-    def test_likelihood_transforms_spin_cartesian(self):
-        """likelihood_transforms with SphereSpinToCartesianSpinTransform converts
-        spherical spins to Cartesian, producing the same injection."""
-        det_reference = make_detector()
-        inject_reference(det_reference)
-
-        s1_transform = SphereSpinToCartesianSpinTransform("s1")
-        s2_transform = SphereSpinToCartesianSpinTransform("s2")
-
-        # Convert reference Cartesian spins to spherical — pass only the keys
-        # each transform cares about to avoid cross-contamination of s1_*/s2_* keys.
-        spherical_s1 = s1_transform.backward({k: v for k, v in REFERENCE_PARAMS.items() if k.startswith("s1_")})
-        spherical_s2 = s2_transform.backward({k: v for k, v in REFERENCE_PARAMS.items() if k.startswith("s2_")})
-
-        params = {
-            **{k: v for k, v in REFERENCE_PARAMS.items() if not k.startswith("s1_") and not k.startswith("s2_")},
-            **spherical_s1,
-            **spherical_s2,
-        }
-
-        det = make_detector()
-        det.inject_signal(
-            duration=DURATION,
-            sampling_frequency=SAMPLING_FREQUENCY,
-            trigger_time=GPS_TIME,
-            waveform_model=RippleIMRPhenomD(f_ref=20.0),
-            parameters=params,
-            likelihood_transforms=[s1_transform, s2_transform],
-            is_zero_noise=True,
-        )
-
-        assert jnp.allclose(
-            det.sliced_fd_data, det_reference.sliced_fd_data, rtol=1e-6, atol=1e-30
-        )
-
-    # ------------------------------------------------------------------
-    # sample_transforms
-    # ------------------------------------------------------------------
-
-    def test_sample_transforms_inverse_applied(self):
-        """sample_transforms + likelihood_transforms round-trip through sampling
-        space back to likelihood space, recovering the reference injection.
-
-        Setup: sampler works in eta-space (output of q->eta).  We pass eta in
-        params; backward() maps it to q; likelihood_transform maps q->eta.
-        """
-        det_reference = make_detector()
-        inject_reference(det_reference)
-
-        q_eta = MassRatioToSymmetricMassRatioTransform
-
-        sampling_params = dict(REFERENCE_PARAMS)
-        sampling_params["eta"] = jnp.array(REFERENCE_PARAMS["eta"])
-
-        det = make_detector()
-        det.inject_signal(
-            duration=DURATION,
-            sampling_frequency=SAMPLING_FREQUENCY,
-            trigger_time=GPS_TIME,
-            waveform_model=RippleIMRPhenomD(f_ref=20.0),
-            parameters=sampling_params,
-            sample_transforms=[q_eta],      # backward: eta (sampling) -> q (prior)
-            likelihood_transforms=[q_eta],  # forward:  q (prior) -> eta (likelihood)
-            is_zero_noise=True,
-        )
-
-        assert jnp.allclose(
-            det.sliced_fd_data, det_reference.sliced_fd_data, rtol=1e-6, atol=1e-30
         )
 
 
