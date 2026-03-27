@@ -120,8 +120,6 @@ H1.set_psd(PowerSpectrum.from_file("path/to/psd.npz"))
 
 For testing and validation, you can inject a waveform directly into a detector. Set the PSD and frequency bounds first, then call `inject_signal`.
 
-### Basic injection
-
 ```python
 import jax
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
