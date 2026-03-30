@@ -1,8 +1,11 @@
 import time
+from pathlib import Path
 
+# Plotting requires the visualize extra: pip install jimgw[visualize]
+import corner
+import numpy as np
 import jax
 import jax.numpy as jnp
-import optax
 
 from jimgw.core.jim import Jim
 from jimgw.core.prior import (
@@ -25,33 +28,25 @@ from jimgw.core.single_event.transforms import (
     GeocentricArrivalTimeToDetectorArrivalTimeTransform,
     GeocentricArrivalPhaseToDetectorArrivalPhaseTransform,
 )
-from flowMC.strategy.optimization import optimization_Adam
 
 jax.config.update("jax_enable_x64", True)
 
-###########################################
-########## First we grab data #############
-###########################################
+# --- Fetch data ---
 
-total_time_start = time.time()
-
-# first, fetch a 128s segment centered on GW170817
-# for the analysis
+# fetch a 128s segment centered on GW170817
 gps = 1187008882.43
 duration = 128.0
 # Request a segment with 2.0 s post-merger
 start = gps + 2.0 - duration
 end = start + duration
 
-# fetch 8192s of data to estimate the PSD (to be
-# careful we should avoid the on-source segment,
-# but we don't do this in this example)
-psd_start = gps - 4096
-psd_end = gps + 4096
+# fetch 4096s of data to estimate the PSD
+psd_start = start - 8192
+psd_end = start
 
-fmin = minimum_frequency = 20
-fmax = maximum_frequency = 2048
-f_ref = fmin
+# set the frequency range for the analysis
+fmin = 20.0
+fmax = 2048.0
 
 # initialize detectors
 ifos = [get_H1(), get_L1(), get_V1()]
@@ -67,16 +62,12 @@ for ifo in ifos:
     psd_fftlength = strain_data.duration * strain_data.sampling_frequency
     ifo.set_psd(psd_data.to_psd(nperseg=psd_fftlength))
 
-###########################################
-########## Set up waveform ################
-###########################################
+# --- Waveform model ---
 
 # initialize waveform
 waveform = RippleIMRPhenomPv2(f_ref=20)
 
-###########################################
-########## Set up priors ##################
-###########################################
+# --- Define the prior ---
 
 prior = []
 
@@ -118,13 +109,13 @@ prior = prior + [
 
 prior = CombinePrior(prior)
 
-# Defining Transforms
+# --- Define transforms ---
 
 sample_transforms = [
-    DistanceToSNRWeightedDistanceTransform(gps_time=gps, ifos=ifos),
-    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(gps_time=gps, ifo=ifos[0]),
-    GeocentricArrivalTimeToDetectorArrivalTimeTransform(gps_time=gps, ifo=ifos[0]),
-    SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps, ifos=ifos),
+    DistanceToSNRWeightedDistanceTransform(trigger_time=gps, ifos=ifos),
+    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(trigger_time=gps, ifo=ifos[0]),
+    GeocentricArrivalTimeToDetectorArrivalTimeTransform(trigger_time=gps, ifo=ifos[0]),
+    SkyFrameToDetectorFrameSkyPositionTransform(trigger_time=gps, ifos=ifos),
 ]
 
 likelihood_transforms = [
@@ -133,6 +124,7 @@ likelihood_transforms = [
     SphereSpinToCartesianSpinTransform("s2"),
 ]
 
+# --- Build the likelihood ---
 
 likelihood = HeterodynedTransientLikelihoodFD(
     ifos,
@@ -140,50 +132,68 @@ likelihood = HeterodynedTransientLikelihoodFD(
     n_bins=1000,
     trigger_time=gps,
     prior=prior,
-    sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    popsize=10,
-    n_steps=50,
 )
 
-#### The rest of this script is not guaranteed to work ####
+# # --- Sample with Jim ---
 
-Adam_optimizer = optimization_Adam(n_steps=3000, learning_rate=0.01, noise_level=1)
+# jim = Jim(
+#     likelihood,
+#     prior,
+#     sample_transforms=sample_transforms,
+#     likelihood_transforms=likelihood_transforms,
+#     n_chains=1000,
+#     n_local_steps=100,
+#     n_global_steps=1000,
+#     n_training_loops=20,
+#     n_production_loops=10,
+#     n_epochs=20,
+#     mala_step_size=1e-2,
+#     rq_spline_hidden_units=[128, 128],
+#     rq_spline_n_bins=10,
+#     rq_spline_n_layers=8,
+#     learning_rate=1e-3,
+#     batch_size=10000,
+#     n_max_examples=30000,
+#     n_NFproposal_batch_size=100,
+#     local_thinning=1,
+#     global_thinning=100,
+#     history_window=100,
+#     n_temperatures=0,
+#     verbose=True,
+# )
 
-n_epochs = 20
-n_loop_training = 100
-total_epochs = n_epochs * n_loop_training
-start = total_epochs // 10
-learning_rate = optax.polynomial_schedule(
-    1e-3, 1e-4, 4.0, total_epochs - start, transition_begin=start
-)
+# start_time = time.time()
+# jim.sample()
+# end_time = time.time()
+# print("Done!")
+# sample_time_mins = (end_time - start_time) / 60
+# print(f"Sampling took {sample_time_mins:.2f} mins")
 
-jim = Jim(
-    likelihood,
-    prior,
-    sample_transforms=sample_transforms,
-    likelihood_transforms=likelihood_transforms,
-    n_chains=500,
-    n_local_steps=100,
-    n_global_steps=1000,
-    n_training_loops=n_loop_training,
-    n_production_loops=10,
-    n_epochs=n_epochs,
-    mala_step_size=2e-3,
-    rq_spline_hidden_units=[128, 128],
-    rq_spline_n_bins=10,
-    rq_spline_n_layers=8,
-    learning_rate=learning_rate,
-    batch_size=10000,
-    n_max_examples=30000,
-    n_NFproposal_batch_size=100,
-    local_thinning=1,
-    global_thinning=100,
-    history_window=200,
-    n_temperatures=0,
-    max_temperature=20.0,
-    n_tempered_steps=10,
-    verbose=True,
-)
+# # --- Inspect the results ---
 
-jim.sample()
+# chains = jim.get_samples()
+
+# parameter_labels = {
+#     "M_c": r"$\mathcal{M}_c\,[M_\odot]$",
+#     "q": r"$q$",
+#     "s1_mag": r"$|\mathbf{s}_1|$",
+#     "s1_theta": r"$\theta_{s_1}$",
+#     "s1_phi": r"$\phi_{s_1}$",
+#     "s2_mag": r"$|\mathbf{s}_2|$",
+#     "s2_theta": r"$\theta_{s_2}$",
+#     "s2_phi": r"$\phi_{s_2}$",
+#     "iota": r"$\iota$",
+#     "d_L": r"$d_L\,[\mathrm{Mpc}]$",
+#     "t_c": r"$t_c\,[\mathrm{s}]$",
+#     "phase_c": r"$\phi_c$",
+#     "psi": r"$\psi$",
+#     "ra": r"$\alpha$",
+#     "dec": r"$\delta$",
+# }
+
+# fig = corner.corner(
+#     np.stack([chains[key] for key in jim.prior.parameter_names]).T[::10],
+#     labels=[parameter_labels.get(k, k) for k in jim.prior.parameter_names],
+# )
+# fig.savefig(Path(__file__).parent / "GW170817.png")

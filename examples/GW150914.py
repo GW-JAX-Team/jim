@@ -1,6 +1,12 @@
 import time
+from pathlib import Path
+
+# Plotting requires the visualize extra: pip install jimgw[visualize]
+import corner
+import numpy as np
 import jax
 import jax.numpy as jnp
+
 from jimgw.core.jim import Jim
 from jimgw.core.prior import (
     CombinePrior,
@@ -25,31 +31,22 @@ from jimgw.core.single_event.transforms import (
 
 jax.config.update("jax_enable_x64", True)
 
-###########################################
-########## First we grab data #############
-###########################################
+# --- Fetch data ---
 
-total_time_start = time.time()
-
-# first, fetch a 4s segment centered on GW150914
-# for the analysis
+# fetch a 4s segment centered on GW150914
 gps = 1126259462.4
-start = gps - 2
-end = gps + 2
+duration = 4.0
+# Request a segment with 2.0 s post-merger
+start = gps + 2.0 - duration
+end = start + duration
 
-# fetch 4096s of data to estimate the PSD (to be
-# careful we should avoid the on-source segment,
-# but we don't do this in this example)
-psd_start = gps - 2048
-psd_end = gps + 2048
+# fetch 2048s of data to estimate the PSD
+psd_start = start - 2048
+psd_end = start
 
-# define frequency integration bounds for the likelihood
-# we set fmax to 87.5% of the Nyquist frequency to avoid
-# data corrupted by the GWOSC antialiasing filter
-# (Note that Data.from_gwosc will pull data sampled at
-# 4096 Hz by default)
+# set the frequency range for the analysis
 fmin = 20.0
-fmax = 1024
+fmax = 512.0
 
 # initialize detectors
 ifos = [get_H1(), get_L1()]
@@ -65,16 +62,12 @@ for ifo in ifos:
     psd_fftlength = data.duration * data.sampling_frequency
     ifo.set_psd(psd_data.to_psd(nperseg=psd_fftlength))
 
-###########################################
-########## Set up waveform ################
-###########################################
+# --- Waveform model ---
 
 # initialize waveform
 waveform = RippleIMRPhenomPv2(f_ref=20)
 
-###########################################
-########## Set up priors ##################
-###########################################
+# --- Define the prior ---
 
 prior = []
 
@@ -116,13 +109,13 @@ prior = prior + [
 
 prior = CombinePrior(prior)
 
-# Defining Transforms
+# --- Define transforms ---
 
 sample_transforms = [
-    DistanceToSNRWeightedDistanceTransform(gps_time=gps, ifos=ifos),
-    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(gps_time=gps, ifo=ifos[0]),
-    GeocentricArrivalTimeToDetectorArrivalTimeTransform(gps_time=gps, ifo=ifos[0]),
-    SkyFrameToDetectorFrameSkyPositionTransform(gps_time=gps, ifos=ifos),
+    DistanceToSNRWeightedDistanceTransform(trigger_time=gps, ifos=ifos),
+    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(trigger_time=gps, ifo=ifos[0]),
+    GeocentricArrivalTimeToDetectorArrivalTimeTransform(trigger_time=gps, ifo=ifos[0]),
+    SkyFrameToDetectorFrameSkyPositionTransform(trigger_time=gps, ifos=ifos),
 ]
 
 likelihood_transforms = [
@@ -131,6 +124,7 @@ likelihood_transforms = [
     SphereSpinToCartesianSpinTransform("s2"),
 ]
 
+# --- Build the likelihood ---
 
 likelihood = TransientLikelihoodFD(
     ifos,
@@ -140,18 +134,20 @@ likelihood = TransientLikelihoodFD(
     f_max=fmax,
 )
 
+# --- Sample with Jim ---
+
 jim = Jim(
     likelihood,
     prior,
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    n_chains=500,
+    n_chains=1000,
     n_local_steps=100,
     n_global_steps=1000,
     n_training_loops=20,
     n_production_loops=10,
     n_epochs=20,
-    mala_step_size=2e-3,
+    mala_step_size=1e-2,
     rq_spline_hidden_units=[128, 128],
     rq_spline_n_bins=10,
     rq_spline_n_layers=8,
@@ -161,33 +157,42 @@ jim = Jim(
     n_NFproposal_batch_size=100,
     local_thinning=1,
     global_thinning=100,
-    history_window=200,
+    history_window=100,
     n_temperatures=0,
-    max_temperature=20.0,
-    n_tempered_steps=10,
     verbose=True,
 )
 
 start_time = time.time()
 jim.sample()
 end_time = time.time()
+print("Done!")
 sample_time_mins = (end_time - start_time) / 60
 print(f"Sampling took {sample_time_mins:.2f} mins")
 
-print("Done!")
-
-logprob = jim.sampler.resources["log_prob_production"].data
-print(jnp.mean(logprob))
+# --- Inspect the results ---
 
 chains = jim.get_samples()
 
-try:
-    import numpy as np
-    import corner
+parameter_labels = {
+    "M_c": r"$\mathcal{M}_c\,[M_\odot]$",
+    "q": r"$q$",
+    "s1_mag": r"$|\mathbf{s}_1|$",
+    "s1_theta": r"$\theta_{s_1}$",
+    "s1_phi": r"$\phi_{s_1}$",
+    "s2_mag": r"$|\mathbf{s}_2|$",
+    "s2_theta": r"$\theta_{s_2}$",
+    "s2_phi": r"$\phi_{s_2}$",
+    "iota": r"$\iota$",
+    "d_L": r"$d_L\,[\mathrm{Mpc}]$",
+    "t_c": r"$t_c\,[\mathrm{s}]$",
+    "phase_c": r"$\phi_c$",
+    "psi": r"$\psi$",
+    "ra": r"$\alpha$",
+    "dec": r"$\delta$",
+}
 
-    fig = corner.corner(
-        np.stack([chains[key] for key in jim.prior.parameter_names]).T[::10]
-    )
-    fig.savefig("GW150914.png")
-except ImportError:
-    print("corner not installed, skipping corner plot")
+fig = corner.corner(
+    np.stack([chains[key] for key in jim.prior.parameter_names]).T[::10],
+    labels=[parameter_labels.get(k, k) for k in jim.prior.parameter_names],
+)
+fig.savefig(Path(__file__).parent / "GW150914.png")
