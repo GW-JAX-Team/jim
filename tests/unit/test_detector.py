@@ -44,7 +44,6 @@ def make_detector():
     det = get_H1()
     psd = PowerSpectrum.from_file(str(FIXTURES_DIR / "GW150914_psd_H1.npz"))
     det.set_psd(psd)
-    det.frequency_bounds = (F_MIN, F_MAX)
     return det
 
 
@@ -57,6 +56,8 @@ def inject_reference(det, trigger_time=GPS_TIME, **overrides):
         trigger_time=trigger_time,
         waveform_model=RippleIMRPhenomD(f_ref=20.0),
         parameters=params,
+        f_min=F_MIN,
+        f_max=F_MAX,
         is_zero_noise=True,
     )
 
@@ -109,6 +110,8 @@ class TestInjectSignal:
             trigger_time=GPS_TIME,
             waveform_model=RippleIMRPhenomD(f_ref=20.0),
             parameters=params,
+            f_min=F_MIN,
+            f_max=F_MAX,
             is_zero_noise=False,
             rng_key=jax.random.key(42),
         )

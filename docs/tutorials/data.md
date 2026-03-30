@@ -127,7 +127,6 @@ from jimgw.core.single_event.waveform import RippleIMRPhenomD
 gps_time = 1126259462.0
 
 H1.load_and_set_psd()
-H1.frequency_bounds = (20.0, 1024.0)
 
 waveform = RippleIMRPhenomD(f_ref=20.0)
 injection_params = {
@@ -144,6 +143,8 @@ H1.inject_signal(
     trigger_time=gps_time,
     waveform_model=waveform,
     parameters=injection_params,
+    f_min=20.0,
+    f_max=1024.0,
     rng_key=jax.random.key(0),
 )
 ```

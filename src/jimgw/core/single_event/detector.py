@@ -589,6 +589,8 @@ class GroundBased2G(Detector):
         trigger_time: float,
         waveform_model,
         parameters: dict[str, float],
+        f_min: float,
+        f_max: float,
         start_time: Optional[float] = None,
         is_zero_noise: bool = False,
         rng_key: Optional[Key] = None,
@@ -605,6 +607,10 @@ class GroundBased2G(Detector):
                 mirroring the behaviour of ``TransientLikelihoodFD``.
             waveform_model: The waveform model to be injected.
             parameters (dict): Dictionary of likelihood-space source parameters.
+            f_min (float): Minimum frequency in Hz. The waveform is zeroed below
+                this frequency.
+            f_max (float): Maximum frequency in Hz. Should be set to the same
+                value used in the likelihood.
             start_time (Optional[float], optional): GPS start time of the
                 data buffer in seconds. If None, defaults to
                 ``trigger_time - duration + 2.0`` (2 s of data after the trigger).
@@ -629,7 +635,6 @@ class GroundBased2G(Detector):
         params["gmst"] = compute_gmst(trigger_time)
 
         # 1. Set empty data to initialise the detector
-        # n_times = int(duration * sampling_frequency)
         n_times = int(jnp.round(duration * sampling_frequency))
         self.set_data(
             Data(
@@ -639,6 +644,9 @@ class GroundBased2G(Detector):
                 start_time=start_time,
             )
         )
+
+        # Set frequency bounds before evaluating the waveform
+        self.set_frequency_bounds(f_min, f_max)
 
         # 2. Compute the projected strain from parameters
         polarisations = waveform_model(self.frequencies, params)
