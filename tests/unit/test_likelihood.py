@@ -12,12 +12,13 @@ from jimgw.core.single_event.waveform import RippleIMRPhenomD
 from jimgw.core.single_event.data import Data, PowerSpectrum
 from jimgw.core.single_event.transforms import (
     GeocentricArrivalTimeToDetectorArrivalTimeTransform,
+    MassRatioToSymmetricMassRatioTransform,
 )
 from jimgw.core.single_event.time_utils import (
     greenwich_mean_sidereal_time as compute_gmst,
 )
-from jimgw.core.prior import PowerLawPrior, UniformPrior
-from tests.utils import assert_all_finite
+from jimgw.core.prior import CombinePrior, PowerLawPrior, UniformPrior
+from tests.utils import assert_all_finite, common_keys_allclose
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
@@ -39,7 +40,7 @@ def detectors_and_waveform():
     return ifos, waveform, fmin, fmax, gps
 
 
-def example_params(gmst):
+def example_params():
     return {
         "M_c": 30.0,
         "eta": 0.249,
@@ -51,7 +52,6 @@ def example_params(gmst):
         "iota": 0.0,
         "ra": 1.375,
         "dec": -1.2108,
-        "gmst": gmst,
         "psi": 0.0,
     }
 
@@ -61,7 +61,7 @@ class TestZeroLikelihood:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = ZeroLikelihood()
         assert isinstance(likelihood, ZeroLikelihood)
-        params = example_params(0.0)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         assert result == 0.0
 
@@ -191,7 +191,7 @@ class TestTransientLikelihoodFD:
         likelihood = TransientLikelihoodFD(
             detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
 
         log_likelihood = likelihood.evaluate(params, {})
         assert jnp.isfinite(log_likelihood), "Log likelihood should be finite"
@@ -236,7 +236,7 @@ class TestHeterodynedTransientLikelihoodFD:
         )
 
         # Create heterodyned likelihood with reference parameters
-        ref_params = example_params(base_likelihood.gmst)
+        ref_params = example_params()
         likelihood = HeterodynedTransientLikelihoodFD(
             detectors=ifos,
             waveform=waveform,
@@ -248,7 +248,7 @@ class TestHeterodynedTransientLikelihoodFD:
         assert isinstance(likelihood, HeterodynedTransientLikelihoodFD)
 
         # Test evaluation at reference parameters
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), "Heterodyned likelihood should be finite"
 
@@ -264,10 +264,7 @@ class TestHeterodynedTransientLikelihoodFD:
     def test_initialization_stores_attributes(self, detectors_and_waveform):
         """Coefficient arrays and grid arrays are populated after init."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
-        base_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
-        )
-        ref_params = example_params(base_likelihood.gmst)
+        ref_params = example_params()
         likelihood = HeterodynedTransientLikelihoodFD(
             detectors=ifos,
             waveform=waveform,
@@ -308,10 +305,7 @@ class TestHeterodynedTransientLikelihoodFD:
 
     def test_evaluate_jit_matches(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
-        base_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
-        )
-        ref_params = example_params(base_likelihood.gmst)
+        ref_params = example_params()
         likelihood = HeterodynedTransientLikelihoodFD(
             detectors=ifos,
             waveform=waveform,
@@ -320,7 +314,7 @@ class TestHeterodynedTransientLikelihoodFD:
             trigger_time=gps,
             reference_parameters=ref_params,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         result_jit = jax.jit(likelihood.evaluate)(params, {})
         assert jnp.allclose(result, result_jit), "JIT and eager results should match"
@@ -328,10 +322,7 @@ class TestHeterodynedTransientLikelihoodFD:
     def test_evaluate_different_fmin(self, detectors_and_waveform):
         """Heterodyned likelihood must accept per-detector f_min and produce a finite result."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
-        base_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
-        )
-        ref_params = example_params(base_likelihood.gmst)
+        ref_params = example_params()
         likelihood = HeterodynedTransientLikelihoodFD(
             detectors=ifos,
             waveform=waveform,
@@ -340,7 +331,7 @@ class TestHeterodynedTransientLikelihoodFD:
             trigger_time=gps,
             reference_parameters=ref_params,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), "Heterodyned likelihood should be finite with different f_min"
 
@@ -489,7 +480,7 @@ class TestTimeMarginalizedTransientLikelihoodFD:
             marginalize_time=True,
         )
         assert isinstance(likelihood, TransientLikelihoodFD)
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), "Time-marginalized likelihood should be finite"
 
@@ -499,7 +490,7 @@ class TestTimeMarginalizedTransientLikelihoodFD:
             detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
             marginalize_time=True,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         result_jit = jax.jit(likelihood.evaluate)(params, {})
         assert jnp.allclose(result, result_jit), "JIT and eager results should match"
@@ -515,7 +506,7 @@ class TestTimeMarginalizedTransientLikelihoodFD:
             trigger_time=gps,
             marginalize_time=True,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), (
             "Time-marginalized likelihood should be finite with different f_min"
@@ -540,8 +531,8 @@ class TestTimeMarginalizedTransientLikelihoodFD:
             trigger_time=gps,
         )
 
-        params_marg = example_params(marg_likelihood.gmst)
-        params_base = example_params(base_likelihood.gmst)
+        params_marg = example_params()
+        params_base = example_params()
 
         marg_result = marg_likelihood.evaluate(params_marg, {})
         base_result = base_likelihood.evaluate(params_base, {})
@@ -584,7 +575,7 @@ class TestPhaseMarginalizedTransientLikelihoodFD:
             detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
             marginalize_phase=True,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), "Phase-marginalized likelihood should be finite"
 
@@ -594,7 +585,7 @@ class TestPhaseMarginalizedTransientLikelihoodFD:
             detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
             marginalize_phase=True,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         result_jit = jax.jit(likelihood.evaluate)(params, {})
         assert jnp.allclose(result, result_jit), "JIT and eager results should match"
@@ -610,7 +601,7 @@ class TestPhaseMarginalizedTransientLikelihoodFD:
             trigger_time=gps,
             marginalize_phase=True,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), (
             "Phase-marginalized likelihood should be finite with different f_min"
@@ -634,8 +625,8 @@ class TestPhaseMarginalizedTransientLikelihoodFD:
             trigger_time=gps,
         )
 
-        params_marg = example_params(marg_likelihood.gmst)
-        params_base = example_params(base_likelihood.gmst)
+        params_marg = example_params()
+        params_base = example_params()
 
         marg_result = marg_likelihood.evaluate(params_marg, {})
         base_result = base_likelihood.evaluate(params_base, {})
@@ -694,7 +685,7 @@ class TestPhaseTimeMarginalizedTransientLikelihoodFD:
             detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
             marginalize_time=True, marginalize_phase=True,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), "Phase-time-marginalized likelihood should be finite"
 
@@ -704,7 +695,7 @@ class TestPhaseTimeMarginalizedTransientLikelihoodFD:
             detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
             marginalize_time=True, marginalize_phase=True,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         result_jit = jax.jit(likelihood.evaluate)(params, {})
         assert jnp.allclose(result, result_jit), "JIT and eager results should match"
@@ -721,7 +712,7 @@ class TestPhaseTimeMarginalizedTransientLikelihoodFD:
             marginalize_time=True,
             marginalize_phase=True,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), (
             "Phase-time-marginalized likelihood should be finite with different f_min"
@@ -745,8 +736,8 @@ class TestPhaseTimeMarginalizedTransientLikelihoodFD:
             trigger_time=gps,
         )
 
-        params_marg = example_params(marg_likelihood.gmst)
-        params_base = example_params(base_likelihood.gmst)
+        params_marg = example_params()
+        params_base = example_params()
 
         marg_result = marg_likelihood.evaluate(params_marg, {})
         base_result = base_likelihood.evaluate(params_base, {})
@@ -775,7 +766,7 @@ class TestPhaseTimeMarginalizedTransientLikelihoodFD:
             trigger_time=gps, marginalize_phase=True,
         )
 
-        params = example_params(phase_time_likelihood.gmst)
+        params = example_params()
 
         pt_result = phase_time_likelihood.evaluate(params, {})
         p_result = phase_likelihood.evaluate(params, {})
@@ -797,10 +788,7 @@ class TestHeterodynedPhaseMarginalizedTransientLikelihoodFD:
     def test_fixed_phase_c_raises(self, detectors_and_waveform):
         """Passing phase_c in fixed_parameters must raise ValueError."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
-        base_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
-        )
-        ref_params = example_params(base_likelihood.gmst)
+        ref_params = example_params()
         with pytest.raises(ValueError, match="Cannot have phase_c fixed"):
             HeterodynedTransientLikelihoodFD(
                 detectors=ifos,
@@ -832,10 +820,7 @@ class TestHeterodynedPhaseMarginalizedTransientLikelihoodFD:
 
     def test_initialization_and_evaluation(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
-        base_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
-        )
-        ref_params = example_params(base_likelihood.gmst)
+        ref_params = example_params()
         likelihood = HeterodynedTransientLikelihoodFD(
             detectors=ifos,
             waveform=waveform,
@@ -846,16 +831,13 @@ class TestHeterodynedPhaseMarginalizedTransientLikelihoodFD:
             marginalize_phase=True,
         )
         assert isinstance(likelihood, HeterodynedTransientLikelihoodFD)
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), "Heterodyned phase-marginalized likelihood should be finite"
 
     def test_evaluate_jit_matches(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
-        base = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
-        )
-        ref_params = example_params(base.gmst)
+        ref_params = example_params()
         likelihood = HeterodynedTransientLikelihoodFD(
             detectors=ifos,
             waveform=waveform,
@@ -865,7 +847,7 @@ class TestHeterodynedPhaseMarginalizedTransientLikelihoodFD:
             reference_parameters=ref_params,
             marginalize_phase=True,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         result_jit = jax.jit(likelihood.evaluate)(params, {})
         assert jnp.allclose(result, result_jit), "JIT and eager results should match"
@@ -873,10 +855,7 @@ class TestHeterodynedPhaseMarginalizedTransientLikelihoodFD:
     def test_evaluate_different_fmin(self, detectors_and_waveform):
         """Per-detector f_min must be accepted and produce a finite result."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
-        base_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
-        )
-        ref_params = example_params(base_likelihood.gmst)
+        ref_params = example_params()
         likelihood = HeterodynedTransientLikelihoodFD(
             detectors=ifos,
             waveform=waveform,
@@ -886,7 +865,7 @@ class TestHeterodynedPhaseMarginalizedTransientLikelihoodFD:
             reference_parameters=ref_params,
             marginalize_phase=True,
         )
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), (
             "Heterodyned phase-marginalized likelihood should be finite with different f_min"
@@ -904,7 +883,7 @@ class TestHeterodynedPhaseMarginalizedTransientLikelihoodFD:
             detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
             trigger_time=gps, marginalize_phase=True,
         )
-        ref_params = example_params(phase_likelihood.gmst)
+        ref_params = example_params()
 
         het_phase_likelihood = HeterodynedTransientLikelihoodFD(
             detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
@@ -912,7 +891,7 @@ class TestHeterodynedPhaseMarginalizedTransientLikelihoodFD:
             marginalize_phase=True,
         )
 
-        params = example_params(het_phase_likelihood.gmst)
+        params = example_params()
 
         het_result = het_phase_likelihood.evaluate(params, {})
         phase_result = phase_likelihood.evaluate(params, {})
@@ -937,7 +916,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         return PowerLawPrior(xmin=xmin, xmax=xmax, alpha=2.0, parameter_names=["d_L"])
 
     @staticmethod
-    def params_without_d_L(gmst: float) -> dict:
+    def params_without_d_L() -> dict:
         """Parameter dict with d_L omitted (the likelihood injects its own value)."""
         return {
             "M_c": 30.0,
@@ -949,7 +928,6 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             "iota": 0.0,
             "ra": 1.375,
             "dec": -1.2108,
-            "gmst": gmst,
             "psi": 0.0,
         }
 
@@ -1074,7 +1052,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             trigger_time=gps, marginalize_distance=True,
             dist_prior=self.make_d_L_prior(),
         )
-        params = self.params_without_d_L(likelihood.gmst)
+        params = self.params_without_d_L()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), f"Expected finite log-likelihood, got {result}"
 
@@ -1086,7 +1064,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             trigger_time=gps, marginalize_distance=True,
             dist_prior=self.make_d_L_prior(),
         )
-        params = self.params_without_d_L(likelihood.gmst)
+        params = self.params_without_d_L()
         result = likelihood.evaluate(params, {})
         result_jit = jax.jit(likelihood.evaluate)(params, {})
         assert jnp.allclose(result, result_jit), (
@@ -1116,8 +1094,8 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             trigger_time=gps,
         )
 
-        params_marg = self.params_without_d_L(marg_likelihood.gmst)
-        params_base = example_params(base_likelihood.gmst)  # includes d_L=400
+        params_marg = self.params_without_d_L()
+        params_base = example_params()  # includes d_L=400
 
         marg_result = marg_likelihood.evaluate(params_marg, {})
         base_result = base_likelihood.evaluate(params_base, {})
@@ -1142,7 +1120,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             trigger_time=gps, marginalize_distance=True,
             dist_prior=self.make_d_L_prior(),
         )
-        params = self.params_without_d_L(likelihood.gmst)
+        params = self.params_without_d_L()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), f"Expected finite log-likelihood, got {result}"
 
@@ -1159,7 +1137,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
         return PowerLawPrior(xmin=xmin, xmax=xmax, alpha=2.0, parameter_names=["d_L"])
 
     @staticmethod
-    def params_without_d_L_phase(gmst: float) -> dict:
+    def params_without_d_L_phase() -> dict:
         return {
             "M_c": 30.0,
             "eta": 0.249,
@@ -1169,7 +1147,6 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
             "iota": 0.0,
             "ra": 1.375,
             "dec": -1.2108,
-            "gmst": gmst,
             "psi": 0.0,
         }
 
@@ -1223,7 +1200,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
             marginalize_distance=True,
             dist_prior=self.make_d_L_prior(),
         )
-        params = self.params_without_d_L_phase(likelihood.gmst)
+        params = self.params_without_d_L_phase()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), (
             f"Expected finite phase+distance-marginalized log-likelihood, got {result}"
@@ -1241,7 +1218,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
             marginalize_distance=True,
             dist_prior=self.make_d_L_prior(),
         )
-        params = self.params_without_d_L_phase(likelihood.gmst)
+        params = self.params_without_d_L_phase()
         result = likelihood.evaluate(params, {})
         result_jit = jax.jit(likelihood.evaluate)(params, {})
         assert jnp.allclose(result, result_jit), (
@@ -1279,7 +1256,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
             ref_dist=phase_distance_likelihood.ref_dist,
         )
 
-        params = self.params_without_d_L_phase(phase_distance_likelihood.gmst)
+        params = self.params_without_d_L_phase()
         pd_result = phase_distance_likelihood.evaluate(params, {})
         d_result = distance_likelihood.evaluate({**params, "phase_c": 0.0}, {})
 
@@ -1301,7 +1278,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
             marginalize_distance=True,
             dist_prior=self.make_d_L_prior(),
         )
-        params = self.params_without_d_L_phase(likelihood.gmst)
+        params = self.params_without_d_L_phase()
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), (
             "Phase+distance-marginalized likelihood should be finite with different f_min"
@@ -1343,7 +1320,7 @@ class TestCallableFixedParameters:
             },
         )
 
-        params = example_params(const_likelihood.gmst)
+        params = example_params()
         # Remove the keys that are being fixed so both paths exercise the fix
         params_without = {k: v for k, v in params.items() if k not in ("s1_z", "s2_z")}
 
@@ -1374,7 +1351,7 @@ class TestCallableFixedParameters:
             fixed_parameters={"s1_z": lambda p: p["_s1_z_raw"]},
         )
 
-        params = example_params(likelihood.gmst)
+        params = example_params()
         params["_s1_z_raw"] = 0.0  # helper value injected into the dict
 
         # Reference: simply pass s1_z = 0.0 directly
@@ -1385,7 +1362,7 @@ class TestCallableFixedParameters:
             f_max=fmax,
             trigger_time=gps,
         )
-        ref_params = example_params(ref_likelihood.gmst)
+        ref_params = example_params()
 
         result = likelihood.evaluate(dict(params), {})
         ref_result = ref_likelihood.evaluate(dict(ref_params), {})
@@ -1412,7 +1389,7 @@ class TestCallableFixedParameters:
             fixed_parameters={"s1_z": lambda p: 0.5},
         )
 
-        params = example_params(likelihood.gmst)
+        params = example_params()
         keys_before = set(params.keys())
         values_before = {k: float(v) for k, v in params.items()}
 
@@ -1441,7 +1418,7 @@ class TestCallableFixedParameters:
             trigger_time=gps,
             fixed_parameters={"s1_z": lambda p: 0.0, "s2_z": lambda p: 0.0},
         )
-        params = example_params(lambda_likelihood.gmst)
+        params = example_params()
         result_lambda = lambda_likelihood.evaluate(dict(params), {})
         result_lambda_jit = jax.jit(lambda_likelihood.evaluate)(dict(params), {})
         assert jnp.isfinite(result_lambda_jit), "JIT scalar-lambda result must be finite"
@@ -1461,7 +1438,7 @@ class TestCallableFixedParameters:
             trigger_time=gps,
             fixed_parameters={"t_c": transform.backward},
         )
-        params_with_tdet = dict(example_params(transform_likelihood.gmst))
+        params_with_tdet = dict(example_params())
         params_with_tdet["t_det"] = 0.0
         result_transform = transform_likelihood.evaluate(dict(params_with_tdet), {})
         result_transform_jit = jax.jit(transform_likelihood.evaluate)(
@@ -1499,7 +1476,7 @@ class TestCallableFixedParameters:
             fixed_parameters={"s1_z": set_nonzero_s1_z, "s2_z": read_s1_z_for_s2},
         )
 
-        params = example_params(likelihood.gmst)  # s1_z=0.0, s2_z=0.0 originally
+        params = example_params()  # s1_z=0.0, s2_z=0.0 originally
         likelihood.evaluate(dict(params), {})
 
         assert len(seen_s1_z_in_s2_callable) == 1, "s2_z callable must have been invoked once"
@@ -1511,10 +1488,7 @@ class TestCallableFixedParameters:
     def test_heterodyned_callable_fixed_parameter(self, detectors_and_waveform):
         """Callable fixed_parameters must work in HeterodynedTransientLikelihoodFD."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
-        base = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
-        )
-        ref_params = example_params(base.gmst)
+        ref_params = example_params()
 
         likelihood = HeterodynedTransientLikelihoodFD(
             detectors=ifos,
@@ -1526,7 +1500,7 @@ class TestCallableFixedParameters:
             fixed_parameters={"s1_z": lambda p: 0.0, "s2_z": lambda p: 0.0},
         )
 
-        params = example_params(likelihood.gmst)
+        params = example_params()
         result = likelihood.evaluate(params, {})
 
         assert jnp.isfinite(result), (
@@ -1573,7 +1547,7 @@ class TestCallableFixedParameters:
         )
 
         # Params include t_det so the transform can invert it, plus all other required keys
-        params = example_params(lambda_likelihood.gmst)
+        params = example_params()
         params["t_det"] = t_det_fixed
 
         result_lambda = lambda_likelihood.evaluate(dict(params), {})
