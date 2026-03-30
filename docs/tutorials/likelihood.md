@@ -181,8 +181,8 @@ likelihood = HeterodynedTransientLikelihoodFD(
     f_max=1024.0,
     prior=prior,
     likelihood_transforms=[MassRatioToSymmetricMassRatioTransform],
-    optimizer_popsize=50,
-    optimizer_maxiter=2000,
+    optimizer_popsize=1000,
+    optimizer_maxiter=1000,
 )
 ```
 

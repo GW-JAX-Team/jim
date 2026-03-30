@@ -770,8 +770,8 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         self,
         prior: Prior,
         likelihood_transforms: list[NtoMTransform],
-        optimizer_popsize: int = 50,
-        optimizer_maxiter: int = 2000,
+        optimizer_popsize: int = 1000,
+        optimizer_maxiter: int = 1000,
     ):
         """Find the maximum-likelihood parameters using differential evolution.
 
@@ -782,10 +782,10 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
             prior: Prior providing parameter bounds and the initial population.
             likelihood_transforms: Transforms mapping sampling parameters to
                 likelihood parameters.
-            optimizer_popsize: DE population size multiplier.  Total population is
-                ``optimizer_popsize * n_dim``.  Values below 30 are unreliable for
-                15D problems.  Defaults to 50.
-            optimizer_maxiter: Maximum DE generations.  Defaults to 2000.
+            optimizer_popsize: `popsize` argument for `scipy.optimize.differential_evolution`.
+                Defaults to 1000.
+            optimizer_maxiter: `maxiter` argument for `scipy.optimize.differential_evolution`.
+                Defaults to 1000.
         """
         parameter_names = list(prior.parameter_names)
         n_dim = len(parameter_names)
