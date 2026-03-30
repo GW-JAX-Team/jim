@@ -138,7 +138,9 @@ Both forms are `jax.jit`-compatible. Callables are evaluated in **insertion orde
 
 ## HeterodynedTransientLikelihoodFD
 
-For faster evaluation, `HeterodynedTransientLikelihoodFD` uses the heterodyne (relative binning) technique. The interface is analogous:
+For faster evaluation, `HeterodynedTransientLikelihoodFD` uses the heterodyne (relative binning) technique.  It requires a set of *reference parameters* around which the binning is constructed.
+
+### Providing reference parameters directly
 
 ```python
 from jimgw.core.single_event.likelihood import HeterodynedTransientLikelihoodFD
@@ -149,8 +151,39 @@ likelihood = HeterodynedTransientLikelihoodFD(
     trigger_time=gps_time,
     f_min=20.0,
     f_max=1024.0,
+    reference_parameters=ref_params,  # dict with all waveform parameters
     marginalize_phase=True,
 )
 ```
 
-This is recommended for production runs where evaluation speed is critical.
+### Automatic reference-parameter search
+
+If you do not have reference parameters, pass a `prior` (and any `likelihood_transforms`) and the constructor will call `maximize_likelihood` internally using `scipy.optimize.differential_evolution`:
+
+```python
+from jimgw.core.single_event.likelihood import HeterodynedTransientLikelihoodFD
+from jimgw.core.prior import CombinePrior, UniformPrior, SinePrior, CosinePrior
+from jimgw.core.single_event.transforms import MassRatioToSymmetricMassRatioTransform
+
+prior = CombinePrior([
+    UniformPrior(10.0, 100.0, parameter_names=["M_c"]),
+    UniformPrior(0.125, 1.0,  parameter_names=["q"]),
+    ...
+    UniformPrior(0.0, 2*jnp.pi, parameter_names=["ra"]),
+    CosinePrior(parameter_names=["dec"]),
+])
+
+likelihood = HeterodynedTransientLikelihoodFD(
+    detectors=[H1, L1],
+    waveform=waveform,
+    trigger_time=gps_time,
+    f_min=20.0,
+    f_max=1024.0,
+    prior=prior,
+    likelihood_transforms=[MassRatioToSymmetricMassRatioTransform],
+    optimizer_popsize=50,
+    optimizer_maxiter=2000,
+)
+```
+
+The optimizer runs `scipy.optimize.differential_evolution` in vectorized mode so the JAX waveform evaluations are batched on CPU/GPU.

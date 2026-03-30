@@ -344,6 +344,85 @@ class TestHeterodynedTransientLikelihoodFD:
         result = likelihood.evaluate(params, {})
         assert jnp.isfinite(result), "Heterodyned likelihood should be finite with different f_min"
 
+    # ------------------------------------------------------------------
+    # maximize_likelihood tests
+    # ------------------------------------------------------------------
+
+    def test_maximize_likelihood(self, detectors_and_waveform):
+        ifos, waveform, fmin, fmax, gps = detectors_and_waveform
+        true_params = example_params()
+
+        # Inject zero-noise signal
+        for ifo in ifos:
+            ifo.inject_signal(
+                duration=4.0,
+                sampling_frequency=fmax * 2,
+                trigger_time=gps,
+                waveform_model=waveform,
+                parameters=true_params,
+                f_min=fmin,
+                f_max=fmax,
+                is_zero_noise=True,
+            )
+
+        base_likelihood = TransientLikelihoodFD(
+            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps
+        )
+
+        # Reference: MF log-likelihood at injected params.
+        ll_injected = float(base_likelihood.evaluate(true_params, {}))
+
+        # Fix all nuisance parameters to truth; DE searches only (M_c, q).
+        fixed_parameters = {k: v for k, v in true_params.items() if k not in ("M_c", "eta")}
+
+        prior = CombinePrior(
+            [
+                UniformPrior(25.0, 35.0, parameter_names=["M_c"]),
+                UniformPrior(0.125, 1.0, parameter_names=["q"]),
+            ]
+        )
+        likelihood_transforms = [MassRatioToSymmetricMassRatioTransform]
+
+        likelihood = HeterodynedTransientLikelihoodFD(
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            fixed_parameters=fixed_parameters,
+            prior=prior,
+            likelihood_transforms=likelihood_transforms,
+        )
+
+        result = likelihood.reference_parameters.copy()
+
+        # 1. Result must contain all expected keys (q → eta via transform).
+        #    reference_parameters also includes trigger_time and gmst injected by __init__.
+        expected_keys = {
+            "M_c", "eta", "s1_z", "s2_z", "d_L", "t_c",
+            "phase_c", "iota", "psi", "ra", "dec",
+            "trigger_time", "gmst",
+        }
+        assert set(result.keys()) == expected_keys, (
+            f"Unexpected keys: got {set(result.keys())}, expected {expected_keys}"
+        )
+        # 2. All returned values must be finite.
+        for key, val in result.items():
+            assert jnp.isfinite(val), (
+                f"maximize_likelihood returned non-finite value for '{key}': {val}"
+            )
+        # 3. The heterodyned likelihood must be finite at the result.
+        assert jnp.isfinite(likelihood.evaluate(result, {})), (
+            "Heterodyned likelihood at maximized parameters must be finite"
+        )
+        # 4. The MF log-likelihood at the result should be close to the injected value
+        result_ll = float(base_likelihood.evaluate(result, {}))
+        assert jnp.isclose(result_ll, ll_injected, rtol=0.01), (
+            f"Log-likelihood at maximize_likelihood result ({result_ll:.2f}) should be close to injected value ({ll_injected:.2f})"
+        )
+        # 5. The result should be close to the injected parameters
+        common_keys_allclose(result, true_params, rtol=0.01)
+
 
 class TestTimeMarginalizedTransientLikelihoodFD:
     """Tests for TransientLikelihoodFD with marginalize_time=True."""
