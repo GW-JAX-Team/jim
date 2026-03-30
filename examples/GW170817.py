@@ -135,65 +135,65 @@ likelihood = HeterodynedTransientLikelihoodFD(
     likelihood_transforms=likelihood_transforms,
 )
 
-# # --- Sample with Jim ---
+# --- Sample with Jim ---
 
-# jim = Jim(
-#     likelihood,
-#     prior,
-#     sample_transforms=sample_transforms,
-#     likelihood_transforms=likelihood_transforms,
-#     n_chains=1000,
-#     n_local_steps=100,
-#     n_global_steps=1000,
-#     n_training_loops=20,
-#     n_production_loops=10,
-#     n_epochs=20,
-#     mala_step_size=1e-2,
-#     rq_spline_hidden_units=[128, 128],
-#     rq_spline_n_bins=10,
-#     rq_spline_n_layers=8,
-#     learning_rate=1e-3,
-#     batch_size=10000,
-#     n_max_examples=30000,
-#     n_NFproposal_batch_size=100,
-#     local_thinning=1,
-#     global_thinning=100,
-#     history_window=100,
-#     n_temperatures=0,
-#     verbose=True,
-# )
+jim = Jim(
+    likelihood,
+    prior,
+    sample_transforms=sample_transforms,
+    likelihood_transforms=likelihood_transforms,
+    n_chains=1000,
+    n_local_steps=100,
+    n_global_steps=1000,
+    n_training_loops=20,
+    n_production_loops=10,
+    n_epochs=20,
+    mala_step_size=1e-2,
+    rq_spline_hidden_units=[128, 128],
+    rq_spline_n_bins=10,
+    rq_spline_n_layers=8,
+    learning_rate=1e-3,
+    batch_size=10000,
+    n_max_examples=30000,
+    n_NFproposal_batch_size=100,
+    local_thinning=1,
+    global_thinning=100,
+    history_window=100,
+    n_temperatures=0,
+    verbose=True,
+)
 
-# start_time = time.time()
-# jim.sample()
-# end_time = time.time()
-# print("Done!")
-# sample_time_mins = (end_time - start_time) / 60
-# print(f"Sampling took {sample_time_mins:.2f} mins")
+start_time = time.time()
+jim.sample()
+end_time = time.time()
+print("Done!")
+sample_time_mins = (end_time - start_time) / 60
+print(f"Sampling took {sample_time_mins:.2f} mins")
 
-# # --- Inspect the results ---
+# --- Inspect the results ---
 
-# chains = jim.get_samples()
+chains = jim.get_samples()
 
-# parameter_labels = {
-#     "M_c": r"$\mathcal{M}_c\,[M_\odot]$",
-#     "q": r"$q$",
-#     "s1_mag": r"$|\mathbf{s}_1|$",
-#     "s1_theta": r"$\theta_{s_1}$",
-#     "s1_phi": r"$\phi_{s_1}$",
-#     "s2_mag": r"$|\mathbf{s}_2|$",
-#     "s2_theta": r"$\theta_{s_2}$",
-#     "s2_phi": r"$\phi_{s_2}$",
-#     "iota": r"$\iota$",
-#     "d_L": r"$d_L\,[\mathrm{Mpc}]$",
-#     "t_c": r"$t_c\,[\mathrm{s}]$",
-#     "phase_c": r"$\phi_c$",
-#     "psi": r"$\psi$",
-#     "ra": r"$\alpha$",
-#     "dec": r"$\delta$",
-# }
+parameter_labels = {
+    "M_c": r"$\mathcal{M}_c\,[M_\odot]$",
+    "q": r"$q$",
+    "s1_mag": r"$|\mathbf{s}_1|$",
+    "s1_theta": r"$\theta_{s_1}$",
+    "s1_phi": r"$\phi_{s_1}$",
+    "s2_mag": r"$|\mathbf{s}_2|$",
+    "s2_theta": r"$\theta_{s_2}$",
+    "s2_phi": r"$\phi_{s_2}$",
+    "iota": r"$\iota$",
+    "d_L": r"$d_L\,[\mathrm{Mpc}]$",
+    "t_c": r"$t_c\,[\mathrm{s}]$",
+    "phase_c": r"$\phi_c$",
+    "psi": r"$\psi$",
+    "ra": r"$\alpha$",
+    "dec": r"$\delta$",
+}
 
-# fig = corner.corner(
-#     np.stack([chains[key] for key in jim.prior.parameter_names]).T[::10],
-#     labels=[parameter_labels.get(k, k) for k in jim.prior.parameter_names],
-# )
-# fig.savefig(Path(__file__).parent / "GW170817.png")
+fig = corner.corner(
+    np.stack([chains[key] for key in jim.prior.parameter_names]).T[::10],
+    labels=[parameter_labels.get(k, k) for k in jim.prior.parameter_names],
+)
+fig.savefig(Path(__file__).parent / "GW170817.png")
