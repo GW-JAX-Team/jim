@@ -158,7 +158,7 @@ likelihood = HeterodynedTransientLikelihoodFD(
 
 ### Automatic reference-parameter search
 
-If you do not have reference parameters, pass a `prior` (and any `likelihood_transforms`) and the constructor will call `maximize_likelihood` internally using `scipy.optimize.differential_evolution`:
+If you do not have reference parameters, pass a `prior` (and any `likelihood_transforms`) and the constructor will call `maximize_likelihood` internally using `evosax.CMA_ES` (Covariance Matrix Adaptation Evolution Strategy):
 
 ```python
 from jimgw.core.single_event.likelihood import HeterodynedTransientLikelihoodFD
@@ -181,9 +181,9 @@ likelihood = HeterodynedTransientLikelihoodFD(
     f_max=1024.0,
     prior=prior,
     likelihood_transforms=[MassRatioToSymmetricMassRatioTransform],
-    optimizer_popsize=1000,
-    optimizer_maxiter=1000,
+    optimizer_popsize=500,
+    optimizer_n_steps=1000,
 )
 ```
 
-The optimizer runs `scipy.optimize.differential_evolution` in vectorized mode so the JAX waveform evaluations are batched on CPU/GPU.
+The optimizer runs `evosax.CMA_ES` with a JAX-native ask/tell loop so the waveform evaluations are fully batched and JIT-compiled on CPU/GPU.

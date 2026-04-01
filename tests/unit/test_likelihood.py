@@ -383,6 +383,8 @@ class TestHeterodynedTransientLikelihoodFD:
             fixed_parameters=fixed_parameters,
             prior=prior,
             likelihood_transforms=likelihood_transforms,
+            optimizer_popsize=10,
+            optimizer_n_steps=10,
         )
 
         result = likelihood.reference_parameters.copy()

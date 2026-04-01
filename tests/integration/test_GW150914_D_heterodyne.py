@@ -78,7 +78,7 @@ likelihood = HeterodynedTransientLikelihoodFD(
     f_max=fmax,
     trigger_time=gps,
     likelihood_transforms=likelihood_transforms,
-    optimizer_maxiter=5,
+    optimizer_n_steps=5,
     optimizer_popsize=10,
 )
 
