@@ -14,7 +14,6 @@ from jimgw.core.prior import (
     CosinePrior,
     SinePrior,
     PowerLawPrior,
-    UniformSpherePrior,
 )
 from jimgw.core.single_event.detector import get_H1, get_L1, get_V1
 from jimgw.core.single_event.likelihood import HeterodynedTransientLikelihoodFD
@@ -22,7 +21,6 @@ from jimgw.core.single_event.data import Data
 from jimgw.core.single_event.waveform import IMRPhenomXAS_NRTidalv3
 from jimgw.core.single_event.transforms import (
     SkyFrameToDetectorFrameSkyPositionTransform,
-    SphereSpinToCartesianSpinTransform,
     MassRatioToSymmetricMassRatioTransform,
     DistanceToSNRWeightedDistanceTransform,
     GeocentricArrivalTimeToDetectorArrivalTimeTransform,
@@ -80,8 +78,8 @@ q_prior = UniformPrior(q_min, q_max, parameter_names=["q"])
 prior = prior + [Mc_prior, q_prior]
 
 # Spin prior
-s1_prior = UniformSpherePrior(parameter_names=["s1"], max_mag=0.05)
-s2_prior = UniformSpherePrior(parameter_names=["s2"], max_mag=0.05)
+s1_prior = UniformPrior(-0.05, 0.05, parameter_names=["s1_z"])
+s2_prior = UniformPrior(-0.05, 0.05, parameter_names=["s2_z"])
 iota_prior = SinePrior(parameter_names=["iota"])
 
 prior = prior + [
@@ -126,8 +124,6 @@ sample_transforms = [
 
 likelihood_transforms = [
     MassRatioToSymmetricMassRatioTransform,
-    SphereSpinToCartesianSpinTransform("s1"),
-    SphereSpinToCartesianSpinTransform("s2"),
 ]
 
 # --- Build the likelihood ---
@@ -185,12 +181,8 @@ chains = jim.get_samples()
 parameter_labels = {
     "M_c": r"$\mathcal{M}_c\,[M_\odot]$",
     "q": r"$q$",
-    "s1_mag": r"$|\mathbf{s}_1|$",
-    "s1_theta": r"$\theta_{s_1}$",
-    "s1_phi": r"$\phi_{s_1}$",
-    "s2_mag": r"$|\mathbf{s}_2|$",
-    "s2_theta": r"$\theta_{s_2}$",
-    "s2_phi": r"$\phi_{s_2}$",
+    "s1_z": r"$\chi_1$",
+    "s2_z": r"$\chi_2$",
     "iota": r"$\iota$",
     "d_L": r"$d_L\,[\mathrm{Mpc}]$",
     "t_c": r"$t_c\,[\mathrm{s}]$",
