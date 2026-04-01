@@ -19,7 +19,7 @@ from jimgw.core.prior import (
 from jimgw.core.single_event.detector import get_H1, get_L1, get_V1
 from jimgw.core.single_event.likelihood import HeterodynedTransientLikelihoodFD
 from jimgw.core.single_event.data import Data
-from jimgw.core.single_event.waveform import RippleIMRPhenomPv2
+from jimgw.core.single_event.waveform import IMRPhenomXAS_NRTidalv3
 from jimgw.core.single_event.transforms import (
     SkyFrameToDetectorFrameSkyPositionTransform,
     SphereSpinToCartesianSpinTransform,
@@ -65,7 +65,7 @@ for ifo in ifos:
 # --- Waveform model ---
 
 # initialize waveform
-waveform = RippleIMRPhenomPv2(f_ref=20)
+waveform = IMRPhenomXAS_NRTidalv3(f_ref=20)
 
 # --- Define the prior ---
 
@@ -107,6 +107,12 @@ prior = prior + [
     dec_prior,
 ]
 
+# Tidal priors
+lambda_1_prior = UniformPrior(0.0, 5000.0, parameter_names=["lambda_1"])
+lambda_2_prior = UniformPrior(0.0, 5000.0, parameter_names=["lambda_2"])
+
+prior = prior + [lambda_1_prior, lambda_2_prior]
+
 prior = CombinePrior(prior)
 
 # --- Define transforms ---
@@ -131,6 +137,8 @@ likelihood = HeterodynedTransientLikelihoodFD(
     waveform=waveform,
     n_bins=1000,
     trigger_time=gps,
+    f_min=fmin,
+    f_max=fmax,
     prior=prior,
     likelihood_transforms=likelihood_transforms,
 )
@@ -190,6 +198,8 @@ parameter_labels = {
     "psi": r"$\psi$",
     "ra": r"$\alpha$",
     "dec": r"$\delta$",
+    "lambda_1": r"$\Lambda_1$",
+    "lambda_2": r"$\Lambda_2$",
 }
 
 fig = corner.corner(
