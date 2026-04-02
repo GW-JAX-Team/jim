@@ -68,10 +68,10 @@ def inject_reference(det, trigger_time=GPS_TIME, **overrides):
 
 
 class TestInjectSignal:
-    """Tests for inject_signal: core behaviour and the transform pipeline."""
+    """Tests for inject_signal: core behavior and the transform pipeline."""
 
     # ------------------------------------------------------------------
-    # Core behaviour
+    # Core behavior
     # ------------------------------------------------------------------
 
     def test_zero_noise_creates_data(self):

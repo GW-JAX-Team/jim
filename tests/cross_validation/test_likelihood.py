@@ -685,8 +685,8 @@ class TestHeterodynedLikelihood:
         jim_ref_params = setup["jim_params"].copy()
         bilby_ref_params = setup["bilby_params"].copy()
 
-        # Initialise bilby first with its default epsilon so we can read back
-        # the number of bins it chose, then initialise Jim with the same count
+        # Initialize bilby first with its default epsilon so we can read back
+        # the number of bins it chose, then initialize Jim with the same count
         # for an apples-to-apples comparison.
         bilby_likelihood = bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
@@ -746,8 +746,8 @@ class TestHeterodynedPhaseMarginalizedLikelihood:
             minimum=0.0, maximum=2 * np.pi, boundary="periodic", name="phase"
         )
 
-        # Initialise bilby first with its default epsilon so we can read back
-        # the number of bins it chose, then initialise Jim with the same count
+        # Initialize bilby first with its default epsilon so we can read back
+        # the number of bins it chose, then initialize Jim with the same count
         # for an apples-to-apples comparison.
         bilby_likelihood = bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],

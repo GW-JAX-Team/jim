@@ -604,7 +604,7 @@ class GroundBased2G(Detector):
             sampling_frequency (float): Sampling frequency in Hz.
             trigger_time (float): GPS time of the event trigger. Used to stamp
                 ``trigger_time`` and derive ``gmst`` for the waveform projection,
-                mirroring the behaviour of ``TransientLikelihoodFD``.
+                mirroring the behavior of ``TransientLikelihoodFD``.
             waveform_model: The waveform model to be injected.
             parameters (dict): Dictionary of likelihood-space source parameters.
             f_min (float): Minimum frequency in Hz. The waveform is zeroed below
@@ -634,7 +634,7 @@ class GroundBased2G(Detector):
         params["trigger_time"] = float(trigger_time)
         params["gmst"] = compute_gmst(trigger_time)
 
-        # 1. Set empty data to initialise the detector
+        # 1. Set empty data to initialize the detector
         n_times = int(jnp.round(duration * sampling_frequency))
         self.set_data(
             Data(

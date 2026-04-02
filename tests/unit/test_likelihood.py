@@ -1031,7 +1031,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         )
         assert jnp.isclose(likelihood.ref_dist, 500.0)
 
-    def test_log_weights_normalised(self, detectors_and_waveform):
+    def test_log_weights_normalized(self, detectors_and_waveform):
         """log_weights must sum to 1 in probability space, i.e. logsumexp ≈ 0."""
         from jax.scipy.special import logsumexp
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
@@ -1074,7 +1074,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         )
 
     def test_matches_base_likelihood_near_true_distance(self, detectors_and_waveform):
-        """With a very narrow prior tightly centred on the true d_L, the
+        """With a very narrow prior tightly centered on the true d_L, the
         marginalized value should be close to the base (non-marginalized)
         likelihood evaluated at that distance.
         """

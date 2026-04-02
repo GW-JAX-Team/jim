@@ -794,7 +794,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         f_max_dict = {d.name: d.frequency_bounds[1] for d in self.detectors}
 
         # ------------------------------------------------------------------
-        # Build the full (un-marginalised) TransientLikelihoodFD objective
+        # Build the full (un-marginalized) TransientLikelihoodFD objective
         # ------------------------------------------------------------------
         full_likelihood = TransientLikelihoodFD(
             detectors=self.detectors,
@@ -805,7 +805,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         )
 
         # ------------------------------------------------------------------
-        # Normalise the search space using the prior sample statistics so
+        # Normalize the search space using the prior sample statistics so
         # that every dimension has unit variance before CMA-ES sees it.
         # CMA-ES then operates with std_init=1 (default) in a space where
         # each parameter already lives on a comparable scale.
@@ -819,7 +819,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         prior_std = jnp.std(sample_matrix, axis=0)
 
         def _log_likelihood(z: Float[Array, " n_dim"]) -> Float:
-            """Evaluate -logL for a single normalised parameter vector."""
+            """Evaluate -logL for a single normalized parameter vector."""
             x = prior_mean + prior_std * z
             named_params = dict(zip(parameter_names, x))
             for transform in likelihood_transforms:
@@ -830,7 +830,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         _log_likelihood_vmap = jax.vmap(_log_likelihood)
 
         # ------------------------------------------------------------------
-        # Set up CMA-ES in normalised space: init_mean=0, std_init=1
+        # Set up CMA-ES in normalized space: init_mean=0, std_init=1
         # ------------------------------------------------------------------
         es = CMA_ES(population_size=optimizer_popsize, solution=jnp.zeros(n_dim))
         es_params = es.default_params
@@ -851,7 +851,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
             # corrupted by unphysical parameter samples (e.g. q < 0 → eta < 0
             # → waveform returns NaN).  Without this, jnp.argmin treats NaN as
             # the smallest value, best_solution never leaves its NaN initial
-            # value, and the entire optimiser output is NaN.
+            # value, and the entire optimizer output is NaN.
             fitness = jnp.where(
                 jnp.isfinite(fitness), fitness, jnp.finfo(jnp.float64).max
             )
