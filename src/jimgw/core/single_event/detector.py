@@ -659,9 +659,8 @@ class GroundBased2G(Detector):
                 seed = int(time.time())
                 rng_key = jax.random.key(seed)
                 logger.info(
-                    "No rng_key provided for noise simulation. Using time-based key with seed=%d (key=%s).",
+                    "No rng_key provided for noise simulation. Using time-based key with seed=%d.",
                     seed,
-                    rng_key,
                 )
             strain_data += jnp.where(
                 self.frequency_mask, self.psd.simulate_data(rng_key), 0.0 + 0.0j
