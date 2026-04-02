@@ -38,8 +38,8 @@ duration = 128.0
 start = gps + 2.0 - duration
 end = start + duration
 
-# fetch 4096s of data to estimate the PSD
-psd_start = start - 8192
+# fetch 2048s of data to estimate the PSD (4096s has a gap in V1; 2048s is clean for all three)
+psd_start = start - 2048
 psd_end = start
 
 # set the frequency range for the analysis
