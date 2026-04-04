@@ -822,10 +822,15 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
             """Evaluate -logL for a single normalized parameter vector."""
             x = prior_mean + prior_std * z
             named_params = dict(zip(parameter_names, x))
+            prior_log_prob = prior.log_prob(named_params)
             for transform in likelihood_transforms:
                 named_params = transform.forward(named_params)
             named_params = apply_fixed_parameters(named_params, self.fixed_parameters)
-            return -full_likelihood.evaluate(named_params, {})
+            return jnp.where(
+                jnp.isfinite(prior_log_prob),
+                -full_likelihood.evaluate(named_params, {}),
+                jnp.inf,
+            )
 
         _log_likelihood_vmap = jax.vmap(_log_likelihood)
 
@@ -833,7 +838,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         # Set up CMA-ES in normalized space: init_mean=0, std_init=1
         # ------------------------------------------------------------------
         es = CMA_ES(population_size=optimizer_popsize, solution=jnp.zeros(n_dim))
-        es_params = es.default_params
+        es_params = es.default_params.replace(std_init=1e-3)  # type: ignore
         key = jax.random.key(42)
         state = es.init(key, jnp.zeros(n_dim), es_params)
 
