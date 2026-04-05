@@ -35,11 +35,9 @@ label = "injection"
 # --- Inject the signal ---
 
 current_time = time.time()
-rng_key = jax.random.key(int(current_time))
-rng_key, *sub_key = jax.random.split(rng_key, 2)
 
 gps_time = current_time - 1000
-random_samples = jax.random.uniform(sub_key[0], (3,), maxval=jnp.pi)
+random_samples = jax.random.uniform(jax.random.key(42), (3,), maxval=jnp.pi)
 
 # Injection parameters in likelihood space.
 injection_parameters = {
