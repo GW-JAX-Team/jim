@@ -208,7 +208,6 @@ class TransientLikelihoodFD(SingleEventLikelihood):
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params = params.copy()
-        apply_fixed_parameters(params, self.fixed_parameters)
         params["trigger_time"] = self.trigger_time
         params["gmst"] = self.gmst
         if self.marginalize_time:
@@ -217,6 +216,7 @@ class TransientLikelihoodFD(SingleEventLikelihood):
             params["phase_c"] = 0.0
         if self.marginalize_distance:
             params["d_L"] = self.ref_dist
+        apply_fixed_parameters(params, self.fixed_parameters)
         return self._likelihood(params, data)
 
     def _likelihood(self, params: dict[str, Float], data: dict) -> Float:
@@ -644,11 +644,11 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         params = params.copy()
-        apply_fixed_parameters(params, self.fixed_parameters)
         params["trigger_time"] = self.trigger_time
         params["gmst"] = self.gmst
         if self.marginalize_phase:
             params["phase_c"] = 0.0
+        apply_fixed_parameters(params, self.fixed_parameters)
         return self._likelihood(params, data)
 
     def _likelihood(self, params: dict[str, Float], data: dict) -> Float:
