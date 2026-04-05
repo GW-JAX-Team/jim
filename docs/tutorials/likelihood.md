@@ -104,7 +104,7 @@ from jimgw.core.single_event.transforms import (
 
 # Maps t_det -> t_c, conditional on (ra, dec)
 transform = GeocentricArrivalTimeToDetectorArrivalTimeTransform(
-    gps_time=trigger_time, ifo=H1
+    trigger_time=trigger_time, ifo=H1
 )
 
 likelihood = TransientLikelihoodFD(
@@ -121,7 +121,7 @@ likelihood = TransientLikelihoodFD(
 Alternatively use a plain lambda:
 
 ```python
-from jimgw.core.single_event.gps_times import greenwich_mean_sidereal_time
+from jimgw.core.single_event.time_utils import greenwich_mean_sidereal_time
 
 gmst = greenwich_mean_sidereal_time(trigger_time)
 t_det_value = 0.0  # the value you are fixing
