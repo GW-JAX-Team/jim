@@ -8,7 +8,9 @@ from jimgw.core.utils import safe_arctan2, carte_to_spherical_angles
 
 def apply_fixed_parameters(
     params: dict[str, Float],
-    fixed_parameters: dict[str, Float | Callable],
+    fixed_parameters: dict[
+        str, Float | Callable[[dict[str, Float]], Float | dict[str, Float]]
+    ],
 ) -> dict[str, Float]:
     """Merge ``fixed_parameters`` into *params*, resolving callables.
 
@@ -24,7 +26,16 @@ def apply_fixed_parameters(
     for key, value in fixed_parameters.items():
         if callable(value):
             result = value(params)
-            params[key] = result[key] if isinstance(result, dict) else result
+            if isinstance(result, dict):
+                if key not in result:
+                    raise KeyError(
+                        f"apply_fixed_parameters: callable {value!r} returned a dict "
+                        f"that does not contain the expected key {key!r}. "
+                        f"Returned keys: {list(result.keys())}"
+                    )
+                params[key] = result[key]
+            else:
+                params[key] = result
         else:
             params[key] = value
     return params
