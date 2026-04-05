@@ -133,7 +133,7 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
             )
             assert_all_finite(inv_jacobian)
 
-            # Step 5–6: bilby forward on recovered angles → reproduced Cartesian
+            # Step 5-6: bilby forward on recovered angles → reproduced Cartesian
             reprod_results = []
             for i in range(n_samples):
                 iota_b, s1x, s1y, s1z, s2x, s2y, s2z = bilby_to_lalsimulation_spins(
