@@ -680,50 +680,6 @@ class TestSpinAnglesToCartesianSpinTransform:
         """
 
         # Generate random sample
-        subkeys = jax.random.split(jax.random.key(12), 8)
-        iota = jax.random.uniform(subkeys[0], (1,), minval=0, maxval=jnp.pi)
-        M_c = jax.random.uniform(subkeys[1], (1,), minval=1, maxval=100)
-        q = jax.random.uniform(subkeys[2], (1,), minval=0.125, maxval=1)
-        fRef = jax.random.uniform(subkeys[3], (1,), minval=10, maxval=100)
-        phiRef = jax.random.uniform(subkeys[4], (1,), minval=0, maxval=2 * jnp.pi)
-
-        S1, S2 = jax.random.uniform(subkeys[5], (2, 3), minval=-1, maxval=1)
-        a1, a2 = jax.random.uniform(subkeys[6], (2,), minval=1e-3, maxval=1)
-        S1 *= a1 / jnp.linalg.norm(S1)
-        S2 *= a2 / jnp.linalg.norm(S2)
-
-        sample = [
-            iota[0],
-            *S1,
-            *S2,
-            M_c[0],
-            q[0],
-            phiRef[0],
-        ]
-        freq_ref_sample = fRef[0]
-        sample_dict = dict(zip(self.forward_keys, sample))
-
-        # Create a JIT compiled version of the transform.
-        jit_transform = jax.jit(
-            lambda data: SpinAnglesToCartesianSpinTransform(
-                freq_ref=freq_ref_sample
-            ).transform(data)
-        )
-        jitted_spins, jitted_jacobian = jit_transform(sample_dict)
-        non_jitted_spins = SpinAnglesToCartesianSpinTransform(
-            freq_ref=freq_ref_sample
-        ).forward(sample_dict)
-
-        assert common_keys_allclose(jitted_spins, non_jitted_spins)
-        # Also check that the jitted jacobian contains no NaNs
-        assert_all_finite(jitted_jacobian)
-
-    def test_jitted_backward_transform(self):
-        """
-        Test that the backward transformation is JIT compilable
-        """
-
-        # Generate random sample
         subkeys = jax.random.split(jax.random.key(123), 11)
 
         theta_jn = jax.random.uniform(subkeys[0], (1,), minval=0, maxval=jnp.pi)
@@ -751,6 +707,51 @@ class TestSpinAnglesToCartesianSpinTransform:
             phase_c[0],
         ]
         freq_ref_sample = f_ref[0]
+        sample_dict = dict(zip(self.forward_keys, sample))
+
+        # Create a JIT compiled version of the transform.
+        jit_transform = jax.jit(
+            lambda data: SpinAnglesToCartesianSpinTransform(
+                freq_ref=freq_ref_sample
+            ).transform(data)
+        )
+        jitted_spins, jitted_jacobian = jit_transform(sample_dict)
+        non_jitted_spins = SpinAnglesToCartesianSpinTransform(
+            freq_ref=freq_ref_sample
+        ).forward(sample_dict)
+
+        assert common_keys_allclose(jitted_spins, non_jitted_spins)
+        # Also check that the jitted jacobian contains no NaNs
+        assert_all_finite(jitted_jacobian)
+
+    def test_jitted_backward_transform(self):
+        """
+        Test that the backward transformation is JIT compilable
+        """
+
+        # Generate random sample
+        subkeys = jax.random.split(jax.random.key(12), 8)
+
+        iota = jax.random.uniform(subkeys[0], (1,), minval=0, maxval=jnp.pi)
+        M_c = jax.random.uniform(subkeys[1], (1,), minval=1, maxval=100)
+        q = jax.random.uniform(subkeys[2], (1,), minval=0.125, maxval=1)
+        fRef = jax.random.uniform(subkeys[3], (1,), minval=10, maxval=100)
+        phiRef = jax.random.uniform(subkeys[4], (1,), minval=0, maxval=2 * jnp.pi)
+
+        S1, S2 = jax.random.uniform(subkeys[5], (2, 3), minval=-1, maxval=1)
+        a1, a2 = jax.random.uniform(subkeys[6], (2,), minval=1e-3, maxval=1)
+        S1 *= a1 / jnp.linalg.norm(S1)
+        S2 *= a2 / jnp.linalg.norm(S2)
+
+        sample = [
+            iota[0],
+            *S1,
+            *S2,
+            M_c[0],
+            q[0],
+            phiRef[0],
+        ]
+        freq_ref_sample = fRef[0]
         sample_dict = dict(zip(self.backward_keys, sample))
 
         # Create a JIT compiled version of the transform.
