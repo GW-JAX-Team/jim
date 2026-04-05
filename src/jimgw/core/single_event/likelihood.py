@@ -821,7 +821,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         def _log_likelihood(z: Float[Array, " n_dim"]) -> Float:
             """Evaluate -logL for a single normalized parameter vector."""
             x = prior_mean + prior_std * z
-            named_params = dict(zip(parameter_names, x))
+            named_params = dict(zip(parameter_names, x, strict=True))
             prior_log_prob = prior.log_prob(named_params)
             for transform in likelihood_transforms:
                 named_params = transform.forward(named_params)
@@ -878,7 +878,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         # Convert best solution back to named parameters
         # ------------------------------------------------------------------
         best_x = prior_mean + prior_std * best_z
-        named_params = dict(zip(parameter_names, best_x))
+        named_params = dict(zip(parameter_names, best_x, strict=True))
         for transform in likelihood_transforms:
             named_params = transform.forward(named_params)
         named_params = apply_fixed_parameters(named_params, self.fixed_parameters)
