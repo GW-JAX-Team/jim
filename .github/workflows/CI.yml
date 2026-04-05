@@ -38,9 +38,9 @@ jobs:
       - name: Run tests
         run: |
           if [[ "${{ matrix.python-version }}" == "3.12" ]]; then
-            uv run --no-sync pytest --cov=jimgw --cov-report=term-missing tests/unit tests/cross_validation --ignore=tests/integration
+            uv run --no-sync pytest --cov=jimgw --cov-report=term-missing tests/unit tests/cross_validation
           else
-            uv run --no-sync pytest tests/unit tests/cross_validation --ignore=tests/integration
+            uv run --no-sync pytest tests/unit tests/cross_validation
           fi
       - name: Upload coverage to Coveralls
         if: matrix.python-version == '3.12'
