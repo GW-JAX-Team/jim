@@ -46,7 +46,7 @@ Use as many chains as your hardware allows, especially on a GPU. More chains imp
 
 ### How long should I run training?
 
-Most computation goes into the training phase. The production phase with a trained normalizing flow is usually cheap. When in doubt, increase `n_loop_training` — blow it up until you cannot stand waiting.
+Most computation goes into the training phase. The production phase with a trained normalizing flow is usually cheap. When in doubt, increase `n_training_loops` in the `Jim` constructor — blow it up until you cannot stand waiting.
 
 ## GPU and Memory
 
