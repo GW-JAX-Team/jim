@@ -384,7 +384,7 @@ class TestHeterodynedTransientLikelihoodFD:
             prior=prior,
             likelihood_transforms=likelihood_transforms,
             optimizer_popsize=10,
-            optimizer_n_steps=10,
+            optimizer_n_steps=50,
         )
 
         result = likelihood.reference_parameters.copy()
@@ -410,11 +410,11 @@ class TestHeterodynedTransientLikelihoodFD:
         )
         # 4. The MF log-likelihood at the result should be close to the injected value
         result_ll = float(base_likelihood.evaluate(result, {}))
-        assert jnp.isclose(result_ll, ll_injected, rtol=0.01), (
+        assert jnp.isclose(result_ll, ll_injected), (
             f"Log-likelihood at maximize_likelihood result ({result_ll:.2f}) should be close to injected value ({ll_injected:.2f})"
         )
         # 5. The result should be close to the injected parameters
-        common_keys_allclose(result, true_params, rtol=0.01)
+        common_keys_allclose(result, true_params)
 
 
 class TestTimeMarginalizedTransientLikelihoodFD:
