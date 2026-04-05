@@ -46,7 +46,6 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
         from jimgw.core.single_event.transforms import (
             SpinAnglesToCartesianSpinTransform,
         )
-        from jimgw.core.single_event.utils import Mc_q_to_m1_m2
 
         n_samples = 50
         key = jax.random.key(42)
@@ -71,7 +70,10 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
         )
 
         for f_ref in [10.0, 20.0, 50.0]:
-            m1, m2 = Mc_q_to_m1_m2(M_c, q)
+            # Derive component masses locally from Mc and q (independent of package under test).
+            # m1 = Mc * (1 + q)^(1/5) / q^(3/5),  m2 = q * m1
+            m1 = M_c * (1 + q) ** (1 / 5) / q ** (3 / 5)
+            m2 = q * m1
 
             # Step 2: bilby reference forward pass
             bilby_results = []
