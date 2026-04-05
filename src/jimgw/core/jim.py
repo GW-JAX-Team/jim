@@ -66,6 +66,7 @@ class Jim(object):
         n_tempered_steps: int = 5,
         # --- Misc ---
         verbose: bool = False,
+        periodic: Optional[dict[str, tuple[float, float]]] = None,
     ):
         self.likelihood = likelihood
         self.prior = prior
@@ -83,6 +84,21 @@ class Jim(object):
             for transform in sample_transforms:
                 self.parameter_names = transform.propagate_name(self.parameter_names)
 
+        # Validate periodic parameter names are in sampling space
+        if periodic is not None:
+            unknown = set(periodic.keys()) - set(self.parameter_names)
+            if unknown:
+                raise ValueError(
+                    f"Periodic parameter(s) {unknown} not found in sampling parameters. "
+                    f"Sampling parameters: {self.parameter_names}"
+                )
+            periodic_index_dict: Optional[dict[int, tuple[float, float]]] = {
+                self.parameter_names.index(name): bounds
+                for name, bounds in periodic.items()
+            }
+        else:
+            periodic_index_dict = None
+
         if len(likelihood_transforms) == 0:
             logger.info(
                 "No likelihood transforms provided. Using prior parameters as likelihood parameters"
@@ -92,9 +108,8 @@ class Jim(object):
             seed = int(time.time_ns() % (2**32))
             rng_key = jax.random.key(seed)
             logger.info(
-                "No rng_key provided for sampler initialization. Using time-based key with seed=%d (key=%s).",
+                "No rng_key provided for sampler initialization. Using time-based key with seed=%d.",
                 seed,
-                rng_key,
             )
 
         rng_key, subkey = jax.random.split(rng_key)
@@ -112,6 +127,7 @@ class Jim(object):
             n_epochs=n_epochs,
             # --- Local sampler ---
             mala_step_size=mala_step_size,
+            periodic=periodic_index_dict,  # type: ignore # Type ignored should be removed once the flowMC release is published
             # --- Normalizing flow model ---
             rq_spline_hidden_units=rq_spline_hidden_units,
             rq_spline_n_bins=rq_spline_n_bins,
@@ -161,12 +177,10 @@ class Jim(object):
 
     def add_name(self, x: Float[Array, " n_dims"]) -> dict[str, Float]:
         """
-        Turn an array into a dictionary
+        Turn an array into a dictionary.
 
-        Parameters
-        ----------
-        x : Array
-            An array of parameters. Shape (n_dims,).
+        Args:
+            x (Array): An array of parameters. Shape (n_dims,).
         """
 
         return dict(zip(self.parameter_names, x))
@@ -255,23 +269,18 @@ class Jim(object):
         of the total samples. This is useful for reducing memory usage when plotting
         or analyzing large sample sets.
 
-        Parameters
-        ----------
-        n_samples : int, optional
-            Number of samples to return via uniform random downsampling. If 0, return all samples
-            with transforms applied, by default 0
-        rng_key : Key, optional
-            RNG key for downsampling, by default jax.random.key(21)
-        training : bool, optional
-            Whether to get the training samples or the production samples, by default False
+        Args:
+            n_samples (int, optional): Number of samples to return via uniform random downsampling.
+                If 0, return all samples with transforms applied, by default 0.
+            rng_key (Key, optional): RNG key for downsampling, by default jax.random.key(21).
+            training (bool, optional): Whether to get the training samples or the production
+                samples, by default False.
 
-        Returns
-        -------
-        dict[str, np.ndarray]
-            Dictionary of samples with parameter names as keys and numpy array values.
-            All sample transforms are reversed to return samples in the prior parameter space.
-            Returns numpy arrays for compatibility with plotting libraries and easy serialization.
-
+        Returns:
+            dict[str, np.ndarray]: Dictionary of samples with parameter names as keys and numpy
+                array values. All sample transforms are reversed to return samples in the prior
+                parameter space. Returns numpy arrays for compatibility with plotting libraries
+                and easy serialization.
         """
         if training:
             assert isinstance(

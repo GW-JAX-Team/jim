@@ -1,8 +1,44 @@
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Complex
+from typing import Callable
 
 from jimgw.core.constants import MTSUN
 from jimgw.core.utils import safe_arctan2, carte_to_spherical_angles
+
+
+def apply_fixed_parameters(
+    params: dict[str, Float],
+    fixed_parameters: dict[
+        str, Float | Callable[[dict[str, Float]], Float | dict[str, Float]]
+    ],
+) -> dict[str, Float]:
+    """Merge ``fixed_parameters`` into *params*, resolving callables.
+
+    For each entry in ``fixed_parameters``:
+    - If the value is callable, it is called with the current *params* dict.
+      If the result is a dict, the value stored under the matching key is used;
+      otherwise the scalar result is used directly.
+    - If the value is not callable it is inserted as-is.
+
+    *params* is mutated in-place; callers that need to preserve the original
+    should copy before calling.
+    """
+    for key, value in fixed_parameters.items():
+        if callable(value):
+            result = value(params)
+            if isinstance(result, dict):
+                if key not in result:
+                    raise KeyError(
+                        f"apply_fixed_parameters: callable {value!r} returned a dict "
+                        f"that does not contain the expected key {key!r}. "
+                        f"Returned keys: {list(result.keys())}"
+                    )
+                params[key] = result[key]
+            else:
+                params[key] = result
+        else:
+            params[key] = value
+    return params
 
 
 def complex_inner_product(
@@ -184,19 +220,12 @@ def Mc_eta_to_m1_m2(M_c: Float, eta: Float) -> tuple[Float, Float]:
     Transforming the chirp mass M_c and symmetric mass ratio eta to the primary mass m1
     and secondary mass m2.
 
-    Parameters
-    ----------
-    M_c : Float
-            Chirp mass.
-    eta : Float
-            Symmetric mass ratio.
+    Args:
+        M_c (Float): Chirp mass.
+        eta (Float): Symmetric mass ratio.
 
-    Returns
-    -------
-    m1 : Float
-            Primary mass.
-    m2 : Float
-            Secondary mass.
+    Returns:
+        tuple[Float, Float]: Primary mass (m1) and secondary mass (m2).
     """
     M = M_c / eta ** (3.0 / 5)
     m1 = M * (1 + jnp.sqrt(1 - 4 * eta)) / 2
@@ -208,17 +237,11 @@ def q_to_eta(q: Float) -> Float:
     """
     Transforming the chirp mass M_c and mass ratio q to the symmetric mass ratio eta.
 
-    Parameters
-    ----------
-    M_c : Float
-            Chirp mass.
-    q : Float
-            Mass ratio.
+    Args:
+        q (Float): Mass ratio.
 
-    Returns
-    -------
-    eta : Float
-            Symmetric mass ratio.
+    Returns:
+        Float: Symmetric mass ratio (eta).
     """
     eta = q / (1 + q) ** 2
     return eta
@@ -230,15 +253,11 @@ def eta_to_q(eta: Float) -> Float:
 
     Copied and modified from bilby/gw/conversion.py
 
-    Parameters
-    ----------
-    eta : Float
-            Symmetric mass ratio.
+    Args:
+        eta (Float): Symmetric mass ratio.
 
-    Returns
-    -------
-    q : Float
-            Mass ratio.
+    Returns:
+        Float: Mass ratio (q).
     """
     temp = 1 / eta / 2 - 1
     return temp - (temp**2 - 1) ** 0.5
@@ -295,21 +314,13 @@ def angle_rotation(
 
     Modified from bilby-cython/geometry.pyx.
 
-    Parameters
-    ----------
-    zenith : Float
-            Zenith angle.
-    azimuth : Float
-            Azimuthal angle.
-    rotation : Float[Array, "3 3"]
-            The rotation matrix.
+    Args:
+        zenith (Float): Zenith angle.
+        azimuth (Float): Azimuthal angle.
+        rotation (Float[Array, "3 3"]): The rotation matrix.
 
-    Returns
-    -------
-    theta : Float
-            Polar angle.
-    phi : Float
-            Azimuthal angle.
+    Returns:
+        tuple[Float, Float]: Polar angle (theta) and azimuthal angle (phi).
     """
     sky_loc_vec = jnp.array(
         [
@@ -332,21 +343,13 @@ def theta_phi_to_ra_dec(theta: Float, phi: Float, gmst: Float) -> tuple[Float, F
     """
     Transforming the polar angle and azimuthal angle to right ascension and declination.
 
-    Parameters
-    ----------
-    theta : Float
-            Polar angle.
-    phi : Float
-            Azimuthal angle.
-    gmst : Float
-            Greenwich mean sidereal time.
+    Args:
+        theta (Float): Polar angle.
+        phi (Float): Azimuthal angle.
+        gmst (Float): Greenwich mean sidereal time.
 
-    Returns
-    -------
-    ra : Float
-            Right ascension.
-    dec : Float
-            Declination.
+    Returns:
+        tuple[Float, Float]: Right ascension (ra) and declination (dec).
     """
     ra = phi + gmst
     dec = jnp.pi / 2 - theta
@@ -360,25 +363,16 @@ def zenith_azimuth_to_ra_dec(
     """
     Transforming the azimuthal angle and zenith angle in Earth frame to right ascension and declination.
 
-    Parameters
-    ----------
-    zenith : Float
-            Zenith angle.
-    azimuth : Float
-            Azimuthal angle.
-    gmst : Float
-            Greenwich mean sidereal time.
-    rotation : Float[Array, "3 3"]
-            The rotation matrix.
-
     Copied and modified from bilby/gw/utils.py
 
-    Returns
-    -------
-    ra : Float
-            Right ascension.
-    dec : Float
-            Declination.
+    Args:
+        zenith (Float): Zenith angle.
+        azimuth (Float): Azimuthal angle.
+        gmst (Float): Greenwich mean sidereal time.
+        rotation (Float[Array, "3 3"]): The rotation matrix.
+
+    Returns:
+        tuple[Float, Float]: Right ascension (ra) and declination (dec).
     """
     theta, phi = angle_rotation(zenith, azimuth, rotation)
     ra, dec = theta_phi_to_ra_dec(theta, phi, gmst)
@@ -390,21 +384,13 @@ def ra_dec_to_theta_phi(ra: Float, dec: Float, gmst: Float) -> tuple[Float, Floa
     Transforming the right ascension ra and declination dec to the polar angle
     theta and azimuthal angle phi.
 
-    Parameters
-    ----------
-    ra : Float
-            Right ascension.
-    dec : Float
-            Declination.
-    gmst : Float
-            Greenwich mean sidereal time.
+    Args:
+        ra (Float): Right ascension.
+        dec (Float): Declination.
+        gmst (Float): Greenwich mean sidereal time.
 
-    Returns
-    -------
-    theta : Float
-            Polar angle.
-    phi : Float
-            Azimuthal angle.
+    Returns:
+        tuple[Float, Float]: Polar angle (theta) and azimuthal angle (phi).
     """
     phi = ra - gmst
     theta = jnp.pi / 2 - dec
@@ -418,23 +404,14 @@ def ra_dec_to_zenith_azimuth(
     """
     Transforming the right ascension and declination to the zenith angle and azimuthal angle.
 
-    Parameters
-    ----------
-    ra : Float
-            Right ascension.
-    dec : Float
-            Declination.
-    gmst : Float
-            Greenwich mean sidereal time.
-    rotation : Float[Array, "3 3"]
-            The rotation matrix.
+    Args:
+        ra (Float): Right ascension.
+        dec (Float): Declination.
+        gmst (Float): Greenwich mean sidereal time.
+        rotation (Float[Array, "3 3"]): The rotation matrix.
 
-    Returns
-    -------
-    zenith : Float
-            Zenith angle.
-    azimuth : Float
-            Azimuthal angle.
+    Returns:
+        tuple[Float, Float]: Zenith angle and azimuthal angle.
     """
     theta, phi = ra_dec_to_theta_phi(ra, dec, gmst)
     zenith, azimuth = angle_rotation(theta, phi, rotation)
@@ -443,19 +420,14 @@ def ra_dec_to_zenith_azimuth(
 
 def rotate_y(angle: Float, vec: Float[Array, "3"]) -> Float[Array, "3"]:
     """
-    Rotate the vector (x, y, z) about y-axis
+    Rotate the vector (x, y, z) about y-axis.
 
-    Parameters
-    ----------
-    angle : Float
-        Angle in radians.
-    vec : Float[Array, "3"]
-        Vector to be rotated.
-    Returns
-    -------
-    rotated_vec : Float[Array, "3"]
-        Rotated vector.
-    -------
+    Args:
+        angle (Float): Angle in radians.
+        vec (Float[Array, "3"]): Vector to be rotated.
+
+    Returns:
+        Float[Array, "3"]: Rotated vector.
     """
     cos_angle = jnp.cos(angle)
     sin_angle = jnp.sin(angle)
@@ -468,18 +440,14 @@ def rotate_y(angle: Float, vec: Float[Array, "3"]) -> Float[Array, "3"]:
 
 def rotate_z(angle: Float, vec: Float[Array, "3"]) -> Float[Array, "3"]:
     """
-    Rotate the vector (x, y, z) about z-axis
+    Rotate the vector (x, y, z) about z-axis.
 
-    Parameters
-    ----------
-    angle : Float
-        Angle in radians.
-    vec : Float[Array, "3"]
-        Vector to be rotated.
-    Returns
-    -------
-    rotated_vec : Float[Array, "3"]
-        Rotated vector.
+    Args:
+        angle (Float): Angle in radians.
+        vec (Float[Array, "3"]): Vector to be rotated.
+
+    Returns:
+        Float[Array, "3"]: Rotated vector.
     """
     cos_angle = jnp.cos(angle)
     sin_angle = jnp.sin(angle)
@@ -495,18 +463,13 @@ def Lmag_2PN(m1: Float, m2: Float, v0: Float) -> Float:
     Compute the magnitude of the orbital angular momentum
     to 2 post-Newtonian orders.
 
-    Parameters
-    ----------
-    m1 : Float
-        Primary mass.
-    m2 : Float
-        Secondary mass.
-    v0 : Float
-        Relative velocity at the reference frequency.
-    Returns
-    -------
-    Lmag : Float
-        Magnitude of the orbital angular momentum.
+    Args:
+        m1 (Float): Primary mass.
+        m2 (Float): Secondary mass.
+        v0 (Float): Relative velocity at the reference frequency.
+
+    Returns:
+        Float: Magnitude of the orbital angular momentum.
     """
     eta = m1 * m2 / (m1 + m2) ** 2
     LN = (m1 + m2) * (m1 + m2) * eta / v0
@@ -528,53 +491,35 @@ def spin_angles_to_cartesian_spin(
     phiRef: Float,
 ) -> tuple[Float, Float, Float, Float, Float, Float, Float]:
     """
-    Transforming the spin parameters
+    Transforming the spin parameters.
 
     The code is based on the approach used in LALsimulation:
     https://lscsoft.docs.ligo.org/lalsuite/lalsimulation/group__lalsimulation__inference.html
 
-    Parameters:
-    -------
-    theta_jn: Float
-        Zenith angle between the total angular momentum and the line of sight
-    phi_jl: Float
-        Difference between total and orbital angular momentum azimuthal angles
-    tilt_1: Float
-        Zenith angle between the spin and orbital angular momenta for the primary object
-    tilt_2: Float
-        Zenith angle between the spin and orbital angular momenta for the secondary object
-    phi_12: Float
-        Difference between the azimuthal angles of the individual spin vector projections
-        onto the orbital plane
-    chi_1: Float
-        Primary object aligned spin:
-    chi_2: Float
-        Secondary object aligned spin:
-    M_c: Float
-        The chirp mass
-    q: Float
-        The mass ratio
-    fRef: Float
-        The reference frequency
-    phiRef: Float
-        Binary phase at a reference frequency
+    Args:
+        theta_jn (Float): Zenith angle between the total angular momentum and the line of sight.
+        phi_jl (Float): Difference between total and orbital angular momentum azimuthal angles.
+        tilt_1 (Float): Zenith angle between the spin and orbital angular momenta for the primary object.
+        tilt_2 (Float): Zenith angle between the spin and orbital angular momenta for the secondary object.
+        phi_12 (Float): Difference between the azimuthal angles of the individual spin vector projections
+            onto the orbital plane.
+        chi_1 (Float): Primary object aligned spin.
+        chi_2 (Float): Secondary object aligned spin.
+        M_c (Float): The chirp mass.
+        q (Float): The mass ratio.
+        fRef (Float): The reference frequency.
+        phiRef (Float): Binary phase at a reference frequency.
 
     Returns:
-    -------
-    iota: Float
-        Zenith angle between the orbital angular momentum and the line of sight
-    S1x: Float
-        The x-component of the primary spin
-    S1y: Float
-        The y-component of the primary spin
-    S1z: Float
-        The z-component of the primary spin
-    S2x: Float
-        The x-component of the secondary spin
-    S2y: Float
-        The y-component of the secondary spin
-    S2z: Float
-        The z-component of the secondary spin
+        tuple[Float, Float, Float, Float, Float, Float, Float]: Tuple of (iota, S1x, S1y, S1z, S2x, S2y, S2z):
+
+            - iota: Zenith angle between the orbital angular momentum and the line of sight.
+            - S1x: The x-component of the primary spin.
+            - S1y: The y-component of the primary spin.
+            - S1z: The z-component of the primary spin.
+            - S2x: The x-component of the secondary spin.
+            - S2y: The y-component of the secondary spin.
+            - S2z: The z-component of the secondary spin.
     """
 
     # Starting frame: LNh along the z-axis
@@ -664,53 +609,34 @@ def cartesian_spin_to_spin_angles(
     phiRef: Float,
 ) -> tuple[Float, Float, Float, Float, Float, Float, Float]:
     """
-    Transforming the cartesian spin parameters to the spin angles
+    Transforming the cartesian spin parameters to the spin angles.
 
     The code is based on the approach used in LALsimulation:
     https://lscsoft.docs.ligo.org/lalsuite/lalsimulation/group__lalsimulation__inference.html
 
-    Parameters:
-    -------
-    iota: Float
-       Zenith angle between the orbital angular momentum and the line of sight
-    S1x: Float
-        The x-component of the primary spin
-    S1y: Float
-        The y-component of the primary spin
-    S1z: Float
-        The z-component of the primary spin
-    S2x: Float
-        The x-component of the secondary spin
-    S2y: Float
-        The y-component of the secondary spin
-    S2z: Float
-        The z-component of the secondary spin
-    M_c: Float
-        The chirp mass
-    q: Float
-        The mass ratio
-    fRef: Float
-        The reference frequency
-    phiRef: Float
-        The binary phase at the reference frequency
+    Args:
+        iota (Float): Zenith angle between the orbital angular momentum and the line of sight.
+        S1x (Float): The x-component of the primary spin.
+        S1y (Float): The y-component of the primary spin.
+        S1z (Float): The z-component of the primary spin.
+        S2x (Float): The x-component of the secondary spin.
+        S2y (Float): The y-component of the secondary spin.
+        S2z (Float): The z-component of the secondary spin.
+        M_c (Float): The chirp mass.
+        q (Float): The mass ratio.
+        fRef (Float): The reference frequency.
+        phiRef (Float): The binary phase at the reference frequency.
 
     Returns:
-    -------
-    theta_jn: Float
-    Zenith angle between the total angular momentum and the line of sight
-    phi_jl: Float
-        Difference between total and orbital angular momentum azimuthal angles
-    tilt_1: Float
-        Zenith angle between the spin and orbital angular momenta for the primary object
-    tilt_2: Float
-        Zenith angle between the spin and orbital angular momenta for the secondary object
-    phi_12: Float
-        Difference between the azimuthal angles of the individual spin vector projections
-        onto the orbital plane
-    chi_1: Float
-        Primary object aligned spin:
-    chi_2: Float
-        Secondary object aligned spin:
+        tuple[Float, ...]: Tuple of (theta_jn, phi_jl, tilt_1, tilt_2, phi_12, chi_1, chi_2):
+
+            - theta_jn: Zenith angle between the total angular momentum and the line of sight.
+            - phi_jl: Difference between total and orbital angular momentum azimuthal angles.
+            - tilt_1: Zenith angle between the spin and orbital angular momenta for the primary object.
+            - tilt_2: Zenith angle between the spin and orbital angular momenta for the secondary object.
+            - phi_12: Difference between the azimuthal angles of the individual spin vector projections onto the orbital plane.
+            - chi_1: Primary object aligned spin.
+            - chi_2: Secondary object aligned spin.
     """
     # Starting frame: LNh along the z-axis
     LNh = jnp.array([0.0, 0.0, 1.0])

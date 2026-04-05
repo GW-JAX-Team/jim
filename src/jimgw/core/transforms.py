@@ -39,15 +39,11 @@ class NtoMTransform(Transform):
         """
         Push forward the input x to transformed coordinate y.
 
-        Parameters
-        ----------
-        x : dict[str, Float]
-                The input dictionary.
+        Args:
+            x (dict[str, Float]): The input dictionary.
 
-        Returns
-        -------
-        y : dict[str, Float]
-                The transformed dictionary.
+        Returns:
+            dict[str, Float]: The transformed dictionary.
         """
         x_copy = x.copy()
         output_params = self.transform_func(x_copy)
@@ -75,17 +71,11 @@ class NtoNTransform(NtoMTransform):
         Transform the input x to transformed coordinate y and return the log Jacobian determinant.
         This only works if the transform is a N -> N transform.
 
-        Parameters
-        ----------
-        x : dict[str, Float]
-                The input dictionary.
+        Args:
+            x (dict[str, Float]): The input dictionary.
 
-        Returns
-        -------
-        y : dict[str, Float]
-                The transformed dictionary.
-        log_det : Float
-                The log Jacobian determinant.
+        Returns:
+            tuple[dict[str, Float], Float]: The transformed dictionary and the log Jacobian determinant.
         """
         x_copy = x.copy()
         transform_params = dict((key, x_copy[key]) for key in self.name_mapping[0])
@@ -116,17 +106,11 @@ class BijectiveTransform(NtoNTransform):
         """
         Inverse transform the input y to original coordinate x.
 
-        Parameters
-        ----------
-        y : dict[str, Float]
-                The transformed dictionary.
+        Args:
+            y (dict[str, Float]): The transformed dictionary.
 
-        Returns
-        -------
-        x : dict[str, Float]
-                The original dictionary.
-        log_det : Float
-                The log Jacobian determinant.
+        Returns:
+            tuple[dict[str, Float], Float]: The original dictionary and the log Jacobian determinant.
         """
         y_copy = y.copy()
         transform_params = dict((key, y_copy[key]) for key in self.name_mapping[1])
@@ -148,17 +132,13 @@ class BijectiveTransform(NtoNTransform):
 
     def backward(self, y: dict[str, Float]) -> dict[str, Float]:
         """
-        Pull back the input y to original coordinate x and return the log Jacobian determinant.
+        Pull back the input y to original coordinate x.
 
-        Parameters
-        ----------
-        y : dict[str, Float]
-                The transformed dictionary.
+        Args:
+            y (dict[str, Float]): The transformed dictionary.
 
-        Returns
-        -------
-        x : dict[str, Float]
-                The original dictionary.
+        Returns:
+            dict[str, Float]: The original dictionary.
         """
         y_copy = y.copy()
         output_params = self.inverse_transform_func(y_copy)
@@ -293,13 +273,10 @@ class OffsetTransform(BijectiveTransform):
 @jaxtyped(typechecker=typechecker)
 class LogitTransform(BijectiveTransform):
     """
-    Logit transform following
+    Logit transform.
 
-    Parameters
-    ----------
-    name_mapping : tuple[list[str], list[str]]
-            The name mapping between the input and output dictionary.
-
+    Args:
+        name_mapping (tuple[list[str], list[str]]): The name mapping between the input and output dictionary.
     """
 
     def __repr__(self):
@@ -323,15 +300,12 @@ class LogitTransform(BijectiveTransform):
 @jaxtyped(typechecker=typechecker)
 class SineTransform(BijectiveTransform):
     """
-    Sine transformation
+    Sine transformation.
 
-    The original parameter is expected to be in [-pi/2, pi/2]
+    The original parameter is expected to be in [-pi/2, pi/2].
 
-    Parameters
-    ----------
-    name_mapping : tuple[list[str], list[str]]
-            The name mapping between the input and output dictionary.
-
+    Args:
+        name_mapping (tuple[list[str], list[str]]): The name mapping between the input and output dictionary.
     """
 
     def __repr__(self):
@@ -355,15 +329,12 @@ class SineTransform(BijectiveTransform):
 @jaxtyped(typechecker=typechecker)
 class CosineTransform(BijectiveTransform):
     """
-    Cosine transformation
+    Cosine transformation.
 
-    The original parameter is expected to be in [0, pi]
+    The original parameter is expected to be in [0, pi].
 
-    Parameters
-    ----------
-    name_mapping : tuple[list[str], list[str]]
-            The name mapping between the input and output dictionary.
-
+    Args:
+        name_mapping (tuple[list[str], list[str]]): The name mapping between the input and output dictionary.
     """
 
     def __repr__(self):
@@ -470,13 +441,10 @@ class BoundToUnbound(BijectiveTransform):
 @jaxtyped(typechecker=typechecker)
 class SingleSidedUnboundTransform(BijectiveTransform):
     """
-    Unbound upper limit transformation
+    Unbound upper limit transformation.
 
-    Parameters
-    ----------
-    name_mapping : tuple[list[str], list[str]]
-            The name mapping between the input and output dictionary.
-
+    Args:
+        name_mapping (tuple[list[str], list[str]]): The name mapping between the input and output dictionary.
     """
 
     original_lower_bound: Float[Array, " n_dim"]
@@ -508,11 +476,10 @@ class SingleSidedUnboundTransform(BijectiveTransform):
 @jaxtyped(typechecker=typechecker)
 class PowerLawTransform(BijectiveTransform):
     """
-    PowerLaw transformation
-    Parameters
-    ----------
-    name_mapping : tuple[list[str], list[str]]
-            The name mapping between the input and output dictionary.
+    PowerLaw transformation.
+
+    Args:
+        name_mapping (tuple[list[str], list[str]]): The name mapping between the input and output dictionary.
     """
 
     xmin: Float
@@ -569,10 +536,9 @@ class PowerLawTransform(BijectiveTransform):
 class CartesianToPolarTransform(BijectiveTransform):
     """
     Transformation from (x, y) to (theta, r).
-    Parameters
-    ----------
-    parameter_name : str
-            The name of the parameter to be transformed.
+
+    Args:
+        parameter_name (str): The name of the parameter to be transformed.
     """
 
     def __repr__(self):
@@ -643,11 +609,10 @@ class PeriodicTransform(BijectiveTransform):
 @jaxtyped(typechecker=typechecker)
 class RayleighTransform(BijectiveTransform):
     """
-    Transformation from Uniform(0, 1) to Rayleigh distribution with scale parameter sigma
-    Parameters
-    ----------
-    parameter_name : str
-            The name of the parameter to be transformed.
+    Transformation from Uniform(0, 1) to Rayleigh distribution with scale parameter sigma.
+
+    Args:
+        name_mapping (tuple[list[str], list[str]]): The name mapping between the input and output dictionary.
     """
 
     def __repr__(self):

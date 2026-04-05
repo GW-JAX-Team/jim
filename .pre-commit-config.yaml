@@ -1,6 +1,10 @@
+ci:
+  autoupdate_branch: jim-dev
+  skip: [uv-lock, pyright]
+
 repos:
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.10.7
+    rev: 0.10.8
     hooks:
       - id: uv-lock
         args: ["--upgrade"]
@@ -19,4 +23,4 @@ repos:
     hooks:
     - id: pyright
       files: src/
-      additional_dependencies: [beartype, jax, jaxtyping, pytest, typing_extensions, flowMC, ripplegw, gwpy, astropy, dagster, corner]
+      additional_dependencies: [beartype, jax, jaxtyping, pytest, typing_extensions, flowMC, ripplegw, gwpy, astropy]

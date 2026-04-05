@@ -33,7 +33,7 @@ class Data(ABC):
         name: Name of the data instance.
         td: Time domain data array.
         fd: Frequency domain data array.
-        epoch: Time epoch of the data.
+        start_time: GPS start time of the data segment in seconds.
         delta_t: Time step between samples.
         window: Window function applied to data.
     """
@@ -43,7 +43,7 @@ class Data(ABC):
     td: Float[Array, "n_time"]
     fd: Complex[Array, "n_time // 2 + 1"]
 
-    epoch: Float
+    start_time: Float
     delta_t: Float
 
     window: Float[Array, "n_time"]
@@ -116,7 +116,7 @@ class Data(ABC):
         Returns:
             Array: Array of time points in seconds.
         """
-        return jnp.arange(self.n_time) * self.delta_t + self.epoch
+        return jnp.arange(self.n_time) * self.delta_t + self.start_time
 
     @property
     def frequencies(self) -> Float[Array, "n_time // 2 + 1"]:
@@ -140,7 +140,7 @@ class Data(ABC):
         self,
         td: Float[Array, "n_time"] = jnp.array([]),
         delta_t: Float = 0.0,
-        epoch: Float = 0.0,
+        start_time: Float = 0.0,
         name: str = "",
         window: Optional[Float[Array, "n_time"]] = None,
     ) -> None:
@@ -149,7 +149,7 @@ class Data(ABC):
         Args:
             td: Time domain data array.
             delta_t: Time step of the data in seconds.
-            epoch: Epoch of the data in seconds (default: 0).
+            start_time: GPS start time of the segment in seconds (default: 0).
             name: Name of the data (default: '').
             window: Window function to apply to the data before FFT (default: None).
         """
@@ -157,7 +157,7 @@ class Data(ABC):
         self.td = td
         self.fd = jnp.zeros(self.n_freq, dtype="complex128")
         self.delta_t = delta_t
-        self.epoch = epoch
+        self.start_time = start_time
         if window is None:
             self.set_tukey_window()
         else:
@@ -166,7 +166,7 @@ class Data(ABC):
     def __repr__(self):
         return (
             f"{self.__class__.__name__}(name='{self.name}', "
-            + f"delta_t={self.delta_t}, epoch={self.epoch})"
+            + f"delta_t={self.delta_t}, start_time={self.start_time})"
         )
 
     def __bool__(self) -> bool:
@@ -277,7 +277,7 @@ class Data(ABC):
         cls,
         fd_strain: Complex[Array, "n_freq"],
         frequencies: Float[Array, "n_freq"],
-        epoch: float = 0.0,
+        start_time: float = 0.0,
         name: str = "",
     ) -> Self:
         """Create a Data object starting from (potentially incomplete)
@@ -286,7 +286,7 @@ class Data(ABC):
         Args:
             fd_strain: Fourier domain data array.
             frequencies: Frequencies of the data in Hz.
-            epoch: Epoch of the data in seconds (default: 0).
+            start_time: GPS start time of the segment in seconds (default: 0).
             name: Name of the data (default: '').
 
         Returns:
@@ -323,7 +323,7 @@ class Data(ABC):
             "Generated frequencies do not match the input frequencies"
         )
         # Create a Data object
-        data = cls(data_td_full, delta_t, epoch=epoch, name=name)
+        data = cls(data_td_full, delta_t, start_time=start_time, name=name)
         data.fd = data_fd_full
 
         # Ensures the newly constructed Data in FD faithfully
@@ -340,21 +340,21 @@ class Data(ABC):
     @classmethod
     def from_file(cls, path: str) -> Self:
         """Load data from a file. This assumes the data to be in .npz format.
-        It should at least contains the keys 'td', 'dt', and 'epoch'.
-        `td` is the time domain data, `dt` is the time step, and `epoch` is the
-        epoch of the data in seconds.
+        It should at least contain the keys 'td', 'dt', and 'start_time' (GPS start time).
 
         Args:
             path (str): Path to the .npz file containing the data.
         """
         with np.load(path) as data:
-            if "td" not in data or "dt" not in data or "epoch" not in data:
-                raise ValueError("The file must contain 'td', 'dt', and 'epoch' keys.")
+            if "td" not in data or "dt" not in data or "start_time" not in data:
+                raise ValueError(
+                    "The file must contain 'td', 'dt', and 'start_time' keys."
+                )
             td = jnp.array(data["td"])
             dt = float(data["dt"])
-            epoch = float(data["epoch"])
+            start_time = float(data["start_time"])
             name = str(data.get("name", ""))
-        return cls(td, dt, epoch, name)
+        return cls(td, dt, start_time, name)
 
     def to_file(self, path: str):
         """Save the data to a file in .npz format.
@@ -366,7 +366,7 @@ class Data(ABC):
             path,
             td=self.td,
             dt=self.delta_t,
-            epoch=self.epoch,
+            start_time=self.start_time,
             name=self.name,
         )
 

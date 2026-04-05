@@ -8,16 +8,15 @@ KNOWN_POLS = "pcxybl"
 
 
 class Polarization(eqx.Module):
-    name: str
     """Object defining a given polarization mode, with utilities to produce
     corresponding tensor in an Earth centric frame.
 
-    Arguments
-    ---------
-    name : str
-        one of 'p' (plus), 'c' (cross), 'x' (vector x), 'y' (vector y), 'b'
-        (breathing), or 'l' (longitudinal).
+    Args:
+        name (str): One of 'p' (plus), 'c' (cross), 'x' (vector x), 'y' (vector y),
+            'b' (breathing), or 'l' (longitudinal).
     """
+
+    name: str
 
     def __init__(self, name: str):
         self.name = name.lower()
@@ -57,21 +56,14 @@ class Polarization(eqx.Module):
         """Computes {name} polarization tensor in celestial
         coordinates from sky location and orientation parameters.
 
-        Arguments
-        ---------
-        ra : Float
-            right ascension in radians.
-        dec : Float
-            declination in radians.
-        psi : Float
-            polarization angle in radians.
-        gmst : Float
-            Greenwhich mean standard time (GMST) in radians.
+        Args:
+            ra (Float): Right ascension in radians.
+            dec (Float): Declination in radians.
+            psi (Float): Polarization angle in radians.
+            gmst (Float): Greenwich mean standard time (GMST) in radians.
 
-        Returns
-        -------
-        tensor : array
-            3x3 polarization tensor.
+        Returns:
+            Float[Array, "3 3"]: 3x3 polarization tensor.
         """
         gmst = jnp.mod(gmst, 2 * jnp.pi)
         phi = ra - gmst
