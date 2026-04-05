@@ -4,7 +4,7 @@
 
 ### Float precision
 
-JAX defaults to float32, but gravitational-wave analyses require float64 precision. Without it you may see inaccurate likelihoods or unexpected NaN values. Always enable it at the top of your script, **before** any JAX operations:
+JAX defaults to float32, but gravitational-wave analyses require float64 precision. Without it, you may see inaccurate likelihoods or unexpected NaN values. Always enable it at the top of your script, **before** any JAX operations:
 
 ```python
 import jax
