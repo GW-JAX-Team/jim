@@ -31,7 +31,7 @@ class SingleEventLikelihood(LikelihoodBase):
     waveform: Waveform
     fixed_parameters: dict[
         str, Float | Callable[[dict[str, Float]], Float | dict[str, Float]]
-    ] = {}
+    ]
 
     @property
     def duration(self) -> Float:
