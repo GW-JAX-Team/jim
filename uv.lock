@@ -401,23 +401,6 @@ wheels = [
 ]
 
 [[package]]
-name = "chex"
-version = "0.1.91"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "absl-py" },
-    { name = "jax" },
-    { name = "jaxlib" },
-    { name = "numpy" },
-    { name = "toolz" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5b/7d/812f01e7b2ddf28a0caa8dde56bd951a2c8f691c9bbfce38d469458d1502/chex-0.1.91.tar.gz", hash = "sha256:65367a521415ada905b8c0222b0a41a68337fcadf79a1fb6fc992dbd95dd9f76", size = 90302, upload-time = "2025-09-01T21:49:32.834Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/12/0c/96102c01dd02ae740d4afc3644d5c7d7fc51d3feefd67300a2aa1ddbf7cb/chex-0.1.91-py3-none-any.whl", hash = "sha256:6fc4cbfc22301c08d4a7ef706045668410100962eba8ba6af03fa07f4e5dcf9b", size = 100965, upload-time = "2025-09-01T21:49:31.141Z" },
-]
-
-[[package]]
 name = "click"
 version = "8.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -799,6 +782,24 @@ wheels = [
 ]
 
 [[package]]
+name = "diffrax"
+version = "0.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "equinox" },
+    { name = "jax" },
+    { name = "jaxtyping" },
+    { name = "lineax" },
+    { name = "optimistix" },
+    { name = "typing-extensions" },
+    { name = "wadler-lindig" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5a/ea/a22853377a840d70d1d174d43183f12990c66eecf34ba7e76eec781249d0/diffrax-0.7.2.tar.gz", hash = "sha256:9adc70fe90dba83f7dd839845839b2531a3dd736a3944fe1aa26598507cfb48e", size = 155159, upload-time = "2026-02-18T01:14:04.964Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6c/48/c42f657f3d6b4d9d9674c9bc48e763d024511ea4cc1d6e0c68c7b4380c43/diffrax-0.7.2-py3-none-any.whl", hash = "sha256:1beee2f991cd049962fe3c89da28f933753aa66d80bef857533276c9f23301ed", size = 199673, upload-time = "2026-02-18T01:14:03.38Z" },
+]
+
+[[package]]
 name = "dill"
 version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -966,20 +967,19 @@ wheels = [
 
 [[package]]
 name = "flowmc"
-version = "0.4.5"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "chex" },
+    { name = "diffrax" },
     { name = "equinox" },
     { name = "jax" },
     { name = "jaxtyping" },
     { name = "optax" },
-    { name = "scikit-learn" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/69/a5/f8fdd54c1bf8fd4a4680419c1c0cae8e5977bfbc75dbe562503412744d46/flowmc-0.4.5.tar.gz", hash = "sha256:dfe99a999609ca2d7a3a7f81280c4dd447b90c6c953b4d166c54a4755684d224", size = 3083518, upload-time = "2025-07-03T18:42:25.963Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/96/95/13f1e1e7ea17cb3f1e65fab9220f522cc24da3cfe01d130597d0996174cc/flowmc-0.5.0.tar.gz", hash = "sha256:06afc900e9d683fca39a41128b2b41ba5005b7540fd2d1cfff58c7d1e136d0f1", size = 2811471, upload-time = "2026-04-08T13:40:13.768Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/fa/c7a5fa1698af3ddf60afb4986eeab13476abc57dc4992e5a3f79cf9f4b95/flowmc-0.4.5-py3-none-any.whl", hash = "sha256:93a1db9526735ec54133ebfdd6fd467ee98d54c95aaa3f2c34374027b9816d89", size = 46677, upload-time = "2025-07-03T18:42:24.724Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/51/fa32b3daba1ed1acc3997340a7ab384d4fa5857b1a1932be0c6e8f44d25c/flowmc-0.5.0-py3-none-any.whl", hash = "sha256:39e0c5135ca8e1e02609bf2f229dbe53d335d07a40ebf83c130456a8e0084f49", size = 85440, upload-time = "2026-04-08T13:40:12.325Z" },
 ]
 
 [[package]]
@@ -1564,14 +1564,14 @@ requires-dist = [
     { name = "beartype", specifier = ">=0.19.0" },
     { name = "corner", marker = "extra == 'visualize'", specifier = ">=2.2.3" },
     { name = "evosax", specifier = ">=0.2.0" },
-    { name = "flowmc", specifier = ">=0.4.5" },
+    { name = "flowmc", specifier = ">=0.5.0" },
     { name = "gwpy", specifier = ">=3.0.12" },
     { name = "jax", specifier = ">=0.8.2" },
     { name = "jax", extras = ["cuda"], marker = "extra == 'cuda'", specifier = ">=0.8.2" },
     { name = "jaxtyping", specifier = ">=0.3.3" },
     { name = "matplotlib", marker = "extra == 'visualize'", specifier = ">=3.10.7" },
     { name = "numpy", marker = "extra == 'visualize'" },
-    { name = "ripplegw", specifier = ">=0.0.9" },
+    { name = "ripplegw", specifier = ">=0.1.0" },
     { name = "scipy", specifier = ">=1.17.1" },
 ]
 provides-extras = ["cuda", "visualize"]
@@ -1844,6 +1844,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7e/9b/521be61daa7603603826d40fa6327a22e04df4f20e69d9ed42182370a7f8/ligotimegps-2.1.0.tar.gz", hash = "sha256:d948ffc4d58472b303478a983ec56d2e6a7f35e54cbb351ca6f1292e68398cb2", size = 28069, upload-time = "2025-10-07T10:55:28.124Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0e/92/38674acb59c663bcdb69522e11afd3b4e6371f74b5764aeec2e99308cd79/ligotimegps-2.1.0-py3-none-any.whl", hash = "sha256:14dbbb07b175b94b4e1a519d7baa4548f0ea07bc71ef7d7f096ad8397d359043", size = 23370, upload-time = "2025-10-07T10:55:28.855Z" },
+]
+
+[[package]]
+name = "lineax"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "equinox" },
+    { name = "jax" },
+    { name = "jaxtyping" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/35/d6/4e28416a6fe58dd6bc7565b1ffa330f4d0ba7d74212642b1b734c511299e/lineax-0.1.0.tar.gz", hash = "sha256:5f1a8f060142af2cdbf7d66b99e8d3071c3aa734b677df6339df4b4c4c0554d2", size = 50209, upload-time = "2026-01-27T21:17:26.652Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/80/0c/2ed47112fc1958a0a81c9b015d4e1861953a1ec3a17b081c0180a25ce82c/lineax-0.1.0-py3-none-any.whl", hash = "sha256:f00911c6b07d427c4835db46856970c8348bc82a035b51f4386ad09382af957a", size = 74600, upload-time = "2026-01-27T21:17:25.33Z" },
 ]
 
 [[package]]
@@ -2653,6 +2668,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/8c/f9/e3d11ae6f298ee941a0690e353a323d158ba5dedc436e75621c310845c5c/optax-0.2.8.tar.gz", hash = "sha256:5b225b35066fc3eebaa4d798f1b4173b4d57d1a480610908981f8343b50af0b0", size = 301193, upload-time = "2026-03-20T23:30:05.465Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8a/69/6a93d8600c339d7687a05857c7907bd4dd8cf88691a5ea106d7a50af90a1/optax-0.2.8-py3-none-any.whl", hash = "sha256:e3ca2d36c99daab1800ae9dbc0545034382d6bc780b24d969e1b0df65fa31cb4", size = 402960, upload-time = "2026-03-20T23:30:03.886Z" },
+]
+
+[[package]]
+name = "optimistix"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "equinox" },
+    { name = "jax" },
+    { name = "jaxtyping" },
+    { name = "lineax" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5c/0b/3bdc0e698cb0d264e5dca0b5bb171342a950a43fa6e046d8c57189298422/optimistix-0.1.0.tar.gz", hash = "sha256:f05c9104748e87e1dc10a0b4a2be94e427f98c3eab0b1d41ea24a593d76be03d", size = 70164, upload-time = "2026-02-16T13:35:43.991Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/63/53/6a81a6ebb1739f19c32002139719d4ee021a349d5bdbe066910feed327a1/optimistix-0.1.0-py3-none-any.whl", hash = "sha256:c8edda7bf7fe48839c93fcd72bce750c950ed9f7033158303150b7ab395add81", size = 101740, upload-time = "2026-02-16T13:35:42.971Z" },
 ]
 
 [[package]]
@@ -3490,16 +3521,15 @@ wheels = [
 
 [[package]]
 name = "ripplegw"
-version = "0.0.9"
+version = "0.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jax" },
-    { name = "jaxlib" },
-    { name = "numpy" },
+    { name = "jaxtyping" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/52/68/0a8d7851a44c8ed6bcdd353337d2dc4e0a891e7cc2895f7fe9bbe17cbbd3/ripplegw-0.0.9.tar.gz", hash = "sha256:f0514364a1f5c530294f0c46e0efde01fecf05e8ee7bd04db256f44e0428de55", size = 452325, upload-time = "2024-05-23T18:48:07.042Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b9/e3/34e7c912de48999174c1aa345acb059453dd2185ba6f06a223598fa1ff41/ripplegw-0.1.0.tar.gz", hash = "sha256:1df54bd681cbc1baf4fbb484f9869e69c02c39b065b611bc90ed9c66d48f6a4a", size = 388170, upload-time = "2026-04-08T13:40:34.385Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b9/1c/bff356a2a6d8ce804d36778d35e8492e8309cd0f824b4f2669f408b16a3c/ripplegw-0.0.9-py3-none-any.whl", hash = "sha256:cd87ff6b3adb8d0651fc2bbbf7b4a21abc2c5bdc0680c8ec9c7b63d6d744b01a", size = 906662, upload-time = "2024-05-23T18:48:05.543Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/9f/ebd5cd04e4b36719dd287e4449f19425f0f1eef3d067ae2942f73a3e1f99/ripplegw-0.1.0-py3-none-any.whl", hash = "sha256:3bcb73acc451b46a6a4ec5c1dd136ad1a9678dd3186bc324cb895e8b01c41444", size = 119915, upload-time = "2026-04-08T13:40:33.056Z" },
 ]
 
 [[package]]
@@ -3986,15 +4016,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/12/64/da524626d3b9cc40c168a13da8335fe1c51be12c0a63685cc6db7308daae/tomli-2.4.1-cp314-cp314t-win_amd64.whl", hash = "sha256:2c1c351919aca02858f740c6d33adea0c5deea37f9ecca1cc1ef9e884a619d26", size = 121196, upload-time = "2026-03-25T20:22:01.169Z" },
     { url = "https://files.pythonhosted.org/packages/5a/cd/e80b62269fc78fc36c9af5a6b89c835baa8af28ff5ad28c7028d60860320/tomli-2.4.1-cp314-cp314t-win_arm64.whl", hash = "sha256:eab21f45c7f66c13f2a9e0e1535309cee140182a9cdae1e041d02e47291e8396", size = 100393, upload-time = "2026-03-25T20:22:02.137Z" },
     { url = "https://files.pythonhosted.org/packages/7b/61/cceae43728b7de99d9b847560c262873a1f6c98202171fd5ed62640b494b/tomli-2.4.1-py3-none-any.whl", hash = "sha256:0d85819802132122da43cb86656f8d1f8c6587d54ae7dcaf30e90533028b49fe", size = 14583, upload-time = "2026-03-25T20:22:03.012Z" },
-]
-
-[[package]]
-name = "toolz"
-version = "1.1.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/11/d6/114b492226588d6ff54579d95847662fc69196bdeec318eb45393b24c192/toolz-1.1.0.tar.gz", hash = "sha256:27a5c770d068c110d9ed9323f24f1543e83b2f300a687b7891c1a6d56b697b5b", size = 52613, upload-time = "2025-10-17T04:03:21.661Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/12/5911ae3eeec47800503a238d971e51722ccea5feb8569b735184d5fcdbc0/toolz-1.1.0-py3-none-any.whl", hash = "sha256:15ccc861ac51c53696de0a5d6d4607f99c210739caf987b5d2054f3efed429d8", size = 58093, upload-time = "2025-10-17T04:03:20.435Z" },
 ]
 
 [[package]]
