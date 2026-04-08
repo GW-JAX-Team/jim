@@ -9,9 +9,16 @@ from jaxtyping import Float, Array, jaxtyped
 
 
 class Transform(ABC):
-    """
-    Base class for transform.
-    The purpose of this class is purely for keeping name
+    """Abstract base class for parameter-space transforms.
+
+    Transforms are responsible for mapping named parameter dictionaries between
+    two coordinate spaces. Subclasses implement the actual numerical mapping;
+    this base class handles name bookkeeping.
+
+    Attributes:
+        name_mapping (tuple[list[str], list[str]]): A pair ``(from_names, to_names)``
+            describing which input parameters are consumed and which output parameters
+            are produced.
     """
 
     name_mapping: tuple[list[str], list[str]]
@@ -19,7 +26,12 @@ class Transform(ABC):
     def __init__(
         self,
         name_mapping: tuple[list[str], list[str]],
-    ):
+    ) -> None:
+        """
+        Args:
+            name_mapping (tuple[list[str], list[str]]): Pair of
+                ``(input_parameter_names, output_parameter_names)``.
+        """
         self.name_mapping = name_mapping
 
     def propagate_name(self, x: Sequence[str]) -> tuple[str, ...]:
@@ -30,6 +42,14 @@ class Transform(ABC):
 
 
 class NtoMTransform(Transform):
+    """N-to-M transform: consumes N named parameters and produces M named parameters.
+
+    Only a forward pass is defined. This is the most general transform type.
+
+    Attributes:
+        transform_func (Callable): Callable that maps an input dict to an output dict.
+    """
+
     transform_func: Callable[[dict[str, Float]], dict[str, Float]]
 
     def __repr__(self):
@@ -59,11 +79,18 @@ class NtoMTransform(Transform):
 
 
 class NtoNTransform(NtoMTransform):
+    """N-to-N transform with automatic Jacobian computation via forward-mode AD.
+
+    The number of input and output parameters must be equal. The log-Jacobian
+    determinant of the transform is computed automatically using ``jax.jacfwd``.
+    """
+
     def __repr__(self):
         return f"NtoNTransform(name_mapping={self.name_mapping})"
 
     @property
     def n_dim(self) -> int:
+        """Number of parameters consumed/produced by this transform."""
         return len(self.name_mapping[0])
 
     def transform(self, x: dict[str, Float]) -> tuple[dict[str, Float], Float]:
@@ -97,6 +124,15 @@ class NtoNTransform(NtoMTransform):
 
 
 class BijectiveTransform(NtoNTransform):
+    """Bijective (invertible) N-to-N transform.
+
+    Extends :class:`NtoNTransform` with an inverse transform function and
+    corresponding ``inverse`` and ``backward`` methods.
+
+    Attributes:
+        inverse_transform_func (Callable): Callable implementing the inverse map.
+    """
+
     inverse_transform_func: Callable[[dict[str, Float]], dict[str, Float]]
 
     def __repr__(self):
@@ -154,6 +190,17 @@ class BijectiveTransform(NtoNTransform):
 
 
 class ConditionalBijectiveTransform(BijectiveTransform):
+    """Bijective transform that depends on additional conditioning parameters.
+
+    Like :class:`BijectiveTransform`, but the transform and inverse functions
+    also receive a set of fixed conditioning parameters (e.g. masses when
+    converting spin angles). The Jacobian is computed only with respect to the
+    primary (non-conditioning) parameters.
+
+    Attributes:
+        conditional_names (list[str]): Names of the conditioning parameters.
+    """
+
     conditional_names: list[str]
 
     def __repr__(self):
@@ -163,11 +210,28 @@ class ConditionalBijectiveTransform(BijectiveTransform):
         self,
         name_mapping: tuple[list[str], list[str]],
         conditional_names: list[str],
-    ):
+    ) -> None:
+        """
+        Args:
+            name_mapping (tuple[list[str], list[str]]): Pair of
+                ``(input_names, output_names)`` for the primary parameters.
+            conditional_names (list[str]): Names of the conditioning parameters
+                that are passed through unchanged.
+        """
         super().__init__(name_mapping)
         self.conditional_names = conditional_names
 
     def transform(self, x: dict[str, Float]) -> tuple[dict[str, Float], Float]:
+        """Apply the conditional forward transform and compute the log-Jacobian.
+
+        Args:
+            x (dict[str, Float]): Parameter dictionary containing both primary and
+                conditioning parameters.
+
+        Returns:
+            tuple[dict[str, Float], Float]: The transformed parameter dictionary and
+                the log absolute Jacobian determinant w.r.t. the primary parameters.
+        """
         x_copy = x.copy()
         transform_params = dict((key, x_copy[key]) for key in self.name_mapping[0])
         transform_params.update(
@@ -194,6 +258,17 @@ class ConditionalBijectiveTransform(BijectiveTransform):
         return x_copy, jacobian
 
     def inverse(self, y: dict[str, Float]) -> tuple[dict[str, Float], Float]:
+        """Apply the conditional inverse transform and compute the log-Jacobian.
+
+        Args:
+            y (dict[str, Float]): Parameter dictionary in the output space, containing
+                both primary (output) and conditioning parameters.
+
+        Returns:
+            tuple[dict[str, Float], Float]: The inverse-transformed parameter dictionary
+                and the log absolute Jacobian determinant w.r.t. the primary output
+                parameters.
+        """
         y_copy = y.copy()
         transform_params = dict((key, y_copy[key]) for key in self.name_mapping[1])
         transform_params.update(
@@ -222,6 +297,12 @@ class ConditionalBijectiveTransform(BijectiveTransform):
 
 @jaxtyped(typechecker=typechecker)
 class ScaleTransform(BijectiveTransform):
+    """Elementwise scaling transform: ``y = x * scale``.
+
+    Attributes:
+        scale (Float): Multiplicative scale factor.
+    """
+
     scale: Float
 
     def __repr__(self):
@@ -231,7 +312,12 @@ class ScaleTransform(BijectiveTransform):
         self,
         name_mapping: tuple[list[str], list[str]],
         scale: Float,
-    ):
+    ) -> None:
+        """
+        Args:
+            name_mapping (tuple[list[str], list[str]]): ``(input_names, output_names)``.
+            scale (Float): Scale factor applied in the forward direction.
+        """
         super().__init__(name_mapping)
         self.scale = scale
         self.transform_func = lambda x: {
@@ -246,6 +332,12 @@ class ScaleTransform(BijectiveTransform):
 
 @jaxtyped(typechecker=typechecker)
 class OffsetTransform(BijectiveTransform):
+    """Elementwise offset (translation) transform: ``y = x + offset``.
+
+    Attributes:
+        offset (Float): Additive offset applied in the forward direction.
+    """
+
     offset: Float
 
     def __repr__(self):
@@ -257,7 +349,12 @@ class OffsetTransform(BijectiveTransform):
         self,
         name_mapping: tuple[list[str], list[str]],
         offset: Float,
-    ):
+    ) -> None:
+        """
+        Args:
+            name_mapping (tuple[list[str], list[str]]): ``(input_names, output_names)``.
+            offset (Float): Offset added in the forward direction.
+        """
         super().__init__(name_mapping)
         self.offset = offset
         self.transform_func = lambda x: {
@@ -357,8 +454,16 @@ class CosineTransform(BijectiveTransform):
 
 @jaxtyped(typechecker=typechecker)
 class BoundToBound(BijectiveTransform):
-    """
-    Bound to bound transformation
+    """Linear rescaling from one bounded interval to another.
+
+    Maps ``x ∈ [original_lower, original_upper]`` to
+    ``y ∈ [target_lower, target_upper]`` via a linear (affine) transform.
+
+    Attributes:
+        original_lower_bound (Float[Array, " n_dim"]): Lower bound(s) of the input interval.
+        original_upper_bound (Float[Array, " n_dim"]): Upper bound(s) of the input interval.
+        target_lower_bound (Float[Array, " n_dim"]): Lower bound(s) of the output interval.
+        target_upper_bound (Float[Array, " n_dim"]): Upper bound(s) of the output interval.
     """
 
     original_lower_bound: Float[Array, " n_dim"]
@@ -401,8 +506,19 @@ class BoundToBound(BijectiveTransform):
 
 @jaxtyped(typechecker=typechecker)
 class BoundToUnbound(BijectiveTransform):
-    """
-    Bound to unbound transformation
+    """Logit-based transform from a bounded interval to the real line.
+
+    Maps ``x ∈ (original_lower, original_upper)`` to ``y ∈ (-∞, +∞)`` via
+
+    .. math::
+
+        y = \\text{logit}\\!\\left(\\frac{x - x_{\\min}}{x_{\\max} - x_{\\min}}\\right).
+
+    The inverse maps back with the sigmoid function.
+
+    Attributes:
+        original_lower_bound (Float[Array, " n_dim"]): Lower bound(s) of the input interval.
+        original_upper_bound (Float[Array, " n_dim"]): Upper bound(s) of the input interval.
     """
 
     original_lower_bound: Float[Array, " n_dim"]
@@ -573,8 +689,16 @@ class CartesianToPolarTransform(BijectiveTransform):
 
 @jaxtyped(typechecker=typechecker)
 class PeriodicTransform(BijectiveTransform):
-    """
-    Periodic transformation
+    """Transform a periodic parameter onto a 2D circle.
+
+    Maps ``(r, θ)`` — where ``θ ∈ [xmin, xmax]`` is the periodic angle and
+    ``r`` is a scale — to Cartesian coordinates ``(x, y) = r(cos θ', sin θ')``
+    (with ``θ' = 2π(θ - xmin)/(xmax - xmin)``).  The inverse recovers
+    ``(r, θ)`` from ``(x, y)``.
+
+    Attributes:
+        xmin (Float): Lower bound of the periodic parameter.
+        xmax (Float): Upper bound of the periodic parameter.
     """
 
     def __repr__(self):
@@ -640,6 +764,19 @@ class RayleighTransform(BijectiveTransform):
 def reverse_bijective_transform(
     original_transform: BijectiveTransform,
 ) -> BijectiveTransform:
+    """Construct the inverse of a bijective transform.
+
+    Swaps the forward and inverse functions and the name mapping of
+    ``original_transform``, returning a new :class:`BijectiveTransform` (or
+    :class:`ConditionalBijectiveTransform`) whose forward direction is the
+    original's inverse.
+
+    Args:
+        original_transform (BijectiveTransform): The transform to invert.
+
+    Returns:
+        BijectiveTransform: A new transform that is the reverse of the input.
+    """
     reversed_name_mapping = (
         original_transform.name_mapping[1],
         original_transform.name_mapping[0],

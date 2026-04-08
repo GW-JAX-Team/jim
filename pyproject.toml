@@ -1,7 +1,7 @@
 [project]
 name = "jimgw"
-version = "0.3.0"
-description = "Gravitatioanl wave data analysis tool in Jax"
+dynamic = ["version"]
+description = "Gravitational wave data analysis tool in Jax"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
@@ -77,8 +77,12 @@ Changelog = "https://github.com/GW-JAX-Team/jim/releases"
 jimgw = { workspace = true }
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.3.0"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

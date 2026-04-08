@@ -12,16 +12,28 @@ def apply_fixed_parameters(
         str, Float | Callable[[dict[str, Float]], Float | dict[str, Float]]
     ],
 ) -> dict[str, Float]:
-    """Merge ``fixed_parameters`` into *params*, resolving callables.
+    """Merge ``fixed_parameters`` into *params*, resolving callables in-place.
 
     For each entry in ``fixed_parameters``:
-    - If the value is callable, it is called with the current *params* dict.
-      If the result is a dict, the value stored under the matching key is used;
-      otherwise the scalar result is used directly.
-    - If the value is not callable it is inserted as-is.
 
-    *params* is mutated in-place; callers that need to preserve the original
-    should copy before calling.
+    - If the value is **callable**, it is called with the current *params* dict.
+      If the result is a ``dict``, the value stored under the matching key is used;
+      otherwise the scalar result is used directly.
+    - If the value is **not callable**, it is inserted as-is.
+
+    Args:
+        params (dict[str, Float]): Parameter dictionary to update in-place. Callers
+            that need to preserve the original should pass a copy.
+        fixed_parameters (dict): Fixed overrides. Values may be scalar constants or
+            callables ``f(params) -> Float | dict[str, Float]`` applied in insertion
+            order.
+
+    Returns:
+        dict[str, Float]: The same ``params`` dict, mutated in-place with the fixed
+            parameters applied.
+
+    Raises:
+        KeyError: If a callable returns a dict that does not contain the expected key.
     """
     for key, value in fixed_parameters.items():
         if callable(value):
@@ -47,23 +59,24 @@ def complex_inner_product(
     psd: Float[Array, " n_freq"],
     df: Float,
 ) -> Complex:
-    """
-    Compute the complex inner product of two waveforms h1 and h2
-    with the given power spectral density (PSD).
-    The first waveform, h1, is complex conjugated.
+    """Compute the complex noise-weighted inner product of two frequency-domain waveforms.
 
-    Note that this is supposed to be a sum instead of an integral for discrete samples.
+    The first waveform ``h1`` is complex-conjugated. The result is:
+
+    .. math::
+
+        \\langle h_1, h_2 \\rangle = 4 \\Delta f \\sum_k \\frac{h_1^*(f_k)\\, h_2(f_k)}{S_n(f_k)}
 
     Args:
-        h1 (Float[Array, "n_sample"]): First waveform. Can be complex.
-        h2 (Float[Array, "n_sample"]): Second waveform. Can be complex.
-        psd (Float[Array, "n_sample"]): Power spectral density.
-        frequency (Float[Array, "n_sample"]): Frequency array.
-        df (Float): Frequency spacing. If None, it is calculated from the frequency array.
+        h1 (Float[Array, " n_freq"]): First waveform (complex array).
+        h2 (Float[Array, " n_freq"]): Second waveform (complex array).
+        psd (Float[Array, " n_freq"]): One-sided power spectral density at each
+            frequency bin.
+        df (Float): Frequency bin spacing in Hz.
 
     Returns:
-        Complex: Noise-weighted inner product of h1 and h2 with given the PSD.
-                If either h1, h2 is the strain data, this is the match-filtered SNR.
+        Complex: Complex noise-weighted inner product. When ``h2`` is the detector
+            data, this is the complex match-filtered SNR.
     """
     return 4.0 * jnp.sum(jnp.conj(h1) * h2 / psd) * df
 
@@ -74,19 +87,26 @@ def inner_product(
     psd: Float[Array, " n_freq"],
     df: Float,
 ) -> Float:
-    """
-    Compute the noise-weighted inner product of two waveforms h1 and h2
-    with the given power spectral density (PSD).
+    """Compute the real noise-weighted inner product of two frequency-domain waveforms.
+
+    Returns the real part of :func:`complex_inner_product`:
+
+    .. math::
+
+        (h_1 | h_2) = \\operatorname{Re}\\langle h_1, h_2 \\rangle
+            = 4 \\Delta f \\sum_k \\operatorname{Re}\\!\\left[
+              \\frac{h_1^*(f_k)\\, h_2(f_k)}{S_n(f_k)} \\right]
 
     Args:
-        h1 (Float[Array, "n_sample"]): First waveform. Can be complex.
-        h2 (Float[Array, "n_sample"]): Second waveform. Can be complex.
-        psd (Float[Array, "n_sample"]): Power spectral density.
-        frequency (Float[Array, "n_sample"]): Frequency array.
-        df (Float): Frequency spacing. If None, it is calculated from the frequency array.
+        h1 (Float[Array, " n_freq"]): First waveform (complex array).
+        h2 (Float[Array, " n_freq"]): Second waveform (complex array).
+        psd (Float[Array, " n_freq"]): One-sided power spectral density at each
+            frequency bin.
+        df (Float): Frequency bin spacing in Hz.
 
     Returns:
-        Float: Noise-weighted inner product of h1 and h2 with given the PSD.
+        Float: Real noise-weighted inner product. When both waveforms are equal,
+            this equals the optimal SNR squared.
     """
     return complex_inner_product(h1, h2, psd, df).real
 

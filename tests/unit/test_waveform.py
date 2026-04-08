@@ -5,7 +5,6 @@ import jax.numpy as jnp
 import pytest
 
 from jimgw.core.single_event.waveform import (
-    Waveform,
     RippleIMRPhenomD,
     RippleIMRPhenomPv2,
     RippleTaylorF2,
@@ -123,7 +122,7 @@ class TestRippleIMRPhenomD:
         f_ref = 20.0
         waveform = RippleIMRPhenomD(f_ref=f_ref)
         assert waveform.f_ref == f_ref
-        assert isinstance(waveform, Waveform)
+        assert callable(waveform)
 
         # Generate waveform
         frequencies = jnp.linspace(20.0, 512.0, 100)
@@ -184,7 +183,7 @@ class TestRippleIMRPhenomPv2:
         f_ref = 20.0
         waveform = RippleIMRPhenomPv2(f_ref=f_ref)
         assert waveform.f_ref == f_ref
-        assert isinstance(waveform, Waveform)
+        assert callable(waveform)
 
         # Generate waveform
         frequencies = jnp.linspace(20.0, 512.0, 100)

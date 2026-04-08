@@ -5,59 +5,68 @@ from jaxtyping import Array, Float
 
 
 class Data(ABC):
+    """Abstract base class for data containers."""
+
     @abstractmethod
     def __init__(self):
         raise NotImplementedError
 
     @abstractmethod
-    def fetch(self):
+    def fetch(self) -> None:
+        """Fetch or load the data into the container."""
         raise NotImplementedError
 
 
 class Model(eqx.Module):
+    """Abstract base class for probabilistic models."""
+
     params: dict
 
     @abstractmethod
     def __init__(self):
         raise NotImplementedError
 
-    def __call__(self, x: Array) -> float:
+    def __call__(self, x: Array) -> Float:
+        """Evaluate the model at x.
+
+        Args:
+            x (Array): Input array.
+
+        Returns:
+            Float: Model output (e.g. log-probability).
+        """
         raise NotImplementedError
 
 
 class LikelihoodBase(ABC):
-    """
-    Base class for likelihoods.
-    Note that this likelihood class should work
-    for a some what general class of problems.
-    In light of that, this class would be some what abstract,
-    but the idea behind it is this handles two main components of a likelihood:
-    the data and the model.
-    It should be able to take the data and model and evaluate the likelihood for
-    a given set of parameters.
+    """Abstract base class for likelihoods.
 
+    Handles two main components: the data and the model.
+    Subclasses must implement :meth:`evaluate`.
     """
 
     _model: object
     _data: object
 
     @property
-    def model(self):
-        """
-        The model for the likelihood.
-        """
+    def model(self) -> object:
+        """The model used by the likelihood."""
         return self._model
 
     @property
-    def data(self):
-        """
-        The data for the likelihood.
-        """
+    def data(self) -> object:
+        """The data used by the likelihood."""
         return self._data
 
     @abstractmethod
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
-        """
-        Evaluate the likelihood for a given set of parameters.
+        """Evaluate the log-likelihood for a given set of parameters.
+
+        Args:
+            params (dict[str, Float]): Dictionary mapping parameter names to values.
+            data (dict): Auxiliary data (typically empty for pre-loaded data).
+
+        Returns:
+            Float: Log-likelihood value.
         """
         raise NotImplementedError

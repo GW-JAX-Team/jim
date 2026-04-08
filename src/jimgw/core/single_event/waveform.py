@@ -1,3 +1,6 @@
+from typing import Callable
+
+from jaxtyping import Array, Float
 from ripplegw import (
     IMRPhenomD,
     IMRPhenomPv2,
@@ -7,7 +10,14 @@ from ripplegw import (
     IMRPhenomXAS_NRTidalv3,
     SineGaussian,
 )
-from ripplegw.interfaces import Waveform  # noqa: F401
+
+#: Type alias for any initialized, callable waveform model.
+#: Matches the ``__call__`` signature of :class:`ripplegw.interfaces.Waveform`:
+#: ``f(freq, params) -> {"p": plus_strain, "c": cross_strain}``.
+WaveformCallable = Callable[
+    [Float[Array, " n_freq"], dict[str, Float]],
+    dict[str, Float[Array, " n_freq"]],
+]
 
 # aliases
 RippleIMRPhenomD = IMRPhenomD

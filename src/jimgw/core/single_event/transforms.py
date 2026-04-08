@@ -35,8 +35,15 @@ SEC_TO_RAD = HR_TO_RAD / HR_TO_SEC
 
 @jaxtyped(typechecker=typechecker)
 class SpinAnglesToCartesianSpinTransform(ConditionalBijectiveTransform):
-    """
-    Spin angles to Cartesian spin transformation
+    """Transform spin angles (J-frame convention) to Cartesian spin components.
+
+    Converts ``(theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1, a_2)`` to
+    ``(iota, s1_x, s1_y, s1_z, s2_x, s2_y, s2_z)`` using the LALSimulation
+    convention. The conditioning parameters are ``(M_c, q)`` and optionally
+    ``phase_c``.
+
+    Attributes:
+        freq_ref (Float): Reference frequency used in the spin conversion.
     """
 
     freq_ref: Float
@@ -48,7 +55,14 @@ class SpinAnglesToCartesianSpinTransform(ConditionalBijectiveTransform):
         self,
         freq_ref: Float,
         fixed_phase: bool = False,
-    ):
+    ) -> None:
+        """
+        Args:
+            freq_ref (Float): Reference frequency in Hz for the spin-angle conversion.
+            fixed_phase (bool): If True, the coalescence phase ``phase_c`` is not
+                included in the conditioning parameters (treated as fixed at 0).
+                Defaults to False.
+        """
         name_mapping = (
             ["theta_jn", "phi_jl", "tilt_1", "tilt_2", "phi_12", "a_1", "a_2"],
             ["iota", "s1_x", "s1_y", "s1_z", "s2_x", "s2_y", "s2_z"],
@@ -182,8 +196,11 @@ class SpinAnglesToCartesianSpinTransform(ConditionalBijectiveTransform):
 
 @jaxtyped(typechecker=typechecker)
 class SphereSpinToCartesianSpinTransform(BijectiveTransform):
-    """
-    Spin to Cartesian spin transformation
+    """Transform spin magnitude and angles to Cartesian spin components.
+
+    Converts ``({label}_mag, {label}_theta, {label}_phi)`` to
+    ``({label}_x, {label}_y, {label}_z)`` using the standard spherical-to-Cartesian
+    conversion.
     """
 
     def __repr__(self):
@@ -192,7 +209,12 @@ class SphereSpinToCartesianSpinTransform(BijectiveTransform):
     def __init__(
         self,
         label: str,
-    ):
+    ) -> None:
+        """
+        Args:
+            label (str): Parameter label prefix (e.g. ``"s1"`` produces
+                ``s1_mag``, ``s1_theta``, ``s1_phi`` → ``s1_x``, ``s1_y``, ``s1_z``).
+        """
         name_mapping = (
             [label + "_mag", label + "_theta", label + "_phi"],
             [label + "_x", label + "_y", label + "_z"],
@@ -228,8 +250,16 @@ class SphereSpinToCartesianSpinTransform(BijectiveTransform):
 
 @jaxtyped(typechecker=typechecker)
 class SkyFrameToDetectorFrameSkyPositionTransform(BijectiveTransform):
-    """
-    Transform sky frame to detector frame sky position
+    """Transform sky position from equatorial (RA/Dec) to detector-frame (zenith/azimuth).
+
+    Converts ``(ra, dec)`` to ``(zenith, azimuth)`` relative to the baseline between
+    two detectors at the given trigger time. The rotation matrix is computed from the
+    baseline vector between the first two detectors in ``ifos``.
+
+    Attributes:
+        gmst (Float): Greenwich Mean Sidereal Time at the trigger time in radians.
+        rotation (Float[Array, "3 3"]): Rotation matrix from equatorial to detector frame.
+        rotation_inv (Float[Array, "3 3"]): Inverse rotation matrix.
     """
 
     gmst: Float
@@ -243,7 +273,13 @@ class SkyFrameToDetectorFrameSkyPositionTransform(BijectiveTransform):
         self,
         trigger_time: Float,
         ifos: Sequence[GroundBased2G],
-    ):
+    ) -> None:
+        """
+        Args:
+            trigger_time (Float): GPS trigger time in seconds.
+            ifos (Sequence[GroundBased2G]): At least two detectors; the rotation is
+                computed from the baseline vector between ``ifos[0]`` and ``ifos[1]``.
+        """
         name_mapping = (["ra", "dec"], ["zenith", "azimuth"])
         super().__init__(name_mapping)
 
@@ -273,14 +309,18 @@ class SkyFrameToDetectorFrameSkyPositionTransform(BijectiveTransform):
 class GeocentricArrivalTimeToDetectorArrivalTimeTransform(
     ConditionalBijectiveTransform
 ):
-    """
-    Transform the geocentric arrival time to detector arrival time.
+    """Transform geocentric coalescence time offset to detector arrival time offset.
 
-    In the geocentric convention, the arrival time of the signal at the
-    center of Earth is trigger_time + t_c.
+    In the geocentric convention the signal arrives at Earth's centre at
+    ``trigger_time + t_c``.  In the detector convention it arrives at the
+    detector at ``trigger_time + time_delay_from_geocenter + t_det``.
 
-    In the detector convention, the arrival time of the signal at the
-    detector is trigger_time + time_delay_from_geo_to_det + t_det.
+    Maps ``t_c`` → ``t_det`` (forward) and ``t_det`` → ``t_c`` (inverse).
+    Conditioning parameters are ``(ra, dec)``.
+
+    Attributes:
+        gmst (Float): Greenwich Mean Sidereal Time at the trigger time in radians.
+        ifo (GroundBased2G): The target detector.
     """
 
     gmst: Float
@@ -293,7 +333,13 @@ class GeocentricArrivalTimeToDetectorArrivalTimeTransform(
         self,
         trigger_time: Float,
         ifo: GroundBased2G,
-    ):
+    ) -> None:
+        """
+        Args:
+            trigger_time (Float): GPS trigger time in seconds.
+            ifo (GroundBased2G): The target detector for which to compute the
+                time delay from the geocentre.
+        """
         name_mapping = (["t_c"], ["t_det"])
         conditional_names = ["ra", "dec"]
         super().__init__(name_mapping, conditional_names)
@@ -334,14 +380,23 @@ class GeocentricArrivalTimeToDetectorArrivalTimeTransform(
 class GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
     ConditionalBijectiveTransform
 ):
-    """
-    Transform the geocentric arrival phase to detector arrival phase.
+    """Transform geocentric coalescence phase to detector arrival phase.
 
-    In the geocentric convention, the arrival phase of the signal at the
-    center of Earth is phase_c / 2 (in ripple, phase_c is the orbital phase).
+    In the geocentric convention the orbital phase at coalescence is
+    ``phase_c`` (so the GW phase is ``phase_c / 2``).  In the detector
+    convention the arrival phase is
 
-    In the detector convention, the arrival phase of the signal at the
-    detector is phase_det = phase_c / 2 + arg R_det.
+    .. math::
+
+        \\phi_{\\mathrm{det}} = \\frac{\\phi_c}{2} + \\arg R_{\\mathrm{det}}
+
+    where :math:`R_{\\mathrm{det}}` is the complex detector response.
+
+    Conditioning parameters are ``(ra, dec, psi, iota)``.
+
+    Attributes:
+        gmst (Float): Greenwich Mean Sidereal Time at the trigger time in radians.
+        ifo (GroundBased2G): The target detector.
     """
 
     gmst: Float
@@ -354,7 +409,13 @@ class GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
         self,
         trigger_time: Float,
         ifo: GroundBased2G,
-    ):
+    ) -> None:
+        """
+        Args:
+            trigger_time (Float): GPS trigger time in seconds.
+            ifo (GroundBased2G): The target detector used to compute the complex
+                antenna response.
+        """
         name_mapping = (["phase_c"], ["phase_det"])
         conditional_names = ["ra", "dec", "psi", "iota"]
         super().__init__(name_mapping, conditional_names)
@@ -405,8 +466,21 @@ class GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
 
 @jaxtyped(typechecker=typechecker)
 class DistanceToSNRWeightedDistanceTransform(ConditionalBijectiveTransform):
-    """
-    Transform the luminosity distance to network SNR weighted distance.
+    """Transform luminosity distance to the network SNR-weighted distance.
+
+    The SNR-weighted distance ``d_hat`` absorbs the network sensitivity and chirp-mass
+    dependence into the distance parameter, making it closer to uniform in the
+    posterior:
+
+    .. math::
+
+        d_{\\hat} = \\frac{d_L}{\\mathcal{M}_c^{5/6}\\, R_{\\mathrm{net}}}
+
+    Conditioning parameters are ``(M_c, ra, dec, psi, iota)``.
+
+    Attributes:
+        gmst (Float): Greenwich Mean Sidereal Time at the trigger time in radians.
+        ifos (Sequence[GroundBased2G]): List of detectors forming the network.
     """
 
     gmst: Float
@@ -419,7 +493,13 @@ class DistanceToSNRWeightedDistanceTransform(ConditionalBijectiveTransform):
         self,
         trigger_time: Float,
         ifos: Sequence[GroundBased2G],
-    ):
+    ) -> None:
+        """
+        Args:
+            trigger_time (Float): GPS trigger time in seconds.
+            ifos (Sequence[GroundBased2G]): Detectors that form the network;
+                used to compute the network antenna response ``R_net``.
+        """
         name_mapping = (["d_L"], ["d_hat"])
         conditional_names = ["M_c", "ra", "dec", "psi", "iota"]
         super().__init__(name_mapping, conditional_names)

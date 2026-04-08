@@ -90,8 +90,15 @@ def n_leap_seconds(date: Int) -> Int:
     return jnp.sum(date > LEAP_SECONDS).astype(jnp.float64)
 
 
-def is_leap_year(year):
-    """Function to check if a year is a leap year."""
+def is_leap_year(year: Int) -> Int:
+    """Check whether a year is a leap year.
+
+    Args:
+        year (Int): The year to check.
+
+    Returns:
+        Int: 1 if the year is a leap year, 0 otherwise (JAX boolean as integer).
+    """
     return (year % 4 == 0) & ((year % 100 != 0) | (year % 400 == 0))
 
 
@@ -208,13 +215,13 @@ def gps_to_julian_day(gps_time: Float) -> Float:
 
 @jit
 def greenwich_mean_sidereal_time(gps_time: Float) -> Float:
-    """
-    Compute the Greenwich mean sidereal time from the GPS time.
+    """Compute the Greenwich Mean Sidereal Time (GMST) from the GPS time.
 
-    Ags:
-        gps_time (float): The GPS time to convert
+    Args:
+        gps_time (Float): GPS time in seconds.
+
     Returns:
-        float: The Greenwich mean sidereal time in radians.
+        Float: Greenwich Mean Sidereal Time in radians.
     """
     return greenwich_sidereal_time(gps_time, 0.0)
 
