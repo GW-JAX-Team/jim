@@ -1,7 +1,7 @@
 [project]
 name = "jimgw"
 dynamic = ["version"]
-description = "Gravitational wave data analysis tool in Jax"
+description = "A JAX-based gravitational-wave inference toolkit"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
