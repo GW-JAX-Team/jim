@@ -23,4 +23,4 @@ repos:
     hooks:
     - id: pyright
       files: src/
-      additional_dependencies: [beartype, jax, jaxtyping, pytest, typing_extensions, flowMC, ripplegw, gwpy, astropy]
+      additional_dependencies: [beartype, jax, jaxtyping, pytest, typing_extensions, flowMC, ripplegw, gwpy, astropy, evosax]
