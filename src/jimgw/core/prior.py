@@ -90,6 +90,15 @@ class CompositePrior(Prior):
         )
 
     def trace_prior_parent(self, output: Optional[list[Prior]] = None) -> list[Prior]:
+        """Recursively collect all leaf (non-composite) priors.
+
+        Args:
+            output (Optional[list[Prior]]): Accumulator list. If None, a new list
+                is created. Defaults to None.
+
+        Returns:
+            list[Prior]: List of all leaf prior objects in this composite.
+        """
         if output is None:
             output = []
         for subprior in self.base_prior:
@@ -220,12 +229,12 @@ class UniformDistribution(Prior):
 
 
 class SequentialTransformPrior(CompositePrior):
-    """
-    Prior distribution transformed by a sequence of bijective transforms.
+    """Prior distribution transformed by a sequence of bijective transforms.
 
     Attributes:
-        base_prior (tuple[Prior, ...]): The base prior to transform.
-        transforms (tuple[BijectiveTransform, ...]): Tuple of transforms to apply sequentially.
+        base_prior (tuple[Prior, ...]): The base prior to transform (must be length 1).
+        transforms (tuple[BijectiveTransform, ...]): Transforms applied sequentially
+            in the forward direction.
         parameter_names (tuple[str, ...]): Names of the parameters after all transforms.
     """
 
@@ -239,6 +248,12 @@ class SequentialTransformPrior(CompositePrior):
         base_prior: list[Prior],
         transforms: list[BijectiveTransform],
     ):
+        """
+        Args:
+            base_prior (list[Prior]): A single-element list containing the base prior.
+            transforms (list[BijectiveTransform]): Ordered list of bijective transforms
+                to apply to samples from the base prior.
+        """
         assert len(base_prior) == 1, (
             "SequentialTransformPrior only takes one base prior"
         )
@@ -250,13 +265,30 @@ class SequentialTransformPrior(CompositePrior):
     def sample(
         self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
+        """Sample by drawing from the base prior and applying all transforms.
+
+        Args:
+            rng_key (Key): JAX PRNG key.
+            n_samples (int): Number of samples to draw.
+
+        Returns:
+            dict[str, Float[Array, " n_samples"]]: Transformed samples keyed by
+                parameter name.
+        """
         output = self.base_prior[0].sample(rng_key, n_samples)
         return jax.vmap(self.transform)(output)
 
     def log_prob(self, z: dict[str, Float]) -> Float:
-        """
-        Evaluating the probability of the transformed variable z.
-        This is what flowMC should sample from
+        """Evaluate the log-probability of a transformed sample z.
+
+        Applies the inverse transforms in reverse order, accumulating
+        log-Jacobian determinants, then evaluates the base prior.
+
+        Args:
+            z (dict[str, Float]): Sample in the transformed (output) space.
+
+        Returns:
+            Float: Log-probability of z under the induced distribution.
         """
         output = 0
         for transform in reversed(self.transforms):
@@ -266,6 +298,14 @@ class SequentialTransformPrior(CompositePrior):
         return output
 
     def transform(self, x: dict[str, Float]) -> dict[str, Float]:
+        """Apply all transforms sequentially (forward direction).
+
+        Args:
+            x (dict[str, Float]): Sample in the base prior space.
+
+        Returns:
+            dict[str, Float]: Transformed sample.
+        """
         for transform in self.transforms:
             x = transform.forward(x)
         return x
@@ -303,8 +343,10 @@ class BoundedMixin:
 
 
 class CombinePrior(CompositePrior):
-    """
-    Multivariate prior constructed by joining multiple independent priors.
+    """Multivariate prior constructed by joining multiple independent priors.
+
+    The joint log-probability is the sum of the individual log-probabilities,
+    which is valid when all component priors are independent.
 
     Attributes:
         base_prior (tuple[Prior, ...]): Tuple of independent priors.
@@ -322,11 +364,25 @@ class CombinePrior(CompositePrior):
         self,
         priors: list[Prior],
     ):
+        """
+        Args:
+            priors (list[Prior]): List of independent prior objects to combine.
+        """
         super().__init__(priors)
 
     def sample(
         self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
+        """Sample from all component priors independently.
+
+        Args:
+            rng_key (Key): JAX PRNG key (split internally for each component).
+            n_samples (int): Number of samples to draw.
+
+        Returns:
+            dict[str, Float[Array, " n_samples"]]: Combined samples from all
+                component priors, keyed by parameter name.
+        """
         output = {}
         for prior in self.base_prior:
             rng_key, subkey = jax.random.split(rng_key)
@@ -334,6 +390,14 @@ class CombinePrior(CompositePrior):
         return output
 
     def log_prob(self, z: dict[str, Float]) -> Float:
+        """Evaluate the joint log-probability as the sum of component log-probabilities.
+
+        Args:
+            z (dict[str, Float]): Dictionary of parameter values.
+
+        Returns:
+            Float: Sum of log-probabilities from all component priors.
+        """
         output = 0.0
         for prior in self.base_prior:
             output += prior.log_prob(z)

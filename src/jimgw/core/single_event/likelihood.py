@@ -5,7 +5,6 @@ from jaxtyping import Array, Float
 from typing import Callable, Optional
 from scipy.interpolate import interp1d
 from evosax.algorithms import CMA_ES
-from ripplegw.interfaces import Waveform
 from jimgw.core.utils import log_i0
 from jimgw.core.prior import Prior
 from jimgw.core.base import LikelihoodBase
@@ -19,6 +18,7 @@ from jimgw.core.single_event.utils import (
 from jimgw.core.single_event.time_utils import (
     greenwich_mean_sidereal_time as compute_gmst,
 )
+from jimgw.core.single_event.waveform import WaveformCallable
 import logging
 from typing import Sequence
 from abc import abstractmethod
@@ -28,24 +28,25 @@ logger = logging.getLogger(__name__)
 
 class SingleEventLikelihood(LikelihoodBase):
     detectors: Sequence[Detector]
-    waveform: Waveform
+    waveform: WaveformCallable
     fixed_parameters: dict[
         str, Float | Callable[[dict[str, Float]], Float | dict[str, Float]]
     ]
 
     @property
     def duration(self) -> Float:
+        """Duration of the data segment in seconds (taken from the first detector)."""
         return self.detectors[0].data.duration
 
     @property
-    def detector_names(self):
-        """The interferometers for the likelihood."""
+    def detector_names(self) -> list[str]:
+        """Names of the detectors used in this likelihood."""
         return [detector.name for detector in self.detectors]
 
     def __init__(
         self,
         detectors: Sequence[Detector],
-        waveform: Waveform,
+        waveform: WaveformCallable,
         fixed_parameters: Optional[
             dict[
                 str,
@@ -53,6 +54,18 @@ class SingleEventLikelihood(LikelihoodBase):
             ]
         ] = None,
     ) -> None:
+        """
+        Args:
+            detectors (Sequence[Detector]): Detectors with initialized data and PSD.
+            waveform (WaveformCallable): Waveform model to evaluate.
+            fixed_parameters (Optional[dict]): Parameters held constant during
+                sampling. Values may be scalars or callables
+                ``f(params) -> Float | dict``; callables are applied in insertion
+                order. Defaults to None (no fixed parameters).
+
+        Raises:
+            ValueError: If any detector has uninitialized data or PSD.
+        """
         # Check that all detectors have initialized data and PSD
         for detector in detectors:
             if detector.data.is_empty:
@@ -90,11 +103,24 @@ class SingleEventLikelihood(LikelihoodBase):
 
 
 class ZeroLikelihood(LikelihoodBase):
-    def __init__(self):
+    """Trivial likelihood that always returns zero.
+
+    Useful for prior-only sampling or debugging.
+    """
+
+    def __init__(self) -> None:
         pass
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
-        """Evaluate the likelihood, which is always zero."""
+        """Return zero regardless of the parameters.
+
+        Args:
+            params (dict[str, Float]): Ignored.
+            data (dict): Ignored.
+
+        Returns:
+            Float: Always 0.0.
+        """
         return 0.0
 
 
@@ -143,7 +169,7 @@ class TransientLikelihoodFD(SingleEventLikelihood):
     def __init__(
         self,
         detectors: Sequence[Detector],
-        waveform: Waveform,
+        waveform: WaveformCallable,
         fixed_parameters: Optional[
             dict[
                 str,
@@ -466,7 +492,8 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         optimizer_n_steps: Maximum number of CMA-ES generations.  Defaults to 1000.
         reference_parameters: Pre-computed reference parameters (dict).  If
             supplied, the optimizer is skipped entirely.
-        reference_waveform: Waveform model for reference; defaults to ``waveform``.
+        reference_waveform: Callable ``f(freq, params) -> {"p": ..., "c": ...}``
+            used to compute the reference waveform.  Defaults to ``waveform``.
         prior: Prior distribution from which the initial CMA-ES mean is
             drawn.  Required when ``reference_parameters`` is not provided.
         likelihood_transforms: Transforms mapping sampling parameters to
@@ -488,7 +515,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
     def __init__(
         self,
         detectors: Sequence[Detector],
-        waveform: Waveform,
+        waveform: WaveformCallable,
         fixed_parameters: Optional[
             dict[
                 str,
@@ -502,7 +529,12 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         optimizer_popsize: int = 500,
         optimizer_n_steps: int = 1000,
         reference_parameters: Optional[dict] = None,
-        reference_waveform: Optional[Waveform] = None,
+        reference_waveform: Optional[
+            Callable[
+                [Float[Array, " n_freq"], dict[str, Float]],
+                dict[str, Float[Array, " n_freq"]],
+            ]
+        ] = None,
         prior: Optional[Prior] = None,
         likelihood_transforms: Optional[list[NtoMTransform]] = None,
         marginalize_phase: bool = False,

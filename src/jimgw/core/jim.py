@@ -17,8 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 class Jim(object):
-    """
-    Master class for interfacing with flowMC
+    """Master class for gravitational wave parameter estimation with flowMC.
+
+    This class wires together a :class:`~jimgw.core.base.LikelihoodBase`, a
+    :class:`~jimgw.core.prior.Prior`, optional parameter transforms, and a
+    :class:`~flowMC.Sampler.Sampler` configured with a normalising-flow
+    enhanced MCMC scheme (MALA + parallel tempering by default).
     """
 
     likelihood: LikelihoodBase
@@ -67,7 +71,54 @@ class Jim(object):
         # --- Misc ---
         verbose: bool = False,
         periodic: Optional[dict[str, tuple[float, float]]] = None,
-    ):
+    ) -> None:
+        """Initialize Jim and construct the internal flowMC sampler.
+
+        Args:
+            likelihood (LikelihoodBase): The likelihood to be evaluated.
+            prior (Prior): The prior distribution.
+            sample_transforms (Sequence[BijectiveTransform]): Bijective transforms
+                applied to the sampling space. Applied in order during the forward
+                pass and reversed when retrieving samples. Defaults to [].
+            likelihood_transforms (Sequence[NtoMTransform]): Transforms applied to
+                the parameter space before evaluating the likelihood. Defaults to [].
+            rng_key (Optional[Key]): JAX PRNG key. If None, a time-based key is used.
+            n_chains (int): Number of MCMC chains. Defaults to 1000.
+            n_local_steps (int): Number of local MCMC steps per loop. Defaults to 100.
+            n_global_steps (int): Number of global (NF proposal) steps per loop.
+                Defaults to 1000.
+            n_training_loops (int): Number of training loops. Defaults to 20.
+            n_production_loops (int): Number of production loops. Defaults to 10.
+            n_epochs (int): Number of normalising-flow training epochs per loop.
+                Defaults to 20.
+            mala_step_size (Float | Float[Array, " n_dims"]): MALA step size.
+                Can be a scalar or a per-dimension array. Defaults to 2e-3.
+            rq_spline_hidden_units (list[int]): Hidden layer widths for the
+                rational-quadratic spline flow. Defaults to [128, 128].
+            rq_spline_n_bins (int): Number of spline bins. Defaults to 10.
+            rq_spline_n_layers (int): Number of spline coupling layers. Defaults to 8.
+            n_NFproposal_batch_size (int): Batch size for NF proposals. Defaults to 1000.
+            learning_rate (float): Adam learning rate for flow training. Defaults to 1e-3.
+            batch_size (int): Training batch size. Defaults to 10000.
+            n_max_examples (int): Maximum number of training examples to keep in the
+                replay buffer. Defaults to 30000.
+            history_window (int): Window size for the training history buffer.
+                Defaults to 100.
+            chain_batch_size (int): Number of chains to process simultaneously.
+                0 means all chains at once. Defaults to 0.
+            local_thinning (int): Thinning factor for local steps. Defaults to 1.
+            global_thinning (int): Thinning factor for global steps. Defaults to 100.
+            n_temperatures (int): Number of parallel tempering temperatures.
+                Set to 0 to disable tempering. Defaults to 5.
+            max_temperature (float): Maximum temperature for parallel tempering.
+                Defaults to 10.0.
+            n_tempered_steps (int): Number of tempering swap steps per loop.
+                Defaults to 5.
+            verbose (bool): Enable verbose logging. Defaults to False.
+            periodic (Optional[dict[str, tuple[float, float]]]): Dictionary mapping
+                parameter names to (lower, upper) bounds for periodic parameters.
+                Defaults to None.
+        """
         self.likelihood = likelihood
         self.prior = prior
 
@@ -185,7 +236,19 @@ class Jim(object):
 
         return dict(zip(self.parameter_names, x))
 
-    def evaluate_prior(self, params: Float[Array, " n_dims"], data: dict):
+    def evaluate_prior(self, params: Float[Array, " n_dims"], data: dict) -> Float:
+        """Evaluate the log-prior in the sampling space.
+
+        Applies sample transforms in reverse to map from sampling space to prior
+        space before evaluating the prior, accumulating log-Jacobian corrections.
+
+        Args:
+            params (Float[Array, " n_dims"]): Parameter array in the sampling space.
+            data (dict): Unused auxiliary data (required by flowMC interface).
+
+        Returns:
+            Float: Log-prior value including Jacobian corrections from transforms.
+        """
         named_params = self.add_name(params)
         transform_jacobian = 0.0
         for transform in reversed(self.sample_transforms):
@@ -193,7 +256,19 @@ class Jim(object):
             transform_jacobian += jacobian
         return self.prior.log_prob(named_params) + transform_jacobian
 
-    def evaluate_posterior(self, params: Float[Array, " n_dims"], data: dict):
+    def evaluate_posterior(self, params: Float[Array, " n_dims"], data: dict) -> Float:
+        """Evaluate the log-posterior in the sampling space.
+
+        Applies sample transforms in reverse to map from sampling space to prior
+        space, then applies likelihood transforms to the likelihood space.
+
+        Args:
+            params (Float[Array, " n_dims"]): Parameter array in the sampling space.
+            data (dict): Unused auxiliary data (required by flowMC interface).
+
+        Returns:
+            Float: Log-posterior value (log-likelihood + log-prior + Jacobians).
+        """
         named_params = self.add_name(params)
         transform_jacobian = 0.0
         for transform in reversed(self.sample_transforms):
@@ -205,6 +280,18 @@ class Jim(object):
         return self.likelihood.evaluate(named_params, data) + prior
 
     def sample_initial_condition(self) -> Float[Array, "n_chains n_dims"]:
+        """Draw initial positions for all chains by sampling from the prior.
+
+        Samples from the prior and applies all sample transforms to produce
+        initial positions in the sampling space.
+
+        Returns:
+            Float[Array, "n_chains n_dims"]: Initial positions array of shape
+                (n_chains, n_dims) in the sampling space.
+
+        Raises:
+            ValueError: If any initial position contains non-finite values.
+        """
         rng_key, subkey = jax.random.split(self.sampler.rng_key)
 
         initial_position = self.prior.sample(subkey, self.sampler.n_chains)
@@ -227,7 +314,21 @@ class Jim(object):
     def sample(
         self,
         initial_position: Optional[Float[Array, "n_chains n_dims"]] = None,
-    ):
+    ) -> None:
+        """Run the sampler.
+
+        Args:
+            initial_position (Optional[Float[Array, "n_chains n_dims"]]): Starting
+                positions for the chains in the sampling space. Accepted shapes:
+
+                - ``(n_dims,)``: broadcast to all chains.
+                - ``(n_chains, n_dims)``: one position per chain.
+                - ``None``: sample from the prior via
+                  :meth:`sample_initial_condition`.
+
+        Raises:
+            ValueError: If ``initial_position`` has an incompatible shape.
+        """
         if initial_position is None:
             logger.info("No initial_position provided. Sampling from prior.")
             initial_position = self.sample_initial_condition()
