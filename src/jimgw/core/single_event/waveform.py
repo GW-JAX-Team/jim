@@ -8,6 +8,7 @@ from ripplegw import (
     IMRPhenomD_NRTidalv2,
     IMRPhenomXAS,
     IMRPhenomXAS_NRTidalv3,
+    IMRPhenomXPHM,
     SineGaussian,
 )
 
@@ -26,4 +27,5 @@ RippleTaylorF2 = TaylorF2
 RippleIMRPhenomD_NRTidalv2 = IMRPhenomD_NRTidalv2
 RippleIMRPhenomXAS = IMRPhenomXAS
 RippleIMRPhenomXAS_NRTidalv3 = IMRPhenomXAS_NRTidalv3
+RippleIMRPhenomXPHM = IMRPhenomXPHM
 RippleSineGaussian = SineGaussian
