@@ -359,7 +359,7 @@ def angle_rotation(
     return theta, phi
 
 
-def theta_phi_to_ra_dec(theta: Float, phi: Float, gmst: Float) -> tuple[Float, Float]:
+def _theta_phi_to_ra_dec(theta: Float, phi: Float, gmst: Float) -> tuple[Float, Float]:
     """
     Transforming the polar angle and azimuthal angle to right ascension and declination.
 
@@ -395,11 +395,11 @@ def zenith_azimuth_to_ra_dec(
         tuple[Float, Float]: Right ascension (ra) and declination (dec).
     """
     theta, phi = angle_rotation(zenith, azimuth, rotation)
-    ra, dec = theta_phi_to_ra_dec(theta, phi, gmst)
+    ra, dec = _theta_phi_to_ra_dec(theta, phi, gmst)
     return ra, dec
 
 
-def ra_dec_to_theta_phi(ra: Float, dec: Float, gmst: Float) -> tuple[Float, Float]:
+def _ra_dec_to_theta_phi(ra: Float, dec: Float, gmst: Float) -> tuple[Float, Float]:
     """
     Transforming the right ascension ra and declination dec to the polar angle
     theta and azimuthal angle phi.
@@ -433,52 +433,44 @@ def ra_dec_to_zenith_azimuth(
     Returns:
         tuple[Float, Float]: Zenith angle and azimuthal angle.
     """
-    theta, phi = ra_dec_to_theta_phi(ra, dec, gmst)
+    theta, phi = _ra_dec_to_theta_phi(ra, dec, gmst)
     zenith, azimuth = angle_rotation(theta, phi, rotation)
     return zenith, azimuth
 
 
-def rotate_y(angle: Float, vec: Float[Array, "3"]) -> Float[Array, "3"]:
-    """
-    Rotate the vector (x, y, z) about y-axis.
+def _rotate_y(angle: Float) -> Float[Array, "3 3"]:
+    """Return the 3x3 rotation matrix for a rotation about the y-axis.
 
     Args:
-        angle (Float): Angle in radians.
-        vec (Float[Array, "3"]): Vector to be rotated.
+        angle (Float): Rotation angle in radians.
 
     Returns:
-        Float[Array, "3"]: Rotated vector.
+        Float[Array, "3 3"]: Rotation matrix Ry(angle).
     """
     cos_angle = jnp.cos(angle)
     sin_angle = jnp.sin(angle)
-    rotation_matrix = jnp.array(
+    return jnp.array(
         [[cos_angle, 0, sin_angle], [0, 1, 0], [-sin_angle, 0, cos_angle]]
     )
-    rotated_vec = jnp.dot(rotation_matrix, vec)
-    return rotated_vec
 
 
-def rotate_z(angle: Float, vec: Float[Array, "3"]) -> Float[Array, "3"]:
-    """
-    Rotate the vector (x, y, z) about z-axis.
+def _rotate_z(angle: Float) -> Float[Array, "3 3"]:
+    """Return the 3x3 rotation matrix for a rotation about the z-axis.
 
     Args:
-        angle (Float): Angle in radians.
-        vec (Float[Array, "3"]): Vector to be rotated.
+        angle (Float): Rotation angle in radians.
 
     Returns:
-        Float[Array, "3"]: Rotated vector.
+        Float[Array, "3 3"]: Rotation matrix Rz(angle).
     """
     cos_angle = jnp.cos(angle)
     sin_angle = jnp.sin(angle)
-    rotation_matrix = jnp.array(
+    return jnp.array(
         [[cos_angle, -sin_angle, 0], [sin_angle, cos_angle, 0], [0, 0, 1]]
     )
-    rotated_vec = jnp.dot(rotation_matrix, vec)
-    return rotated_vec
 
 
-def Lmag_2PN(m1: Float, m2: Float, v0: Float) -> Float:
+def _Lmag_2PN(m1: Float, m2: Float, v0: Float) -> Float:
     """
     Compute the magnitude of the orbital angular momentum
     to 2 post-Newtonian orders.
@@ -566,7 +558,7 @@ def spin_angles_to_cartesian_spin(
     v0 = jnp.cbrt((m1 + m2) * MTSUN * jnp.pi * fRef)
 
     # Define S1, S2, and J
-    Lmag = Lmag_2PN(m1, m2, v0)
+    Lmag = _Lmag_2PN(m1, m2, v0)
     s1 = m1 * m1 * chi_1 * s1hat
     s2 = m2 * m2 * chi_2 * s2hat
     J = s1 + s2 + jnp.array([0.0, 0.0, Lmag])
@@ -575,19 +567,14 @@ def spin_angles_to_cartesian_spin(
     Jhat = J / jnp.linalg.norm(J)
     theta0, phi0 = carte_to_spherical_angles(*Jhat)
 
-    # Rotation 1: Rotate about z-axis by -phi0
-    s1hat = rotate_z(-phi0, s1hat)
-    s2hat = rotate_z(-phi0, s2hat)
-
-    # Rotation 2: Rotate about y-axis by -theta0
-    LNh = rotate_y(-theta0, LNh)
-    s1hat = rotate_y(-theta0, s1hat)
-    s2hat = rotate_y(-theta0, s2hat)
-
-    # Rotation 3: Rotate about z-axis by -phi_jl
-    LNh = rotate_z(phi_jl - jnp.pi, LNh)
-    s1hat = rotate_z(phi_jl - jnp.pi, s1hat)
-    s2hat = rotate_z(phi_jl - jnp.pi, s2hat)
+    # Rotations 1–3 combined.
+    # LNh only needs R2 and R3 (it starts along z, so R1 has no effect).
+    # s1hat and s2hat need all three: R3 @ R2 @ R1.
+    R_23 = _rotate_z(phi_jl - jnp.pi) @ _rotate_y(-theta0)
+    R_123 = R_23 @ _rotate_z(-phi0)
+    LNh = R_23 @ LNh
+    s1hat = R_123 @ s1hat
+    s2hat = R_123 @ s2hat
 
     # Compute iota
     N = jnp.array([0.0, jnp.sin(theta_jn), jnp.cos(theta_jn)])
@@ -595,20 +582,14 @@ def spin_angles_to_cartesian_spin(
 
     thetaLJ, phiL = carte_to_spherical_angles(*LNh)
 
-    # Rotation 4: Rotate about z-axis by -phiL
-    s1hat = rotate_z(-phiL, s1hat)
-    s2hat = rotate_z(-phiL, s2hat)
-    N = rotate_z(-phiL, N)
-
-    # Rotation 5: Rotate about y-axis by -thetaLJ
-    s1hat = rotate_y(-thetaLJ, s1hat)
-    s2hat = rotate_y(-thetaLJ, s2hat)
-    N = rotate_y(-thetaLJ, N)
-
-    # Rotation 6:
+    # Rotations 4–6 combined.
+    # N only needs R4 and R5; s1hat/s2hat need all three: R6 @ R5 @ R4.
+    R_45 = _rotate_y(-thetaLJ) @ _rotate_z(-phiL)
+    N = R_45 @ N
     phiN = safe_arctan2(N[1], N[0])
-    s1hat = rotate_z(jnp.pi / 2.0 - phiN - phiRef, s1hat)
-    s2hat = rotate_z(jnp.pi / 2.0 - phiN - phiRef, s2hat)
+    R_456 = _rotate_z(jnp.pi / 2.0 - phiN - phiRef) @ R_45
+    s1hat = R_456 @ s1hat
+    s2hat = R_456 @ s2hat
 
     S1 = s1hat * chi_1
     S2 = s2hat * chi_2
@@ -686,7 +667,7 @@ def cartesian_spin_to_spin_angles(
     S1 = m1 * m1 * s1_vec
     S2 = m2 * m2 * s2_vec
 
-    Lmag = Lmag_2PN(m1, m2, v0)
+    Lmag = _Lmag_2PN(m1, m2, v0)
     J = S1 + S2 + Lmag * LNh
 
     # Normalize J
@@ -703,15 +684,14 @@ def cartesian_spin_to_spin_angles(
     # Inclination w.r.t. J
     theta_jn = jnp.arccos(jnp.dot(Jhat, N))
 
-    # Rotate from L-frame to J-frame
-    N = rotate_z(-phiJ, N)
-    N = rotate_y(-thetaJL, N)
-
-    LNh = rotate_z(-phiJ, LNh)
-    LNh = rotate_y(-thetaJL, LNh)
+    # Rotate from L-frame to J-frame: combine the two rotations into one matrix.
+    # N and LNh both need Ry(-thetaJL) @ Rz(-phiJ).
+    R_JL = _rotate_y(-thetaJL) @ _rotate_z(-phiJ)
+    N = R_JL @ N
+    LNh = R_JL @ LNh
 
     phiN = safe_arctan2(N[1], N[0])
-    LNh = rotate_z(0.5 * jnp.pi - phiN, LNh)
+    LNh = _rotate_z(0.5 * jnp.pi - phiN) @ LNh
 
     phi_jl = safe_arctan2(LNh[1], LNh[0])
     phi_jl = (phi_jl + 2 * jnp.pi) % (2 * jnp.pi)  # Ensure 0 <= phi_jl < 2pi

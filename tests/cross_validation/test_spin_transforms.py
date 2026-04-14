@@ -174,3 +174,242 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
             assert common_keys_allclose(reprod_cartesian, bilby_cartesian), (
                 f"Round-trip (bilby → Jim inverse → bilby) fails at f_ref={f_ref}"
             )
+
+
+class TestSpinTransformCornerCases:
+    """Corner-case cross-validation of spin transforms against bilby."""
+
+    # Fixed reference frequency used throughout these tests.
+    F_REF = 20.0
+
+    def _bilby_forward(
+        self, theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1, a_2, m1_si, m2_si, phase_c
+    ):
+        """Call bilby_to_lalsimulation_spins and return a dict."""
+        from bilby.gw.conversion import bilby_to_lalsimulation_spins
+
+        iota, s1x, s1y, s1z, s2x, s2y, s2z = bilby_to_lalsimulation_spins(
+            theta_jn=float(theta_jn),
+            phi_jl=float(phi_jl),
+            tilt_1=float(tilt_1),
+            tilt_2=float(tilt_2),
+            phi_12=float(phi_12),
+            a_1=float(a_1),
+            a_2=float(a_2),
+            mass_1=float(m1_si),
+            mass_2=float(m2_si),
+            reference_frequency=self.F_REF,
+            phase=float(phase_c),
+        )
+        return {
+            "iota": iota,
+            "s1_x": s1x,
+            "s1_y": s1y,
+            "s1_z": s1z,
+            "s2_x": s2x,
+            "s2_y": s2y,
+            "s2_z": s2z,
+        }
+
+    def _jim_forward(self, params):
+        """Call Jim's SpinAnglesToCartesianSpinTransform and return the output dict."""
+        from jimgw.core.single_event.transforms import (
+            SpinAnglesToCartesianSpinTransform,
+        )
+
+        transform = SpinAnglesToCartesianSpinTransform(freq_ref=self.F_REF)
+        out, _ = transform.transform(params)
+        return out
+
+    def _msun_si(self, M_c, q):
+        from bilby.gw.utils import solar_mass as MSUN_SI
+
+        m1 = float(M_c * (1 + q) ** (1 / 5) / q ** (3 / 5))
+        m2 = float(q * m1)
+        return m1 * MSUN_SI, m2 * MSUN_SI
+
+    @pytest.mark.parametrize(
+        "tilt_1,tilt_2,label",
+        [
+            (0.0, 0.0, "aligned"),
+            (jnp.pi, jnp.pi, "anti-aligned"),
+            (jnp.pi / 2, jnp.pi / 2, "in-plane"),
+            (0.0, jnp.pi, "mixed"),
+        ],
+    )
+    def test_tilt_boundary(self, tilt_1, tilt_2, label):
+        """Spin tilt boundary values (0, π/2, π) match bilby."""
+        params = {
+            "theta_jn": jnp.float64(0.8),
+            "phi_jl": jnp.float64(1.2),
+            "tilt_1": jnp.float64(tilt_1),
+            "tilt_2": jnp.float64(tilt_2),
+            "phi_12": jnp.float64(0.5),
+            "a_1": jnp.float64(0.5),
+            "a_2": jnp.float64(0.3),
+            "M_c": jnp.float64(20.0),
+            "q": jnp.float64(0.8),
+            "phase_c": jnp.float64(0.3),
+        }
+        m1_si, m2_si = self._msun_si(params["M_c"], params["q"])
+        ref = self._bilby_forward(
+            params["theta_jn"],
+            params["phi_jl"],
+            tilt_1,
+            tilt_2,
+            params["phi_12"],
+            params["a_1"],
+            params["a_2"],
+            m1_si,
+            m2_si,
+            params["phase_c"],
+        )
+        jim = self._jim_forward(params)
+        assert common_keys_allclose(jim, ref), (
+            f"tilt boundary '{label}': Jim and bilby disagree.\n"
+            f"  Jim: {jim}\n  bilby: {ref}"
+        )
+
+    @pytest.mark.parametrize(
+        "theta_jn,label",
+        [
+            (0.0, "face-on"),
+            (jnp.pi, "face-away"),
+            (jnp.pi / 2, "edge-on"),
+        ],
+    )
+    def test_theta_jn_boundary(self, theta_jn, label):
+        """Inclination angle boundary values (0, π/2, π) match bilby."""
+        params = {
+            "theta_jn": jnp.float64(theta_jn),
+            "phi_jl": jnp.float64(1.2),
+            "tilt_1": jnp.float64(0.4),
+            "tilt_2": jnp.float64(0.6),
+            "phi_12": jnp.float64(0.5),
+            "a_1": jnp.float64(0.5),
+            "a_2": jnp.float64(0.3),
+            "M_c": jnp.float64(20.0),
+            "q": jnp.float64(0.8),
+            "phase_c": jnp.float64(0.3),
+        }
+        m1_si, m2_si = self._msun_si(params["M_c"], params["q"])
+        ref = self._bilby_forward(
+            theta_jn,
+            params["phi_jl"],
+            params["tilt_1"],
+            params["tilt_2"],
+            params["phi_12"],
+            params["a_1"],
+            params["a_2"],
+            m1_si,
+            m2_si,
+            params["phase_c"],
+        )
+        jim = self._jim_forward(params)
+        assert common_keys_allclose(jim, ref), (
+            f"theta_jn '{label}': Jim and bilby disagree.\n  Jim: {jim}\n  bilby: {ref}"
+        )
+
+    @pytest.mark.parametrize(
+        "phi_jl,label",
+        [
+            (0.0, "phi_jl=0"),
+            (jnp.pi, "phi_jl=pi"),
+            (2 * jnp.pi - 1e-10, "phi_jl≈2pi"),
+        ],
+    )
+    def test_phi_jl_boundary(self, phi_jl, label):
+        """phi_jl boundary values match bilby."""
+        params = {
+            "theta_jn": jnp.float64(0.8),
+            "phi_jl": jnp.float64(phi_jl),
+            "tilt_1": jnp.float64(0.4),
+            "tilt_2": jnp.float64(0.6),
+            "phi_12": jnp.float64(0.5),
+            "a_1": jnp.float64(0.5),
+            "a_2": jnp.float64(0.3),
+            "M_c": jnp.float64(20.0),
+            "q": jnp.float64(0.8),
+            "phase_c": jnp.float64(0.3),
+        }
+        m1_si, m2_si = self._msun_si(params["M_c"], params["q"])
+        ref = self._bilby_forward(
+            params["theta_jn"],
+            phi_jl,
+            params["tilt_1"],
+            params["tilt_2"],
+            params["phi_12"],
+            params["a_1"],
+            params["a_2"],
+            m1_si,
+            m2_si,
+            params["phase_c"],
+        )
+        jim = self._jim_forward(params)
+        assert common_keys_allclose(jim, ref), (
+            f"{label}: Jim and bilby disagree.\n  Jim: {jim}\n  bilby: {ref}"
+        )
+
+    def test_equal_mass(self):
+        """q=1 (equal mass) matches bilby."""
+        params = {
+            "theta_jn": jnp.float64(0.8),
+            "phi_jl": jnp.float64(1.2),
+            "tilt_1": jnp.float64(0.4),
+            "tilt_2": jnp.float64(0.6),
+            "phi_12": jnp.float64(0.5),
+            "a_1": jnp.float64(0.5),
+            "a_2": jnp.float64(0.3),
+            "M_c": jnp.float64(20.0),
+            "q": jnp.float64(1.0),
+            "phase_c": jnp.float64(0.3),
+        }
+        m1_si, m2_si = self._msun_si(params["M_c"], params["q"])
+        ref = self._bilby_forward(
+            params["theta_jn"],
+            params["phi_jl"],
+            params["tilt_1"],
+            params["tilt_2"],
+            params["phi_12"],
+            params["a_1"],
+            params["a_2"],
+            m1_si,
+            m2_si,
+            params["phase_c"],
+        )
+        jim = self._jim_forward(params)
+        assert common_keys_allclose(jim, ref), (
+            f"equal mass (q=1): Jim and bilby disagree.\n  Jim: {jim}\n  bilby: {ref}"
+        )
+
+    def test_near_extremal_spin(self):
+        """Near-extremal spin magnitudes (a=0.999) match bilby."""
+        params = {
+            "theta_jn": jnp.float64(0.8),
+            "phi_jl": jnp.float64(1.2),
+            "tilt_1": jnp.float64(0.4),
+            "tilt_2": jnp.float64(0.6),
+            "phi_12": jnp.float64(0.5),
+            "a_1": jnp.float64(0.999),
+            "a_2": jnp.float64(0.999),
+            "M_c": jnp.float64(20.0),
+            "q": jnp.float64(0.8),
+            "phase_c": jnp.float64(0.3),
+        }
+        m1_si, m2_si = self._msun_si(params["M_c"], params["q"])
+        ref = self._bilby_forward(
+            params["theta_jn"],
+            params["phi_jl"],
+            params["tilt_1"],
+            params["tilt_2"],
+            params["phi_12"],
+            params["a_1"],
+            params["a_2"],
+            m1_si,
+            m2_si,
+            params["phase_c"],
+        )
+        jim = self._jim_forward(params)
+        assert common_keys_allclose(jim, ref), (
+            f"near-extremal spin: Jim and bilby disagree.\n  Jim: {jim}\n  bilby: {ref}"
+        )
