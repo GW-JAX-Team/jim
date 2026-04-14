@@ -112,8 +112,6 @@ prior = CombinePrior(prior)
 # --- Define transforms ---
 
 sample_transforms = [
-    DistanceToSNRWeightedDistanceTransform(trigger_time=gps, ifos=ifos),
-    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(trigger_time=gps, ifo=ifos[0]),
     GeocentricArrivalTimeToDetectorArrivalTimeTransform(trigger_time=gps, ifo=ifos[0]),
     SkyFrameToDetectorFrameSkyPositionTransform(trigger_time=gps, ifos=ifos),
 ]

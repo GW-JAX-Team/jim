@@ -89,8 +89,8 @@ All transforms are importable from `jimgw.core.single_event.transforms`.
 | --- | --- | --- |
 | `SkyFrameToDetectorFrameSkyPositionTransform(trigger_time, ifos)` | `(ra, dec) → (zenith, azimuth)` | Reduces ra/dec correlation for detector networks |
 | `GeocentricArrivalTimeToDetectorArrivalTimeTransform(trigger_time, ifo)` | `t_c → t_det` | Conditional on ra, dec |
-| `GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(trigger_time, ifo)` | `phase_c → phase_det` | Conditional on ra, dec, psi, iota |
-| `DistanceToSNRWeightedDistanceTransform` | `d_L → d_hat` | SNR-weighted distance parameterisation |
+| `GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(trigger_time, ifo)` | `phase_c → phase_det` | Conditional on ra, dec, psi, iota. Assumes dominant quadrupolar mode only ([arXiv:2207.03508](https://arxiv.org/abs/2207.03508)); **not valid** for waveforms with higher harmonics or precession. |
+| `DistanceToSNRWeightedDistanceTransform` | `d_L → d_hat` | SNR-weighted distance parameterisation ([arXiv:2207.03508](https://arxiv.org/abs/2207.03508)). Assumes dominant quadrupolar mode only; **not valid** for waveforms with higher harmonics or precession. |
 
 ## Passing Transforms to Jim
 

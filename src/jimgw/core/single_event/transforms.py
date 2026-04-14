@@ -394,6 +394,13 @@ class GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(
 
     Conditioning parameters are ``(ra, dec, psi, iota)``.
 
+    Warning:
+        This transform is derived under the assumption that the waveform consists
+        only of the dominant quadrupolar mode (:math:`\\ell = 2, |m| = 2`), following
+        the parameterisation in `arXiv:2207.03508 <https://arxiv.org/abs/2207.03508>`_.
+        It is **not valid** for waveforms that include higher harmonics or orbital
+        precession.  Use at your own discretion when such waveform approximants are employed.
+
     Attributes:
         gmst (Float): Greenwich Mean Sidereal Time at the trigger time in radians.
         ifo (GroundBased2G): The target detector.
@@ -477,6 +484,13 @@ class DistanceToSNRWeightedDistanceTransform(ConditionalBijectiveTransform):
         d_{\\hat} = \\frac{d_L}{\\mathcal{M}_c^{5/6}\\, R_{\\mathrm{net}}}
 
     Conditioning parameters are ``(M_c, ra, dec, psi, iota)``.
+
+    Warning:
+        This transform is derived under the assumption that the waveform consists
+        only of the dominant quadrupolar mode (:math:`\\ell = 2, |m| = 2`), following
+        the parameterisation in `arXiv:2207.03508 <https://arxiv.org/abs/2207.03508>`_.
+        It is **not valid** for waveforms that include higher harmonics or orbital
+        precession.  Use at your own discretion when such waveform approximants are employed.
 
     Attributes:
         gmst (Float): Greenwich Mean Sidereal Time at the trigger time in radians.
