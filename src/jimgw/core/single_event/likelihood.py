@@ -18,7 +18,7 @@ from jimgw.core.single_event.utils import (
 from jimgw.core.single_event.time_utils import (
     greenwich_mean_sidereal_time as compute_gmst,
 )
-from jimgw.core.single_event.waveform import WaveformCallable
+from ripplegw.interfaces import Waveform
 import logging
 from typing import Sequence
 from abc import abstractmethod
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class SingleEventLikelihood(LikelihoodBase):
     detectors: Sequence[Detector]
-    waveform: WaveformCallable
+    waveform: Waveform
     fixed_parameters: dict[
         str, Float | Callable[[dict[str, Float]], Float | dict[str, Float]]
     ]
@@ -46,7 +46,7 @@ class SingleEventLikelihood(LikelihoodBase):
     def __init__(
         self,
         detectors: Sequence[Detector],
-        waveform: WaveformCallable,
+        waveform: Waveform,
         fixed_parameters: Optional[
             dict[
                 str,
@@ -57,7 +57,7 @@ class SingleEventLikelihood(LikelihoodBase):
         """
         Args:
             detectors (Sequence[Detector]): Detectors with initialized data and PSD.
-            waveform (WaveformCallable): Waveform model to evaluate.
+            waveform (Waveform): Waveform model to evaluate.
             fixed_parameters (Optional[dict]): Parameters held constant during
                 sampling. Values may be scalars or callables
                 ``f(params) -> Float | dict``; callables are applied in insertion
@@ -169,7 +169,7 @@ class TransientLikelihoodFD(SingleEventLikelihood):
     def __init__(
         self,
         detectors: Sequence[Detector],
-        waveform: WaveformCallable,
+        waveform: Waveform,
         fixed_parameters: Optional[
             dict[
                 str,
@@ -515,7 +515,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
     def __init__(
         self,
         detectors: Sequence[Detector],
-        waveform: WaveformCallable,
+        waveform: Waveform,
         fixed_parameters: Optional[
             dict[
                 str,

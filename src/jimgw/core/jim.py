@@ -12,6 +12,11 @@ from jaxtyping import Array, Float, Key
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.prior import Prior
 from jimgw.core.transforms import BijectiveTransform, NtoMTransform
+from jimgw.core.single_event.likelihood import (
+    SingleEventLikelihood,
+    TransientLikelihoodFD,
+)
+from ripplegw.interfaces import Waveform
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +159,52 @@ class Jim(object):
             logger.info(
                 "No likelihood transforms provided. Using prior parameters as likelihood parameters"
             )
+
+        # Check if parameters defined by the prior are consumed by the likelihood
+        if isinstance(likelihood, SingleEventLikelihood):
+            # Propagate prior names through likelihood_transforms to get the
+            # parameter names as they appear in the likelihood space.
+            lh_space_names: tuple[str, ...] = prior.parameter_names
+            for transform in likelihood_transforms:
+                lh_space_names = transform.propagate_name(lh_space_names)
+
+            # Check 1: likelihood-space params that shadow fixed_parameters.
+            if likelihood.fixed_parameters:
+                prior_fixed_overlap = set(lh_space_names) & set(
+                    likelihood.fixed_parameters.keys()
+                )
+                if prior_fixed_overlap:
+                    raise ValueError(
+                        f"Prior defines parameter(s) {sorted(prior_fixed_overlap)} that are "
+                        f"also in fixed_parameters. Either remove them from the prior or "
+                        f"from fixed_parameters."
+                    )
+
+            # Check 2: likelihood-space params not consumed by the likelihood.
+            # Only applies when the waveform is a Waveform instance that exposes
+            # parameter_names; plain callables are skipped.
+            if isinstance(likelihood.waveform, Waveform):
+                # Params consumed by the waveform model
+                consumed: set[str] = set(likelihood.waveform.parameter_names)
+                # Params consumed by fd_response (sky localisation / time shift)
+                consumed |= {"ra", "dec", "psi", "t_c"}
+                # Marginalized params are injected by the likelihood; the user
+                # should NOT have priors on them.
+                if isinstance(likelihood, TransientLikelihoodFD):
+                    if likelihood.marginalize_time:
+                        consumed.discard("t_c")
+                    if likelihood.marginalize_phase:
+                        consumed.discard("phase_c")
+                    if likelihood.marginalize_distance:
+                        consumed.discard("d_L")
+
+                unused = set(lh_space_names) - consumed
+                if unused:
+                    raise ValueError(
+                        f"Prior defines parameter(s) {sorted(unused)} that are not consumed "
+                        f"by the likelihood or detector response. Remove them from the prior "
+                        f"or add appropriate likelihood_transforms."
+                    )
 
         if rng_key is None:
             seed = int(time.time_ns() % (2**32))
