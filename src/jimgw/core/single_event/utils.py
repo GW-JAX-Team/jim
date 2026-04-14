@@ -449,9 +449,7 @@ def _rotate_y(angle: Float) -> Float[Array, "3 3"]:
     """
     cos_angle = jnp.cos(angle)
     sin_angle = jnp.sin(angle)
-    return jnp.array(
-        [[cos_angle, 0, sin_angle], [0, 1, 0], [-sin_angle, 0, cos_angle]]
-    )
+    return jnp.array([[cos_angle, 0, sin_angle], [0, 1, 0], [-sin_angle, 0, cos_angle]])
 
 
 def _rotate_z(angle: Float) -> Float[Array, "3 3"]:
@@ -465,9 +463,7 @@ def _rotate_z(angle: Float) -> Float[Array, "3 3"]:
     """
     cos_angle = jnp.cos(angle)
     sin_angle = jnp.sin(angle)
-    return jnp.array(
-        [[cos_angle, -sin_angle, 0], [sin_angle, cos_angle, 0], [0, 0, 1]]
-    )
+    return jnp.array([[cos_angle, -sin_angle, 0], [sin_angle, cos_angle, 0], [0, 0, 1]])
 
 
 def _Lmag_2PN(m1: Float, m2: Float, v0: Float) -> Float:
