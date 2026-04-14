@@ -667,9 +667,9 @@ class TestSpinAnglesToCartesianSpinTransform:
             jimgw_spins = SpinAnglesToCartesianSpinTransform(freq_ref=fRef).backward(
                 dict(zip(self.backward_keys, sample))
             )
-            jimgw_spins = SpinAnglesToCartesianSpinTransform(
-                freq_ref=fRef
-            ).forward(jimgw_spins)
+            jimgw_spins = SpinAnglesToCartesianSpinTransform(freq_ref=fRef).forward(
+                jimgw_spins
+            )
             jimgw_spins = jnp.array(list(jimgw_spins.values()))
             # default atol: 1e-8, rtol: 1e-5
             assert np.allclose(jimgw_spins, jnp.array([*sample[7:], *sample[:7]]))
@@ -1293,9 +1293,7 @@ class TestMassTransforms:
             "m_2": 25.0,
         }
 
-        forward_output = ComponentMassesToChirpMassMassRatioTransform.forward(
-            original
-        )
+        forward_output = ComponentMassesToChirpMassMassRatioTransform.forward(original)
         recovered = ComponentMassesToChirpMassMassRatioTransform.backward(
             forward_output
         )
@@ -1356,8 +1354,8 @@ class TestMassTransforms:
             "m_2": 25.0,
         }
 
-        forward_output = (
-            ComponentMassesToChirpMassSymmetricMassRatioTransform.forward(original)
+        forward_output = ComponentMassesToChirpMassSymmetricMassRatioTransform.forward(
+            original
         )
         recovered = ComponentMassesToChirpMassSymmetricMassRatioTransform.backward(
             forward_output

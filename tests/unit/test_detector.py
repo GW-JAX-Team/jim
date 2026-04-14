@@ -122,6 +122,3 @@ class TestInjectSignal:
             rtol=1e-05,
             atol=1e-23,
         )
-
-
-

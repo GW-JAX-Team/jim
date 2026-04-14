@@ -333,7 +333,9 @@ class TestHeterodynedTransientLikelihoodFD:
         )
         params = example_params()
         result = likelihood.evaluate(params, {})
-        assert jnp.isfinite(result), "Heterodyned likelihood should be finite with different f_min"
+        assert jnp.isfinite(result), (
+            "Heterodyned likelihood should be finite with different f_min"
+        )
 
     # ------------------------------------------------------------------
     # maximize_likelihood tests
@@ -364,7 +366,9 @@ class TestHeterodynedTransientLikelihoodFD:
         ll_injected = float(base_likelihood.evaluate(true_params, {}))
 
         # Fix all nuisance parameters to truth; DE searches only (M_c, q).
-        fixed_parameters = {k: v for k, v in true_params.items() if k not in ("M_c", "eta")}
+        fixed_parameters = {
+            k: v for k, v in true_params.items() if k not in ("M_c", "eta")
+        }
 
         prior = CombinePrior(
             [
@@ -392,9 +396,19 @@ class TestHeterodynedTransientLikelihoodFD:
         # 1. Result must contain all expected keys (q → eta via transform).
         #    reference_parameters also includes trigger_time and gmst injected by __init__.
         expected_keys = {
-            "M_c", "eta", "s1_z", "s2_z", "d_L", "t_c",
-            "phase_c", "iota", "psi", "ra", "dec",
-            "trigger_time", "gmst",
+            "M_c",
+            "eta",
+            "s1_z",
+            "s2_z",
+            "d_L",
+            "t_c",
+            "phase_c",
+            "iota",
+            "psi",
+            "ra",
+            "dec",
+            "trigger_time",
+            "gmst",
         }
         assert set(result.keys()) == expected_keys, (
             f"Unexpected keys: got {set(result.keys())}, expected {expected_keys}"
@@ -428,7 +442,11 @@ class TestTimeMarginalizedTransientLikelihoodFD:
         """tc_range, tc_array, pad_low and pad_high are stored after init."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
             marginalize_time=True,
         )
         assert isinstance(likelihood, TransientLikelihoodFD)
@@ -478,7 +496,11 @@ class TestTimeMarginalizedTransientLikelihoodFD:
     def test_initialization_and_evaluation(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
             marginalize_time=True,
         )
         assert isinstance(likelihood, TransientLikelihoodFD)
@@ -489,7 +511,11 @@ class TestTimeMarginalizedTransientLikelihoodFD:
     def test_evaluate_jit_matches(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
             marginalize_time=True,
         )
         params = example_params()
@@ -525,11 +551,18 @@ class TestTimeMarginalizedTransientLikelihoodFD:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
 
         marg_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_time=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_time=True,
         )
         base_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
             trigger_time=gps,
         )
 
@@ -574,7 +607,11 @@ class TestPhaseMarginalizedTransientLikelihoodFD:
     def test_initialization_and_evaluation(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
             marginalize_phase=True,
         )
         params = example_params()
@@ -584,7 +621,11 @@ class TestPhaseMarginalizedTransientLikelihoodFD:
     def test_evaluate_jit_matches(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
             marginalize_phase=True,
         )
         params = example_params()
@@ -619,11 +660,18 @@ class TestPhaseMarginalizedTransientLikelihoodFD:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
 
         marg_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_phase=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_phase=True,
         )
         base_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
             trigger_time=gps,
         )
 
@@ -684,18 +732,30 @@ class TestPhaseTimeMarginalizedTransientLikelihoodFD:
     def test_initialization_and_evaluation(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
-            marginalize_time=True, marginalize_phase=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_time=True,
+            marginalize_phase=True,
         )
         params = example_params()
         result = likelihood.evaluate(params, {})
-        assert jnp.isfinite(result), "Phase-time-marginalized likelihood should be finite"
+        assert jnp.isfinite(result), (
+            "Phase-time-marginalized likelihood should be finite"
+        )
 
     def test_evaluate_jit_matches(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax, trigger_time=gps,
-            marginalize_time=True, marginalize_phase=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_time=True,
+            marginalize_phase=True,
         )
         params = example_params()
         result = likelihood.evaluate(params, {})
@@ -730,11 +790,19 @@ class TestPhaseTimeMarginalizedTransientLikelihoodFD:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
 
         marg_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_time=True, marginalize_phase=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_time=True,
+            marginalize_phase=True,
         )
         base_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
             trigger_time=gps,
         )
 
@@ -760,12 +828,21 @@ class TestPhaseTimeMarginalizedTransientLikelihoodFD:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
 
         phase_time_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_time=True, marginalize_phase=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_time=True,
+            marginalize_phase=True,
         )
         phase_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_phase=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_phase=True,
         )
 
         params = example_params()
@@ -835,7 +912,9 @@ class TestHeterodynedPhaseMarginalizedTransientLikelihoodFD:
         assert isinstance(likelihood, HeterodynedTransientLikelihoodFD)
         params = example_params()
         result = likelihood.evaluate(params, {})
-        assert jnp.isfinite(result), "Heterodyned phase-marginalized likelihood should be finite"
+        assert jnp.isfinite(result), (
+            "Heterodyned phase-marginalized likelihood should be finite"
+        )
 
     def test_evaluate_jit_matches(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
@@ -882,14 +961,22 @@ class TestHeterodynedPhaseMarginalizedTransientLikelihoodFD:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
 
         phase_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_phase=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_phase=True,
         )
         ref_params = example_params()
 
         het_phase_likelihood = HeterodynedTransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, reference_parameters=ref_params,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            reference_parameters=ref_params,
             marginalize_phase=True,
         )
 
@@ -942,8 +1029,13 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         with pytest.raises(ValueError, match="prior must be provided"):
             TransientLikelihoodFD(
-                detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-                trigger_time=gps, marginalize_distance=True, dist_prior=None,
+                detectors=ifos,
+                waveform=waveform,
+                f_min=fmin,
+                f_max=fmax,
+                trigger_time=gps,
+                marginalize_distance=True,
+                dist_prior=None,
             )
 
     def test_init_fixed_d_L_raises(self, detectors_and_waveform):
@@ -951,8 +1043,12 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         with pytest.raises(ValueError, match="Cannot have d_L fixed"):
             TransientLikelihoodFD(
-                detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-                trigger_time=gps, marginalize_distance=True,
+                detectors=ifos,
+                waveform=waveform,
+                f_min=fmin,
+                f_max=fmax,
+                trigger_time=gps,
+                marginalize_distance=True,
                 fixed_parameters={"d_L": 400.0},
                 dist_prior=self.make_d_L_prior(),
             )
@@ -961,10 +1057,17 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         """A prior that contains no d_L sub-prior must raise ValueError."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         prior_no_d_L = UniformPrior(xmin=10.0, xmax=100.0, parameter_names=["M_c"])
-        with pytest.raises(ValueError, match="must be a 1D prior with parameter_names="):
+        with pytest.raises(
+            ValueError, match="must be a 1D prior with parameter_names="
+        ):
             TransientLikelihoodFD(
-                detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-                trigger_time=gps, marginalize_distance=True, dist_prior=prior_no_d_L,
+                detectors=ifos,
+                waveform=waveform,
+                f_min=fmin,
+                f_max=fmax,
+                trigger_time=gps,
+                marginalize_distance=True,
+                dist_prior=prior_no_d_L,
             )
 
     def test_init_n_dist_points_too_small_raises(self, detectors_and_waveform):
@@ -972,9 +1075,14 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         with pytest.raises(ValueError, match="n_dist_points must be at least 2"):
             TransientLikelihoodFD(
-                detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-                trigger_time=gps, marginalize_distance=True,
-                dist_prior=self.make_d_L_prior(), n_dist_points=1,
+                detectors=ifos,
+                waveform=waveform,
+                f_min=fmin,
+                f_max=fmax,
+                trigger_time=gps,
+                marginalize_distance=True,
+                dist_prior=self.make_d_L_prior(),
+                n_dist_points=1,
             )
 
     def test_init_negative_ref_dist_raises(self, detectors_and_waveform):
@@ -982,9 +1090,14 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         with pytest.raises(ValueError, match="ref_dist must be > 0"):
             TransientLikelihoodFD(
-                detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-                trigger_time=gps, marginalize_distance=True,
-                dist_prior=self.make_d_L_prior(), ref_dist=-100.0,
+                detectors=ifos,
+                waveform=waveform,
+                f_min=fmin,
+                f_max=fmax,
+                trigger_time=gps,
+                marginalize_distance=True,
+                dist_prior=self.make_d_L_prior(),
+                ref_dist=-100.0,
             )
 
     # ------------------------------------------------------------------
@@ -995,8 +1108,12 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         """A PowerLawPrior directly for d_L must be accepted."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_distance=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_distance=True,
             dist_prior=self.make_d_L_prior(),
         )
         assert isinstance(likelihood, TransientLikelihoodFD)
@@ -1006,8 +1123,13 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         uniform_d_L = UniformPrior(xmin=100.0, xmax=5000.0, parameter_names=["d_L"])
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_distance=True, dist_prior=uniform_d_L,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_distance=True,
+            dist_prior=uniform_d_L,
         )
         assert isinstance(likelihood, TransientLikelihoodFD)
 
@@ -1016,8 +1138,13 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         d_L_prior = self.make_d_L_prior(xmin=200.0, xmax=1000.0)
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_distance=True, dist_prior=d_L_prior,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_distance=True,
+            dist_prior=d_L_prior,
         )
         assert jnp.isclose(likelihood.ref_dist, (200.0 + 1000.0) / 2.0)
 
@@ -1025,19 +1152,29 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         """An explicit ref_dist is stored unchanged."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_distance=True,
-            dist_prior=self.make_d_L_prior(), ref_dist=500.0,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_distance=True,
+            dist_prior=self.make_d_L_prior(),
+            ref_dist=500.0,
         )
         assert jnp.isclose(likelihood.ref_dist, 500.0)
 
     def test_log_weights_normalized(self, detectors_and_waveform):
         """log_weights must sum to 1 in probability space, i.e. logsumexp ≈ 0."""
         from jax.scipy.special import logsumexp
+
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_distance=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_distance=True,
             dist_prior=self.make_d_L_prior(),
         )
         assert jnp.isclose(logsumexp(likelihood.log_weights), 0.0, atol=1e-5)
@@ -1050,8 +1187,12 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         """evaluate() must return a finite scalar."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_distance=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_distance=True,
             dist_prior=self.make_d_L_prior(),
         )
         params = self.params_without_d_L()
@@ -1062,8 +1203,12 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         """jax.jit(evaluate) must agree with the eager result."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_distance=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_distance=True,
             dist_prior=self.make_d_L_prior(),
         )
         params = self.params_without_d_L()
@@ -1086,13 +1231,21 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             xmin=true_d_L - 1.0, xmax=true_d_L + 1.0, parameter_names=["d_L"]
         )
         marg_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
-            trigger_time=gps, marginalize_distance=True,
-            dist_prior=narrow_prior, ref_dist=true_d_L,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_distance=True,
+            dist_prior=narrow_prior,
+            ref_dist=true_d_L,
         )
 
         base_likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform, f_min=fmin, f_max=fmax,
+            detectors=ifos,
+            waveform=waveform,
+            f_min=fmin,
+            f_max=fmax,
             trigger_time=gps,
         )
 
@@ -1117,9 +1270,12 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
         produce a finite result."""
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         likelihood = TransientLikelihoodFD(
-            detectors=ifos, waveform=waveform,
-            f_min={"H1": fmin, "L1": fmin + 1.0}, f_max=fmax,
-            trigger_time=gps, marginalize_distance=True,
+            detectors=ifos,
+            waveform=waveform,
+            f_min={"H1": fmin, "L1": fmin + 1.0},
+            f_max=fmax,
+            trigger_time=gps,
+            marginalize_distance=True,
             dist_prior=self.make_d_L_prior(),
         )
         params = self.params_without_d_L()
@@ -1374,7 +1530,9 @@ class TestCallableFixedParameters:
             f"Callable ({result}) should match constant ({ref_result})"
         )
 
-    def test_callable_fixed_parameter_does_not_mutate_input(self, detectors_and_waveform):
+    def test_callable_fixed_parameter_does_not_mutate_input(
+        self, detectors_and_waveform
+    ):
         """evaluate() must not mutate the caller's params dict.
 
         TransientLikelihoodFD.evaluate() copies the dict internally, so
@@ -1423,7 +1581,9 @@ class TestCallableFixedParameters:
         params = example_params()
         result_lambda = lambda_likelihood.evaluate(dict(params), {})
         result_lambda_jit = jax.jit(lambda_likelihood.evaluate)(dict(params), {})
-        assert jnp.isfinite(result_lambda_jit), "JIT scalar-lambda result must be finite"
+        assert jnp.isfinite(result_lambda_jit), (
+            "JIT scalar-lambda result must be finite"
+        )
         assert jnp.allclose(result_lambda, result_lambda_jit), (
             "JIT and eager scalar-lambda results must match"
         )
@@ -1446,12 +1606,16 @@ class TestCallableFixedParameters:
         result_transform_jit = jax.jit(transform_likelihood.evaluate)(
             dict(params_with_tdet), {}
         )
-        assert jnp.isfinite(result_transform_jit), "JIT transform.backward result must be finite"
+        assert jnp.isfinite(result_transform_jit), (
+            "JIT transform.backward result must be finite"
+        )
         assert jnp.allclose(result_transform, result_transform_jit), (
             "JIT and eager transform.backward results must match"
         )
 
-    def test_callables_evaluated_in_insertion_order_with_chaining(self, detectors_and_waveform):
+    def test_callables_evaluated_in_insertion_order_with_chaining(
+        self, detectors_and_waveform
+    ):
         """Later callables in fixed_parameters see values set by earlier ones.
 
         The loop applies overrides in insertion order and mutates the working
@@ -1481,7 +1645,9 @@ class TestCallableFixedParameters:
         params = example_params()  # s1_z=0.0, s2_z=0.0 originally
         likelihood.evaluate(dict(params), {})
 
-        assert len(seen_s1_z_in_s2_callable) == 1, "s2_z callable must have been invoked once"
+        assert len(seen_s1_z_in_s2_callable) == 1, (
+            "s2_z callable must have been invoked once"
+        )
         assert seen_s1_z_in_s2_callable[0] == 0.5, (
             f"s2_z callable should see s1_z=0.5 (set by first callable), "
             f"but saw {seen_s1_z_in_s2_callable[0]}"
@@ -1533,8 +1699,9 @@ class TestCallableFixedParameters:
             f_max=fmax,
             trigger_time=gps,
             fixed_parameters={
-                "t_c": lambda p: t_det_fixed
-                - ifos[0].delay_from_geocenter(p["ra"], p["dec"], gmst),
+                "t_c": lambda p: (
+                    t_det_fixed - ifos[0].delay_from_geocenter(p["ra"], p["dec"], gmst)
+                ),
             },
         )
 
@@ -1556,7 +1723,9 @@ class TestCallableFixedParameters:
         result_transform = transform_likelihood.evaluate(dict(params), {})
 
         assert jnp.isfinite(result_lambda), "Lambda fixed t_c result should be finite"
-        assert jnp.isfinite(result_transform), "Transform.backward fixed t_c result should be finite"
+        assert jnp.isfinite(result_transform), (
+            "Transform.backward fixed t_c result should be finite"
+        )
         assert jnp.allclose(result_lambda, result_transform, atol=1e-6), (
             f"Lambda ({result_lambda}) and transform.backward ({result_transform}) "
             "approaches must give the same likelihood"

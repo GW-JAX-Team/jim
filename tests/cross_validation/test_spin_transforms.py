@@ -129,7 +129,12 @@ class TestSpinAnglesToCartesianSpinTransformBilby:
             assert_all_finite(fwd_jacobian)
 
             # Step 4: Jim inverse on bilby reference Cartesian → recovered angles
-            cartesian_with_masses = {**bilby_cartesian, "M_c": M_c, "q": q, "phase_c": phase_c}
+            cartesian_with_masses = {
+                **bilby_cartesian,
+                "M_c": M_c,
+                "q": q,
+                "phase_c": phase_c,
+            }
             recovered_angles, inv_jacobian = jax.vmap(transform.inverse)(
                 cartesian_with_masses
             )

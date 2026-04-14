@@ -129,7 +129,9 @@ class TestSkyFrameToDetectorFrameHighLevel:
                 assert jnp.allclose(jim_zenith_azimuth["zenith"], jnp.array(zenith)), (
                     f"Jim forward zenith round-trip failed for {ifo_names} at gps={gps_time}"
                 )
-                assert jnp.allclose(jim_zenith_azimuth["azimuth"], jnp.array(azimuth)), (
+                assert jnp.allclose(
+                    jim_zenith_azimuth["azimuth"], jnp.array(azimuth)
+                ), (
                     f"Jim forward azimuth round-trip failed for {ifo_names} at gps={gps_time}"
                 )
                 assert_all_finite(fwd_jacobian)
@@ -257,7 +259,9 @@ class TestGMST:
 
     def test_gmst(self):
         """Compare Jim's GMST with bilby_cython's implementation."""
-        from jimgw.core.single_event.time_utils import greenwich_mean_sidereal_time as jim_gmst
+        from jimgw.core.single_event.time_utils import (
+            greenwich_mean_sidereal_time as jim_gmst,
+        )
         from bilby_cython.time import greenwich_mean_sidereal_time
 
         tol_diff = 0

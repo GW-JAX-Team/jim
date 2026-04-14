@@ -407,9 +407,7 @@ class TestPhaseMarginalizedLikelihood:
             priors=priors,
         ).log_likelihood_ratio(bilby_params_ph0.copy())
 
-        print(
-            f"\n[PhaseMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
-        )
+        print(f"\n[PhaseMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}")
         assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD(marginalize_phase) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
@@ -465,9 +463,7 @@ class TestTimeMarginalizedLikelihood:
             priors=priors,
         ).log_likelihood_ratio(setup["bilby_params"].copy())
 
-        print(
-            f"\n[TimeMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
-        )
+        print(f"\n[TimeMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}")
         assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD(marginalize_time) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
@@ -526,9 +522,7 @@ class TestDistanceMarginalizedLikelihood:
             priors=bilby_priors,
         ).log_likelihood_ratio(setup["bilby_params"].copy())
 
-        print(
-            f"\n[DistMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
-        )
+        print(f"\n[DistMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}")
         assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD(marginalize_distance) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
@@ -597,9 +591,7 @@ class TestPhaseDistanceMarginalizedLikelihood:
             priors=bilby_priors,
         ).log_likelihood_ratio(bilby_params_ph0.copy())
 
-        print(
-            f"\n[PhaseDistMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
-        )
+        print(f"\n[PhaseDistMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}")
         assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD(marginalize_phase+distance) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
@@ -657,9 +649,7 @@ class TestPhaseTimeMarginalizedLikelihood:
             priors=priors,
         ).log_likelihood_ratio(bilby_params_ph0.copy())
 
-        print(
-            f"\n[PhaseTimeMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
-        )
+        print(f"\n[PhaseTimeMarg] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}")
         assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"TransientLikelihoodFD(marginalize_time+phase) mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
@@ -688,10 +678,12 @@ class TestHeterodynedLikelihood:
         # Initialize bilby first with its default epsilon so we can read back
         # the number of bins it chose, then initialize Jim with the same count
         # for an apples-to-apples comparison.
-        bilby_likelihood = bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
-            interferometers=setup["bilby_ifos"],
-            waveform_generator=setup["wfg"],
-            fiducial_parameters=bilby_ref_params,
+        bilby_likelihood = (
+            bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
+                interferometers=setup["bilby_ifos"],
+                waveform_generator=setup["wfg"],
+                fiducial_parameters=bilby_ref_params,
+            )
         )
         n_bins = bilby_likelihood.number_of_bins
 
@@ -715,9 +707,7 @@ class TestHeterodynedLikelihood:
         jim_ll = jim_likelihood.evaluate(jim_eval_params, {})
         bilby_ll = bilby_likelihood.log_likelihood_ratio(bilby_eval_params)
 
-        print(
-            f"\n[Heterodyned] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}"
-        )
+        print(f"\n[Heterodyned] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}")
         assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"HeterodynedTransientLikelihoodFD mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
@@ -749,12 +739,14 @@ class TestHeterodynedPhaseMarginalizedLikelihood:
         # Initialize bilby first with its default epsilon so we can read back
         # the number of bins it chose, then initialize Jim with the same count
         # for an apples-to-apples comparison.
-        bilby_likelihood = bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
-            interferometers=setup["bilby_ifos"],
-            waveform_generator=setup["wfg"],
-            fiducial_parameters=bilby_ref_params,
-            phase_marginalization=True,
-            priors=priors,
+        bilby_likelihood = (
+            bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
+                interferometers=setup["bilby_ifos"],
+                waveform_generator=setup["wfg"],
+                fiducial_parameters=bilby_ref_params,
+                phase_marginalization=True,
+                priors=priors,
+            )
         )
         n_bins = bilby_likelihood.number_of_bins
 
@@ -771,9 +763,11 @@ class TestHeterodynedPhaseMarginalizedLikelihood:
 
         # Slightly perturb to move away from reference point; keep phase=0 so
         # that jim's internal phase_c=0 override remains consistent with the spins.
-        bilby_eval_params = {**bilby_ref_params_ph0,
-                             "mass_1": setup["bilby_params"]["mass_1"] * 1.01,
-                             "mass_2": setup["bilby_params"]["mass_2"] * 1.01}
+        bilby_eval_params = {
+            **bilby_ref_params_ph0,
+            "mass_1": setup["bilby_params"]["mass_1"] * 1.01,
+            "mass_2": setup["bilby_params"]["mass_2"] * 1.01,
+        }
 
         jim_eval_params = bilby_to_jim_params(bilby_eval_params)
 
