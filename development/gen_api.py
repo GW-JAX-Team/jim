@@ -11,6 +11,7 @@ Environment variables:
 """
 import os
 import re
+import shutil
 import tomllib
 from pathlib import Path
 
@@ -130,6 +131,10 @@ def main() -> None:
     toml_text = toml_path.read_text()
     with toml_path.open("rb") as f:
         config = tomllib.load(f)
+
+    # Copy CONTRIBUTING.md so Zensical picks it up (symlinks and the name
+    # "contributing.md" are both excluded by Zensical at build time)
+    shutil.copy(repo_root / "CONTRIBUTING.md", docs_dir / "contributing.md")
 
     # Generate stubs and build API nav
     modules = scan_modules(src_dir)
