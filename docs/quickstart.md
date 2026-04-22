@@ -112,4 +112,4 @@ jim.sample()
 samples = jim.get_samples()
 ```
 
-For a full worked example, see the [Getting Started tutorial](tutorials/getting_started.py). For production-grade scripts, browse the [`example/` directory on GitHub](https://github.com/kazewong/jim/tree/main/example).
+For a full worked example, see the [Getting Started tutorial](../tutorials/getting_started). For production-grade scripts, browse the [`example/` directory on GitHub](https://github.com/kazewong/jim/tree/main/example).
