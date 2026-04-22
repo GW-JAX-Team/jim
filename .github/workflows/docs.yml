@@ -65,6 +65,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.alias }}
         run: |
           mv site /tmp/docs-built
+          git clean -fd
           git fetch origin gh-pages 2>/dev/null || true
           if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
             git checkout gh-pages
