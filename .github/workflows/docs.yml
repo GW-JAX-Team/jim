@@ -2,22 +2,23 @@ name: Docs
 
 on:
   push:
-    branches: [jim-dev]
+    branches: [main, jim-dev]
+    tags: ['v*']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v7
         with:
@@ -29,27 +30,78 @@ jobs:
       - name: Install doc dependencies
         run: uv sync --group doc
 
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "alias=stable" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF}" == refs/heads/main ]]; then
+            echo "alias=latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "alias=development" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Convert notebooks to Markdown
         run: |
           for nb in docs/tutorials/*.ipynb; do
-            uv run jupytext --to markdown "$nb"
+            [ -f "$nb" ] && uv run jupytext --to markdown "$nb"
           done
 
-      - name: Build Zensical docs
-        run: uv run zensical build --clean
+      - name: Generate API stubs and versioned config
+        env:
+          VERSION_ALIAS: ${{ steps.version.outputs.alias }}
+        run: uv run python docs/gen_api.py
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site/
+      - name: Build docs
+        run: uv run zensical build -f _zensical_build.toml --clean
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Deploy to gh-pages
+        env:
+          VERSION: ${{ steps.version.outputs.alias }}
+        run: |
+          mv site /tmp/docs-built
+          git fetch origin gh-pages 2>/dev/null || true
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git checkout gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf . --quiet || true
+          fi
+
+          rm -rf "${VERSION}"
+          cp -r /tmp/docs-built "${VERSION}"
+
+          case "$VERSION" in
+            stable) title="Stable" ;;
+            latest) title="Latest" ;;
+            development) title="Development" ;;
+            *) title="$VERSION" ;;
+          esac
+          [ -f versions.json ] || echo '[]' > versions.json
+          jq --arg v "$VERSION" --arg t "$title" \
+            '([.[] | select(.version != $v)] + [{"version": $v, "title": $t, "aliases": []}])
+             | sort_by(if .version == "stable" then 0
+                       elif .version == "latest" then 1
+                       elif .version == "development" then 2
+                       else 99 end)' \
+            versions.json > versions.json.tmp
+          mv versions.json.tmp versions.json
+
+          cat > index.html << 'EOF'
+          <!doctype html>
+          <html><head><meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=stable/">
+          <script>window.location.replace("stable/")</script>
+          <title>Redirecting to stable docs</title>
+          </head><body>Redirecting to <a href="stable/">stable documentation</a>.</body></html>
+          EOF
+
+          touch .nojekyll
+          git add -A
+          git diff --cached --quiet || git commit -m "docs: deploy ${VERSION} [skip ci]"
+          git push origin gh-pages

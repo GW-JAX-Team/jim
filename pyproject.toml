@@ -58,11 +58,6 @@ cross-validation = [
 ]
 doc = [
     "jupytext",
-    "mkdocs-gen-files",
-    "mkdocs-jupyter<0.26.0",
-    "mkdocs-literate-nav",
-    "mkdocs-material",
-    "mkdocs<2",
     "mkdocstrings[python]",
     "pymdown-extensions",
     "zensical",
@@ -70,7 +65,7 @@ doc = [
 
 [project.urls]
 Homepage = "https://github.com/GW-JAX-Team/jim"
-Documentation = "https://jim.readthedocs.io"
+Documentation = "https://gw-jax-team.github.io/Jim/"
 Repository = "https://github.com/GW-JAX-Team/jim"
 "Bug Tracker" = "https://github.com/GW-JAX-Team/jim/issues"
 Changelog = "https://github.com/GW-JAX-Team/jim/releases"
