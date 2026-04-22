@@ -1,0 +1,91 @@
+[project]
+site_name = "Jim"
+site_url = "https://gw-jax-team.github.io/Jim/development/"
+site_description = "A JAX-based gravitational-wave inference toolkit"
+site_author = "GW JAX Team"
+repo_url = "https://github.com/GW-JAX-Team/jim"
+repo_name = "GW-JAX-Team/jim"
+
+extra_javascript = [
+    "javascripts/mathjax.js",
+    "https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js",
+]
+
+nav = [
+    {"Home" = "index.md"},
+    {"Installation" = "installation.md"},
+    {"Quick Start" = "quickstart.md"},
+    {"Tutorials" = [
+        "tutorials/index.md",
+        {"Getting Started" = "tutorials/getting_started.md"},
+        {"Data" = "tutorials/data.md"},
+        {"Likelihood" = "tutorials/likelihood.md"},
+        {"Prior" = "tutorials/prior.md"},
+        {"Transforms" = "tutorials/transforms.md"},
+    ]},
+    {"FAQ" = "FAQ.md"},
+    {"Contributing" = "contributing.md"},
+    {"API" = [
+        {"jimgw" = [
+            {"core" = [
+                {"base" = "api/jimgw/core/base.md"},
+                {"constants" = "api/jimgw/core/constants.md"},
+                {"jim" = "api/jimgw/core/jim.md"},
+                {"prior" = "api/jimgw/core/prior.md"},
+                {"single_event" = [
+                    {"data" = "api/jimgw/core/single_event/data.md"},
+                    {"detector" = "api/jimgw/core/single_event/detector.md"},
+                    {"likelihood" = "api/jimgw/core/single_event/likelihood.md"},
+                    {"polarization" = "api/jimgw/core/single_event/polarization.md"},
+                    {"prior" = "api/jimgw/core/single_event/prior.md"},
+                    {"time_utils" = "api/jimgw/core/single_event/time_utils.md"},
+                    {"transforms" = "api/jimgw/core/single_event/transforms.md"},
+                    {"utils" = "api/jimgw/core/single_event/utils.md"},
+                    {"waveform" = "api/jimgw/core/single_event/waveform.md"},
+                ]},
+                {"transforms" = "api/jimgw/core/transforms.md"},
+                {"utils" = "api/jimgw/core/utils.md"},
+            ]},
+        ]},
+    ]},
+]
+
+[project.extra.version]
+provider = "mike"
+default = "stable"
+
+[project.theme]
+variant = "modern"
+features = [
+    "navigation.instant",
+    "navigation.tabs",
+    "navigation.top",
+    "toc.follow",
+    "header.autohide",
+]
+
+[project.markdown_extensions.pymdownx.arithmatex]
+generic = true
+
+[project.markdown_extensions.pymdownx.superfences]
+
+[project.markdown_extensions.admonition]
+
+[project.markdown_extensions.toc]
+permalink = "¤"
+toc_depth = 4
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "google"
+filters = ["!^logger$"]
+inherited_members = true
+show_root_heading = true
+show_root_full_path = true
+show_if_no_docstring = true
+show_signature_annotations = true
+show_source = false
+members_order = "source"
+heading_level = 3
