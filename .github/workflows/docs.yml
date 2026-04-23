@@ -96,11 +96,20 @@ jobs:
 
           cat > index.html << 'EOF'
           <!doctype html>
-          <html><head><meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=stable/">
-          <script>window.location.replace("stable/")</script>
-          <title>Redirecting to stable docs</title>
-          </head><body>Redirecting to <a href="stable/">stable documentation</a>.</body></html>
+          <html><head><meta charset="utf-8"><title>Redirecting…</title>
+          <script>
+          fetch("versions.json").then(function(r){return r.json();}).then(function(vs){
+            var order=["stable","latest","development"];
+            var available=vs.map(function(v){return v.version;});
+            for(var i=0;i<order.length;i++){
+              if(available.indexOf(order[i])!==-1){
+                window.location.replace(order[i]+"/");return;
+              }
+            }
+            if(available.length>0)window.location.replace(available[0]+"/");
+          }).catch(function(){window.location.replace("stable/");});
+          </script>
+          </head><body>Redirecting…</body></html>
           EOF
 
           touch .nojekyll
