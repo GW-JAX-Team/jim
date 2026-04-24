@@ -52,9 +52,7 @@ SamplerBuilder = Callable[..., Sampler]
 _REGISTRY: dict[str, Callable[[], SamplerBuilder]] = {}
 
 
-def register_sampler(
-    type_str: str, lazy_loader: Callable[[], SamplerBuilder]
-) -> None:
+def register_sampler(type_str: str, lazy_loader: Callable[[], SamplerBuilder]) -> None:
     """Register a concrete :class:`Sampler` class under ``type_str``.
 
     ``lazy_loader`` is called (with no args) only when :func:`build_sampler`

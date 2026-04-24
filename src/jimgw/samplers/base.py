@@ -127,9 +127,7 @@ class Sampler(ABC):
             named_params = transform.forward(named_params)
         return self.likelihood.evaluate(named_params, {}) + log_prior
 
-    def log_likelihood_in_sample_space(
-        self, params: Float[Array, " n_dims"]
-    ) -> Float:
+    def log_likelihood_in_sample_space(self, params: Float[Array, " n_dims"]) -> Float:
         """Log-likelihood in the sampling space (no prior, no Jacobian).
 
         Used by nested samplers that want ``log_prior`` and ``log_likelihood``
