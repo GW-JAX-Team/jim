@@ -131,7 +131,7 @@ def test_log_prior_with_bound_to_unbound_includes_jacobian():
 def test_parameter_names_propagate_through_transforms():
     prior = UniformPrior(10.0, 80.0, parameter_names=["M_c"])
     transform = BoundToUnbound(
-        name_mapping=[["M_c"], ["M_c_unbounded"]],
+        name_mapping=(["M_c"], ["M_c_unbounded"]),
         original_lower_bound=10.0,
         original_upper_bound=80.0,
     )

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Optional, Union
 
-from pydantic import BaseModel, Discriminator, Field
+from pydantic import BaseModel, Discriminator, Field, field_validator
 
 
 class BaseSamplerConfig(BaseModel):
@@ -76,6 +76,13 @@ class BlackJAXNSAWConfig(BaseSamplerConfig):
     max_proposals: int = 1000
     termination_dlogz: float = 0.1
 
+    @field_validator("n_delete_frac")
+    @classmethod
+    def _n_delete_frac_range(cls, v: float) -> float:
+        if not (0.0 < v < 1.0):
+            raise ValueError("n_delete_frac must be strictly between 0 and 1")
+        return v
+
 
 class BlackJAXNSSConfig(BaseSamplerConfig):
     """Configuration for the BlackJAX nested slice sampler."""
@@ -86,6 +93,13 @@ class BlackJAXNSSConfig(BaseSamplerConfig):
     n_delete_frac: float = 0.5
     num_inner_steps_per_dim: int = 20
     termination_dlogz: float = 0.1
+
+    @field_validator("n_delete_frac")
+    @classmethod
+    def _n_delete_frac_range(cls, v: float) -> float:
+        if not (0.0 < v < 1.0):
+            raise ValueError("n_delete_frac must be strictly between 0 and 1")
+        return v
 
 
 class BlackJAXSMCConfig(BaseSamplerConfig):

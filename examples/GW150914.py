@@ -134,30 +134,34 @@ likelihood = TransientLikelihoodFD(
 
 # --- Sample with Jim ---
 
+from jimgw.samplers.config import FlowMCSamplerConfig
+
 jim = Jim(
     likelihood,
     prior,
+    sampler_config=FlowMCSamplerConfig(
+        n_chains=1000,
+        n_local_steps=100,
+        n_global_steps=1000,
+        n_training_loops=20,
+        n_production_loops=10,
+        n_epochs=20,
+        mala_step_size=1e-2,
+        rq_spline_hidden_units=[128, 128],
+        rq_spline_n_bins=10,
+        rq_spline_n_layers=8,
+        learning_rate=1e-3,
+        batch_size=10000,
+        n_max_examples=30000,
+        n_NFproposal_batch_size=100,
+        local_thinning=1,
+        global_thinning=100,
+        history_window=100,
+        n_temperatures=0,
+        verbose=True,
+    ),
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    n_chains=1000,
-    n_local_steps=100,
-    n_global_steps=1000,
-    n_training_loops=20,
-    n_production_loops=10,
-    n_epochs=20,
-    mala_step_size=1e-2,
-    rq_spline_hidden_units=[128, 128],
-    rq_spline_n_bins=10,
-    rq_spline_n_layers=8,
-    learning_rate=1e-3,
-    batch_size=10000,
-    n_max_examples=30000,
-    n_NFproposal_batch_size=100,
-    local_thinning=1,
-    global_thinning=100,
-    history_window=100,
-    n_temperatures=0,
-    verbose=True,
 )
 
 start_time = time.time()

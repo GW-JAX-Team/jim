@@ -63,6 +63,10 @@ doc = [
     "pymdown-extensions",
     "zensical",
 ]
+samplers = [
+    "anesthetic>=2",
+    "blackjax",
+]
 
 [project.urls]
 Homepage = "https://github.com/GW-JAX-Team/jim"
@@ -73,6 +77,15 @@ Changelog = "https://github.com/GW-JAX-Team/jim/releases"
 
 [tool.uv.sources]
 jimgw = { workspace = true }
+# Pinned to the user's maintained fork on a dedicated `jim` branch that carries:
+#   - blackjax.ns.{base,adaptive,utils}       (NS-AW, NSS)
+#   - blackjax.nss                            (NSS)
+#   - blackjax.adaptive_persistent_sampling_smc,
+#     blackjax.smc.persistent_sampling, blackjax.smc.inner_kernel_tuning
+#     with StateWithParameterOverride                                      (SMC)
+# When upstream blackjax-devs ships all three feature sets, switch this
+# pin to a tagged PyPI release and drop the [tool.uv.sources] entry.
+blackjax = { git = "https://github.com/thomasckng/blackjax.git", branch = "jim" }
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

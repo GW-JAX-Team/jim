@@ -90,3 +90,34 @@ def build_sampler(
         likelihood_transforms=likelihood_transforms,
         config=config,
     )
+
+
+# --- flowMC (always available; flowMC is a required dep) ---
+from jimgw.samplers.flowmc import FlowMCSampler  # noqa: E402
+
+register_sampler("flowmc", lambda: FlowMCSampler)
+
+# --- BlackJAX samplers (lazy; installed via `uv sync --group samplers`) ---
+
+
+def _load_ns_aw() -> SamplerBuilder:
+    from jimgw.samplers.blackjax.ns_aw import BlackJAXNSAWSampler  # type: ignore[import]
+
+    return BlackJAXNSAWSampler  # type: ignore[return-value]
+
+
+def _load_nss() -> SamplerBuilder:
+    from jimgw.samplers.blackjax.nss import BlackJAXNSSSampler  # type: ignore[import]
+
+    return BlackJAXNSSSampler  # type: ignore[return-value]
+
+
+def _load_smc() -> SamplerBuilder:
+    from jimgw.samplers.blackjax.smc import BlackJAXSMCSampler  # type: ignore[import]
+
+    return BlackJAXSMCSampler  # type: ignore[return-value]
+
+
+register_sampler("blackjax-ns-aw", _load_ns_aw)
+register_sampler("blackjax-nss", _load_nss)
+register_sampler("blackjax-smc", _load_smc)

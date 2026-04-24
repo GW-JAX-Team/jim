@@ -78,16 +78,22 @@ likelihood = TransientLikelihoodFD(
     trigger_time=gps,
 )
 
+from jimgw.samplers.config import FlowMCSamplerConfig
+
 jim = Jim(
     likelihood,
     prior,
+    sampler_config=FlowMCSamplerConfig(
+        n_chains=2,
+        n_local_steps=2,
+        n_global_steps=2,
+        global_thinning=1,
+        n_training_loops=1,
+        n_production_loops=1,
+        n_epochs=1,
+        n_temperatures=0,
+    ),
     likelihood_transforms=likelihood_transforms,
-    n_chains=2,
-    n_local_steps=2,
-    n_global_steps=2,
-    n_training_loops=1,
-    n_production_loops=1,
-    global_thinning=1,
 )
 
 jim.sample()

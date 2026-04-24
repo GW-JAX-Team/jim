@@ -1,12 +1,9 @@
-from typing import Sequence, Optional
 import logging
-import time
+from typing import Optional, Sequence
+
 import jax
 import jax.numpy as jnp
 import numpy as np
-from flowMC.resource_strategy_bundle.RQSpline_MALA_PT import RQSpline_MALA_PT_Bundle
-from flowMC.resource.buffers import Buffer
-from flowMC.Sampler import Sampler
 from jaxtyping import Array, Float, Key
 
 from jimgw.core.base import LikelihoodBase
@@ -17,23 +14,22 @@ from jimgw.core.single_event.likelihood import (
     TransientLikelihoodFD,
 )
 from ripplegw.interfaces import Waveform
+from jimgw.samplers import Sampler, SamplerConfig, build_sampler
 
 logger = logging.getLogger(__name__)
 
 
-class Jim(object):
-    """Master class for gravitational wave parameter estimation with flowMC.
+class Jim:
+    """Master class for gravitational-wave parameter estimation.
 
-    This class wires together a :class:`~jimgw.core.base.LikelihoodBase`, a
+    Wires together a :class:`~jimgw.core.base.LikelihoodBase`, a
     :class:`~jimgw.core.prior.Prior`, optional parameter transforms, and a
-    :class:`~flowMC.Sampler.Sampler` configured with a normalising-flow
-    enhanced MCMC scheme (MALA + parallel tempering by default).
+    pluggable JAX :class:`~jimgw.samplers.Sampler` selected via a typed
+    ``sampler_config`` object.
     """
 
     likelihood: LikelihoodBase
     prior: Prior
-
-    # Name of parameters to sample from
     sample_transforms: Sequence[BijectiveTransform]
     likelihood_transforms: Sequence[NtoMTransform]
     parameter_names: tuple[str, ...]
@@ -41,155 +37,80 @@ class Jim(object):
 
     def __init__(
         self,
-        # --- Required ---
         likelihood: LikelihoodBase,
         prior: Prior,
-        sample_transforms: Sequence[BijectiveTransform] = [],
-        likelihood_transforms: Sequence[NtoMTransform] = [],
-        rng_key: Optional[Key] = None,
-        n_chains: int = 1000,
-        n_local_steps: int = 100,
-        n_global_steps: int = 1000,
-        n_training_loops: int = 20,
-        n_production_loops: int = 10,
-        n_epochs: int = 20,
-        # --- Local sampler ---
-        mala_step_size: Float | Float[Array, " n_dims"] = 2e-3,
-        # --- Normalizing flow model ---
-        rq_spline_hidden_units: list[int] = [128, 128],
-        rq_spline_n_bins: int = 10,
-        rq_spline_n_layers: int = 8,
-        n_NFproposal_batch_size: int = 1000,
-        # --- Training ---
-        learning_rate: float = 1e-3,
-        batch_size: int = 10000,
-        n_max_examples: int = 30000,
-        history_window: int = 100,
-        # --- Sampling execution ---
-        chain_batch_size: int = 0,
-        local_thinning: int = 1,
-        global_thinning: int = 100,
-        # --- Parallel tempering ---
-        n_temperatures: int = 5,
-        max_temperature: float = 10.0,
-        n_tempered_steps: int = 5,
-        # --- Misc ---
-        verbose: bool = False,
-        periodic: Optional[dict[str, tuple[float, float]]] = None,
+        sampler_config: SamplerConfig,
+        *,
+        sample_transforms: Sequence[BijectiveTransform] = (),
+        likelihood_transforms: Sequence[NtoMTransform] = (),
     ) -> None:
-        """Initialize Jim and construct the internal flowMC sampler.
+        """Initialise Jim and build the internal sampler.
 
         Args:
-            likelihood (LikelihoodBase): The likelihood to be evaluated.
-            prior (Prior): The prior distribution.
-            sample_transforms (Sequence[BijectiveTransform]): Bijective transforms
-                applied to the sampling space. Applied in order during the forward
-                pass and reversed when retrieving samples. Defaults to [].
-            likelihood_transforms (Sequence[NtoMTransform]): Transforms applied to
-                the parameter space before evaluating the likelihood. Defaults to [].
-            rng_key (Optional[Key]): JAX PRNG key. If None, a time-based key is used.
-            n_chains (int): Number of MCMC chains. Defaults to 1000.
-            n_local_steps (int): Number of local MCMC steps per loop. Defaults to 100.
-            n_global_steps (int): Number of global (NF proposal) steps per loop.
-                Defaults to 1000.
-            n_training_loops (int): Number of training loops. Defaults to 20.
-            n_production_loops (int): Number of production loops. Defaults to 10.
-            n_epochs (int): Number of normalising-flow training epochs per loop.
-                Defaults to 20.
-            mala_step_size (Float | Float[Array, " n_dims"]): MALA step size.
-                Can be a scalar or a per-dimension array. Defaults to 2e-3.
-            rq_spline_hidden_units (list[int]): Hidden layer widths for the
-                rational-quadratic spline flow. Defaults to [128, 128].
-            rq_spline_n_bins (int): Number of spline bins. Defaults to 10.
-            rq_spline_n_layers (int): Number of spline coupling layers. Defaults to 8.
-            n_NFproposal_batch_size (int): Batch size for NF proposals. Defaults to 1000.
-            learning_rate (float): Adam learning rate for flow training. Defaults to 1e-3.
-            batch_size (int): Training batch size. Defaults to 10000.
-            n_max_examples (int): Maximum number of training examples to keep in the
-                replay buffer. Defaults to 30000.
-            history_window (int): Window size for the training history buffer.
-                Defaults to 100.
-            chain_batch_size (int): Number of chains to process simultaneously.
-                0 means all chains at once. Defaults to 0.
-            local_thinning (int): Thinning factor for local steps. Defaults to 1.
-            global_thinning (int): Thinning factor for global steps. Defaults to 100.
-            n_temperatures (int): Number of parallel tempering temperatures.
-                Set to 0 to disable tempering. Defaults to 5.
-            max_temperature (float): Maximum temperature for parallel tempering.
-                Defaults to 10.0.
-            n_tempered_steps (int): Number of tempering swap steps per loop.
-                Defaults to 5.
-            verbose (bool): Enable verbose logging. Defaults to False.
-            periodic (Optional[dict[str, tuple[float, float]]]): Dictionary mapping
-                parameter names to (lower, upper) bounds for periodic parameters.
-                Defaults to None.
+            likelihood: The likelihood to evaluate.
+            prior: The prior distribution.
+            sampler_config: Pydantic config selecting and configuring the
+                sampler backend (e.g. :class:`~jimgw.samplers.FlowMCSamplerConfig`).
+            sample_transforms: Bijective transforms applied in the sampling
+                space (reversed when retrieving posterior samples).
+            likelihood_transforms: Transforms applied to reach the likelihood
+                parameter space from the prior parameter space.
         """
+        self._setup_problem(likelihood, prior, sample_transforms, likelihood_transforms)
+        self.sampler = build_sampler(
+            sampler_config,
+            likelihood,
+            prior,
+            sample_transforms,
+            likelihood_transforms,
+        )
+        self._rng_key: Key = jax.random.key(sampler_config.rng_seed)
+        self._sanity_check_posterior()
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _setup_problem(
+        self,
+        likelihood: LikelihoodBase,
+        prior: Prior,
+        sample_transforms: Sequence[BijectiveTransform],
+        likelihood_transforms: Sequence[NtoMTransform],
+    ) -> None:
         self.likelihood = likelihood
         self.prior = prior
-
         self.sample_transforms = sample_transforms
         self.likelihood_transforms = likelihood_transforms
-        self.parameter_names = prior.parameter_names
 
-        if len(sample_transforms) == 0:
-            logger.info(
-                "No sample transforms provided. Using prior parameters as sampling parameters"
-            )
+        self.parameter_names = prior.parameter_names
+        if not sample_transforms:
+            logger.info("No sample transforms provided — using prior parameters as sampling parameters.")
         else:
-            logger.info("Using sample transforms")
+            logger.info("Using sample transforms.")
             for transform in sample_transforms:
                 self.parameter_names = transform.propagate_name(self.parameter_names)
 
-        # Validate periodic parameter names are in sampling space
-        if periodic is not None:
-            unknown = set(periodic.keys()) - set(self.parameter_names)
-            if unknown:
-                raise ValueError(
-                    f"Periodic parameter(s) {unknown} not found in sampling parameters. "
-                    f"Sampling parameters: {self.parameter_names}"
-                )
-            periodic_index_dict: Optional[dict[int, tuple[float, float]]] = {
-                self.parameter_names.index(name): bounds
-                for name, bounds in periodic.items()
-            }
-        else:
-            periodic_index_dict = None
+        if not likelihood_transforms:
+            logger.info("No likelihood transforms provided — using prior parameters as likelihood parameters.")
 
-        if len(likelihood_transforms) == 0:
-            logger.info(
-                "No likelihood transforms provided. Using prior parameters as likelihood parameters"
-            )
-
-        # Check if parameters defined by the prior are consumed by the likelihood
         if isinstance(likelihood, SingleEventLikelihood):
-            # Propagate prior names through likelihood_transforms to get the
-            # parameter names as they appear in the likelihood space.
             lh_space_names: tuple[str, ...] = prior.parameter_names
             for transform in likelihood_transforms:
                 lh_space_names = transform.propagate_name(lh_space_names)
 
-            # Check 1: likelihood-space params that shadow fixed_parameters.
             if likelihood.fixed_parameters:
-                prior_fixed_overlap = set(lh_space_names) & set(
-                    likelihood.fixed_parameters.keys()
-                )
-                if prior_fixed_overlap:
+                overlap = set(lh_space_names) & set(likelihood.fixed_parameters.keys())
+                if overlap:
                     raise ValueError(
-                        f"Prior defines parameter(s) {sorted(prior_fixed_overlap)} that are "
-                        f"also in fixed_parameters. Either remove them from the prior or "
-                        f"from fixed_parameters."
+                        f"Prior defines parameter(s) {sorted(overlap)} that are "
+                        "also in fixed_parameters. Either remove them from the prior "
+                        "or from fixed_parameters."
                     )
 
-            # Check 2: likelihood-space params not consumed by the likelihood.
-            # Only applies when the waveform is a Waveform instance that exposes
-            # parameter_names; plain callables are skipped.
             if isinstance(likelihood.waveform, Waveform):
-                # Params consumed by the waveform model
                 consumed: set[str] = set(likelihood.waveform.parameter_names)
-                # Params consumed by fd_response (sky localisation / time shift)
                 consumed |= {"ra", "dec", "psi", "t_c"}
-                # Marginalized params are injected by the likelihood; the user
-                # should NOT have priors on them.
                 if isinstance(likelihood, TransientLikelihoodFD):
                     if likelihood.marginalize_time:
                         consumed.discard("t_c")
@@ -197,195 +118,65 @@ class Jim(object):
                         consumed.discard("phase_c")
                     if likelihood.marginalize_distance:
                         consumed.discard("d_L")
-
                 unused = set(lh_space_names) - consumed
                 if unused:
                     raise ValueError(
-                        f"Prior defines parameter(s) {sorted(unused)} that are not consumed "
-                        f"by the likelihood or detector response. Remove them from the prior "
-                        f"or add appropriate likelihood_transforms."
+                        f"Prior defines parameter(s) {sorted(unused)} that are not "
+                        "consumed by the likelihood or detector response. Remove them "
+                        "from the prior or add appropriate likelihood_transforms."
                     )
 
-        if rng_key is None:
-            seed = int(time.time_ns() % (2**32))
-            rng_key = jax.random.key(seed)
-            logger.info(
-                "No rng_key provided for sampler initialization. Using time-based key with seed=%d.",
-                seed,
-            )
-
-        rng_key, subkey = jax.random.split(rng_key)
-
-        resource_strategy_bundle = RQSpline_MALA_PT_Bundle(
-            # --- Required ---
-            rng_key=subkey,
-            n_chains=n_chains,
-            n_dims=self.prior.n_dims,
-            logpdf=self.evaluate_posterior,
-            n_local_steps=n_local_steps,
-            n_global_steps=n_global_steps,
-            n_training_loops=n_training_loops,
-            n_production_loops=n_production_loops,
-            n_epochs=n_epochs,
-            # --- Local sampler ---
-            mala_step_size=mala_step_size,
-            periodic=periodic_index_dict,  # type: ignore # Type ignored should be removed once the flowMC release is published
-            # --- Normalizing flow model ---
-            rq_spline_hidden_units=rq_spline_hidden_units,
-            rq_spline_n_bins=rq_spline_n_bins,
-            rq_spline_n_layers=rq_spline_n_layers,
-            n_NFproposal_batch_size=n_NFproposal_batch_size,
-            # --- Training ---
-            learning_rate=learning_rate,
-            batch_size=batch_size,
-            n_max_examples=n_max_examples,
-            history_window=history_window,
-            # --- Sampling execution ---
-            chain_batch_size=chain_batch_size,
-            local_thinning=local_thinning,
-            global_thinning=global_thinning,
-            # --- Parallel tempering ---
-            n_temperatures=max(n_temperatures, 1),
-            max_temperature=max_temperature,
-            n_tempered_steps=n_tempered_steps,
-            logprior=self.evaluate_prior,
-            # --- Early stopping ---
-            early_stopping=True,
-            early_stopping_tolerance=0.1,
-            early_stopping_patience=3,
-            early_stopping_min_acceptance=0.1,
-            # --- Misc ---
-            verbose=verbose,
-        )
-
-        if n_temperatures == 0:
-            logger.info(
-                "The number of temperatures is set to 0. No tempering will be applied."
-            )
-            resource_strategy_bundle.strategy_order = [
-                strat
-                for strat in resource_strategy_bundle.strategy_order
-                if strat != "parallel_tempering"
-            ]
-
-        assert isinstance(rng_key, jax.Array)
-        rng_key, subkey = jax.random.split(rng_key)
-        self.sampler = Sampler(
-            self.prior.n_dims,
-            n_chains,
-            subkey,
-            resource_strategy_bundles=resource_strategy_bundle,
-        )
-
-        # Sanity-check: evaluate the posterior at 10 points drawn from the prior.
-        _check_positions = self.sample_initial_positions(n_points=10)
-        _log_posteriors = jax.vmap(self.evaluate_posterior, in_axes=(0, None))(
-            _check_positions, {}
-        )
-        _n_nan = int(jnp.sum(jnp.isnan(_log_posteriors)))
-        if _n_nan > 5:
+    def _sanity_check_posterior(self) -> None:
+        self._rng_key, check_key = jax.random.split(self._rng_key)
+        check_positions = self.sampler.sample_initial_positions(check_key, 10)
+        log_posteriors = jax.vmap(self.sampler.log_posterior)(check_positions)
+        n_nan = int(jnp.sum(jnp.isnan(log_posteriors)))
+        if n_nan > 5:
             raise ValueError(
-                f"The posterior returned NaN for {_n_nan}/10 test points sampled "
+                f"The posterior returned NaN for {n_nan}/10 test points sampled "
                 "from the prior. Check your likelihood and transforms for correctness."
             )
-        elif _n_nan > 0:
+        elif n_nan > 0:
             logger.warning(
                 "%d/10 test points sampled from the prior returned NaN posterior "
                 "values. This may indicate issues at the boundaries of your prior.",
-                _n_nan,
+                n_nan,
             )
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def add_name(self, x: Float[Array, " n_dims"]) -> dict[str, Float]:
-        """
-        Turn an array into a dictionary.
+        """Convert a flat array to a named dict keyed by sampling parameter names."""
+        return self.sampler.add_name(x)
 
-        Args:
-            x (Array): An array of parameters. Shape (n_dims,).
-        """
+    def evaluate_prior(self, params: Float[Array, " n_dims"]) -> Float:
+        """Log-prior in the sampling space (with Jacobian corrections from sample_transforms)."""
+        return self.sampler.log_prior(params)
 
-        return dict(zip(self.parameter_names, x))
-
-    def evaluate_prior(self, params: Float[Array, " n_dims"], data: dict) -> Float:
-        """Evaluate the log-prior in the sampling space.
-
-        Applies sample transforms in reverse to map from sampling space to prior
-        space before evaluating the prior, accumulating log-Jacobian corrections.
-
-        Args:
-            params (Float[Array, " n_dims"]): Parameter array in the sampling space.
-            data (dict): Unused auxiliary data (required by flowMC interface).
-
-        Returns:
-            Float: Log-prior value including Jacobian corrections from transforms.
-        """
-        named_params = self.add_name(params)
-        transform_jacobian = 0.0
-        for transform in reversed(self.sample_transforms):
-            named_params, jacobian = transform.inverse(named_params)
-            transform_jacobian += jacobian
-        return self.prior.log_prob(named_params) + transform_jacobian
-
-    def evaluate_posterior(self, params: Float[Array, " n_dims"], data: dict) -> Float:
-        """Evaluate the log-posterior in the sampling space.
-
-        Applies sample transforms in reverse to map from sampling space to prior
-        space, then applies likelihood transforms to the likelihood space.
-
-        Args:
-            params (Float[Array, " n_dims"]): Parameter array in the sampling space.
-            data (dict): Unused auxiliary data (required by flowMC interface).
-
-        Returns:
-            Float: Log-posterior value (log-likelihood + log-prior + Jacobians).
-        """
-        named_params = self.add_name(params)
-        transform_jacobian = 0.0
-        for transform in reversed(self.sample_transforms):
-            named_params, jacobian = transform.inverse(named_params)
-            transform_jacobian += jacobian
-        prior = self.prior.log_prob(named_params) + transform_jacobian
-        for transform in self.likelihood_transforms:
-            named_params = transform.forward(named_params)
-        return self.likelihood.evaluate(named_params, data) + prior
+    def evaluate_posterior(self, params: Float[Array, " n_dims"]) -> Float:
+        """Log-posterior in the sampling space."""
+        return self.sampler.log_posterior(params)
 
     def sample_initial_positions(
-        self, n_points: Optional[int] = None
+        self,
+        n_points: int,
+        rng_key: Optional[Key] = None,
     ) -> Float[Array, "n_points n_dims"]:
-        """Draw initial positions for chains by sampling from the prior.
-
-        Samples from the prior and applies all sample transforms to produce
-        positions in the sampling space.
+        """Draw ``n_points`` initial positions from the prior in sampling space.
 
         Args:
-            n_points (int | None): Number of points to sample. Defaults to
-                ``self.sampler.n_chains`` when ``None``.
+            n_points: Number of positions to draw.
+            rng_key: Optional explicit PRNG key. If ``None``, Jim's internal
+                key is advanced automatically.
 
         Returns:
-            Float[Array, "n_points n_dims"]: Positions array of shape
-                (n_points, n_dims) in the sampling space.
-
-        Raises:
-            ValueError: If any initial position contains non-finite values.
+            Array of shape ``(n_points, n_dims)`` in sampling space.
         """
-        n = n_points if n_points is not None else self.sampler.n_chains
-        rng_key, subkey = jax.random.split(self.sampler.rng_key)
-
-        initial_position = self.prior.sample(subkey, n)
-        for transform in self.sample_transforms:
-            initial_position = jax.vmap(transform.forward)(initial_position)
-        initial_position = jnp.array(
-            [initial_position[key] for key in self.parameter_names]
-        ).T
-
-        if not jnp.all(jnp.isfinite(initial_position)):
-            raise ValueError(
-                "Initial positions contain non-finite values (NaN or inf). "
-                "Check your priors and transforms for validity."
-            )
-
-        self.sampler.rng_key = rng_key
-
-        return initial_position
+        if rng_key is None:
+            self._rng_key, rng_key = jax.random.split(self._rng_key)
+        return self.sampler.sample_initial_positions(rng_key, n_points)
 
     def sample(
         self,
@@ -394,44 +185,13 @@ class Jim(object):
         """Run the sampler.
 
         Args:
-            initial_position (Optional[Float[Array, "n_chains n_dims"]]): Starting
-                positions for the chains in the sampling space. Accepted shapes:
-
-                - ``(n_dims,)``: broadcast to all chains.
-                - ``(n_chains, n_dims)``: one position per chain.
-                - ``None``: sample from the prior via
-                  :meth:`sample_initial_positions`.
-
-        Raises:
-            ValueError: If ``initial_position`` has an incompatible shape.
+            initial_position: Starting positions for the chains in sampling
+                space. Shape ``(n_dims,)`` broadcasts to all chains, shape
+                ``(n_chains, n_dims)`` sets one position per chain, ``None``
+                draws from the prior. The sampler validates the exact shape.
         """
-        if initial_position is None:
-            logger.info("No initial_position provided. Sampling from prior.")
-            initial_position = self.sample_initial_positions()
-        else:
-            initial_position = jnp.asarray(initial_position)
-            if initial_position.ndim == 1:
-                if initial_position.shape[0] != self.prior.n_dims:
-                    raise ValueError(
-                        f"initial_position must have shape (n_dims,) or (n_chains, n_dims). Got shape {initial_position.shape}."
-                    )
-                logger.info(
-                    "1D initial_position provided. Broadcasting it to all chains."
-                )
-                initial_position = jnp.broadcast_to(
-                    initial_position, (self.sampler.n_chains, self.prior.n_dims)
-                )
-            elif initial_position.ndim == 2:
-                if initial_position.shape != (self.sampler.n_chains, self.prior.n_dims):
-                    raise ValueError(
-                        f"initial_position must have shape (n_dims,) or (n_chains, n_dims). Got shape {initial_position.shape}."
-                    )
-                logger.info("Using the provided initial positions for sampling.")
-            else:
-                raise ValueError(
-                    f"initial_position must have shape (n_dims,) or (n_chains, n_dims). Got shape {initial_position.shape}."
-                )
-        self.sampler.sample(initial_position, {})
+        self._rng_key, rng_key = jax.random.split(self._rng_key)
+        self.sampler.sample(rng_key, initial_position)
 
     def get_samples(
         self,
@@ -439,60 +199,46 @@ class Jim(object):
         rng_key: Key = jax.random.key(21),
         training: bool = False,
     ) -> dict[str, np.ndarray]:
-        """
-        Get the samples from the sampler, with optional uniform downsampling.
-
-        When `n_samples` > 0, performs uniform random downsampling to return a subset
-        of the total samples. This is useful for reducing memory usage when plotting
-        or analyzing large sample sets.
+        """Retrieve posterior samples, optionally downsampled.
 
         Args:
-            n_samples (int, optional): Number of samples to return via uniform random downsampling.
-                If 0, return all samples with transforms applied, by default 0.
-            rng_key (Key, optional): RNG key for downsampling, by default jax.random.key(21).
-            training (bool, optional): Whether to get the training samples or the production
-                samples, by default False.
+            n_samples: If > 0, uniformly downsample to this many samples.
+                If 0 (default), return all available samples.
+            rng_key: PRNG key for downsampling. Ignored when ``n_samples=0``.
+            training: If ``True``, return training samples instead of
+                production samples. Only meaningful for flowMC; raises
+                ``ValueError`` for samplers that do not produce training data.
 
         Returns:
-            dict[str, np.ndarray]: Dictionary of samples with parameter names as keys and numpy
-                array values. All sample transforms are reversed to return samples in the prior
-                parameter space. Returns numpy arrays for compatibility with plotting libraries
-                and easy serialization.
+            Dict mapping parameter names to 1-D numpy arrays in prior space.
         """
+        output = self.sampler.get_output()
+
         if training:
-            assert isinstance(
-                chains := self.sampler.resources["positions_training"], Buffer
-            )
-            chains = chains.data
+            if "training_samples" not in output.metadata:
+                raise ValueError(
+                    "training=True requires a sampler that stores training samples "
+                    "(e.g. FlowMCSampler). This sampler does not provide them."
+                )
+            chains: dict[str, np.ndarray] = output.metadata["training_samples"]
         else:
-            assert isinstance(
-                chains := self.sampler.resources["positions_production"], Buffer
-            )
-            chains = chains.data
+            chains = output.samples
 
-        chains = chains.reshape(-1, self.prior.n_dims)
+        n_available = next(iter(chains.values())).shape[0]
 
-        # Downsample to requested number of samples (uniform random sampling)
-        n_available = chains.shape[0]
         if n_samples > 0:
             if n_samples > n_available:
                 logger.warning(
-                    f"Requested {n_samples} samples but only {n_available} available. "
-                    f"Returning all available samples."
+                    "Requested %d samples but only %d available. Returning all available samples.",
+                    n_samples,
+                    n_available,
                 )
             else:
-                # Uniformly randomly select n_samples from the chains
                 rng_key, subkey = jax.random.split(rng_key)
                 indices = jax.random.choice(
                     subkey, n_available, shape=(n_samples,), replace=False
                 )
-                chains = chains[indices]
-
-        chains = jax.vmap(self.add_name)(chains)
-        for sample_transform in reversed(self.sample_transforms):
-            chains = jax.vmap(sample_transform.backward)(chains)
-
-        # Convert to numpy arrays for compatibility with plotting and serialization
-        chains = {key: np.array(val) for key, val in chains.items()}
+                idx = np.array(indices)
+                chains = {k: v[idx] for k, v in chains.items()}
 
         return chains

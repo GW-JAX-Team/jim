@@ -82,21 +82,26 @@ likelihood = HeterodynedTransientLikelihoodFD(
     optimizer_popsize=10,
 )
 
+from jimgw.samplers.config import FlowMCSamplerConfig
+
 jim = Jim(
     likelihood,
     prior,
+    sampler_config=FlowMCSamplerConfig(
+        n_chains=2,
+        n_local_steps=2,
+        n_global_steps=2,
+        global_thinning=1,
+        n_training_loops=1,
+        n_production_loops=1,
+        n_epochs=1,
+        mala_step_size=3e-3,
+        learning_rate=1e-4,
+        n_max_examples=30,
+        batch_size=100,
+        n_temperatures=0,
+    ),
     likelihood_transforms=likelihood_transforms,
-    n_training_loops=1,
-    n_production_loops=1,
-    n_local_steps=2,
-    n_global_steps=2,
-    n_chains=2,
-    n_epochs=1,
-    learning_rate=1e-4,
-    n_max_examples=30,
-    batch_size=100,
-    mala_step_size=3e-3,
-    global_thinning=1,
 )
 
 jim.sample()
