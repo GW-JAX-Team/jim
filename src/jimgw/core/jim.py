@@ -85,14 +85,18 @@ class Jim:
 
         self.parameter_names = prior.parameter_names
         if not sample_transforms:
-            logger.info("No sample transforms provided — using prior parameters as sampling parameters.")
+            logger.info(
+                "No sample transforms provided — using prior parameters as sampling parameters."
+            )
         else:
             logger.info("Using sample transforms.")
             for transform in sample_transforms:
                 self.parameter_names = transform.propagate_name(self.parameter_names)
 
         if not likelihood_transforms:
-            logger.info("No likelihood transforms provided — using prior parameters as likelihood parameters.")
+            logger.info(
+                "No likelihood transforms provided — using prior parameters as likelihood parameters."
+            )
 
         if isinstance(likelihood, SingleEventLikelihood):
             lh_space_names: tuple[str, ...] = prior.parameter_names

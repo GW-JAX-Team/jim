@@ -106,7 +106,9 @@ class BlackJAXNSAWSampler(Sampler):
                     f"initial_position must have shape ({n_live}, {self.n_dims}), "
                     f"got {arr.shape}."
                 )
-            initial_particles = {k: arr[:, i] for i, k in enumerate(self.parameter_names)}
+            initial_particles = {
+                k: arr[:, i] for i, k in enumerate(self.parameter_names)
+            }
 
         stepper_fn = to_unit_cube_stepper(config.periodic, self.parameter_names)
 

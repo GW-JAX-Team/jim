@@ -90,11 +90,10 @@ class FlowMCSampler(Sampler):
         )
 
         if config.n_temperatures == 0:
-            logger.info(
-                "n_temperatures is 0 — parallel tempering disabled."
-            )
+            logger.info("n_temperatures is 0 — parallel tempering disabled.")
             resource_strategy_bundle.strategy_order = [
-                s for s in resource_strategy_bundle.strategy_order
+                s
+                for s in resource_strategy_bundle.strategy_order
                 if s != "parallel_tempering"
             ]
 
@@ -107,14 +106,10 @@ class FlowMCSampler(Sampler):
         self._sampled = False
 
     # flowMC expects callables with signature (params, data) -> Float.
-    def _logpdf_flowmc(
-        self, params: Float[Array, " n_dims"], _data: dict
-    ) -> Float:
+    def _logpdf_flowmc(self, params: Float[Array, " n_dims"], _data: dict) -> Float:
         return self.log_posterior(params)
 
-    def _logprior_flowmc(
-        self, params: Float[Array, " n_dims"], _data: dict
-    ) -> Float:
+    def _logprior_flowmc(self, params: Float[Array, " n_dims"], _data: dict) -> Float:
         return self.log_prior(params)
 
     @property
@@ -192,9 +187,7 @@ class FlowMCSampler(Sampler):
         named = jax.vmap(self.add_name)(prod_positions)
         for transform in reversed(self.sample_transforms):
             named = jax.vmap(transform.backward)(named)
-        samples: dict[str, np.ndarray] = {
-            k: np.array(v) for k, v in named.items()
-        }
+        samples: dict[str, np.ndarray] = {k: np.array(v) for k, v in named.items()}
 
         prod_log_prob = resources["log_prob_production"].data  # type: ignore[union-attr]
         log_posterior = np.array(prod_log_prob.reshape(-1))

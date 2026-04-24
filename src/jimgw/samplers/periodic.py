@@ -98,14 +98,13 @@ def to_unit_cube_stepper(
     mask, lower, period = _build_masks(periodic, parameter_names)
 
     def stepper(position: dict, direction: dict, step_size: float) -> dict:
-        proposed = jax.tree.map(
-            lambda pos, d: pos + step_size * d, position, direction
-        )
+        proposed = jax.tree.map(lambda pos, d: pos + step_size * d, position, direction)
         return jax.tree.map(
-            lambda prop, lo, per, m: jnp.where(
-                m, lo + jnp.mod(prop - lo, per), prop
-            ),
-            proposed, lower, period, mask,
+            lambda prop, lo, per, m: jnp.where(m, lo + jnp.mod(prop - lo, per), prop),
+            proposed,
+            lower,
+            period,
+            mask,
         )
 
     return stepper
@@ -136,14 +135,13 @@ def to_prior_space_stepper(
     mask, lower, period = _build_masks(periodic, parameter_names)
 
     def stepper(position: dict, direction: dict, step_size: float) -> tuple:
-        proposed = jax.tree.map(
-            lambda pos, d: pos + step_size * d, position, direction
-        )
+        proposed = jax.tree.map(lambda pos, d: pos + step_size * d, position, direction)
         wrapped = jax.tree.map(
-            lambda prop, lo, per, m: jnp.where(
-                m, lo + jnp.mod(prop - lo, per), prop
-            ),
-            proposed, lower, period, mask,
+            lambda prop, lo, per, m: jnp.where(m, lo + jnp.mod(prop - lo, per), prop),
+            proposed,
+            lower,
+            period,
+            mask,
         )
         return wrapped, True
 
@@ -183,7 +181,11 @@ def to_displacement_wrapper(
                 lo + jnp.mod(curr + prop - lo, per) - curr,
                 prop,
             ),
-            proposed, current, lower, period, mask,
+            proposed,
+            current,
+            lower,
+            period,
+            mask,
         )
 
     return wrapper

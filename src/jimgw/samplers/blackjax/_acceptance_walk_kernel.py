@@ -72,8 +72,12 @@ def _de_one_step(
         pos_b_raw = jax.random.randint(key_b, (), 0, num_survivors - 1)
         pos_b = jnp.where(pos_b_raw >= pos_a, pos_b_raw + 1, pos_b_raw)
 
-        point_a = jax.tree_util.tree_map(lambda x: x[top_indices[pos_a]], params.live_points)
-        point_b = jax.tree_util.tree_map(lambda x: x[top_indices[pos_b]], params.live_points)
+        point_a = jax.tree_util.tree_map(
+            lambda x: x[top_indices[pos_a]], params.live_points
+        )
+        point_b = jax.tree_util.tree_map(
+            lambda x: x[top_indices[pos_b]], params.live_points
+        )
         delta = jax.tree_util.tree_map(lambda a, b: a - b, point_a, point_b)
 
         is_small_step = jax.random.uniform(key_mix) < params.mix
@@ -94,7 +98,9 @@ def _de_one_step(
         return jnp.logical_and(jnp.logical_not(is_valid), count < max_proposals)
 
     init = (jnp.array(False), rng_key, state.position, state.logdensity, jnp.array(0))
-    is_valid, _, pos_prop, logp_prop, n_proposals = jax.lax.while_loop(cond_fun, body_fun, init)
+    is_valid, _, pos_prop, logp_prop, n_proposals = jax.lax.while_loop(
+        cond_fun, body_fun, init
+    )
 
     logl_prop = loglikelihood_fn(pos_prop)
     is_accepted = jnp.logical_and(is_valid, logl_prop > loglikelihood_0)
@@ -105,9 +111,13 @@ def _de_one_step(
     final_logp = jnp.where(is_accepted, logp_prop, state.logdensity)
     final_logl = jnp.where(is_accepted, logl_prop, state.loglikelihood)
 
-    new_state = StateWithLogLikelihood(final_pos, final_logp, final_logl, loglikelihood_0)
+    new_state = StateWithLogLikelihood(
+        final_pos, final_logp, final_logl, loglikelihood_0
+    )
     likelihood_evals = is_valid.astype(jnp.int32)
-    info = DEInfo(is_accepted=is_accepted, evals=n_proposals, likelihood_evals=likelihood_evals)
+    info = DEInfo(
+        is_accepted=is_accepted, evals=n_proposals, likelihood_evals=likelihood_evals
+    )
 
     return new_state, info
 
@@ -143,10 +153,19 @@ def _de_walk(
 
     def cond_fun(carry):
         _, _, _, _, total_proposals, walks_completed = carry
-        return jnp.logical_and(walks_completed < params.num_walks, total_proposals < max_mcmc)
+        return jnp.logical_and(
+            walks_completed < params.num_walks, total_proposals < max_mcmc
+        )
 
     def body_fun(carry):
-        key, current_state, n_accept, n_likelihood_evals, total_proposals, walks_completed = carry
+        (
+            key,
+            current_state,
+            n_accept,
+            n_likelihood_evals,
+            total_proposals,
+            walks_completed,
+        ) = carry
         step_key, next_key = jax.random.split(key)
         new_state, info = single_step(step_key, current_state, loglikelihood_0)
         return (
@@ -196,11 +215,23 @@ def _update_bilby_walks(
     default_current_walks = jnp.array(100, dtype=jnp.int32)
     default_n_likelihood_evals_total = jnp.array(0, dtype=jnp.int32)
 
-    walks_float = jnp.where(is_uninitialized, default_walks_float, prev_params.walks_float.astype(jnp.float32))
-    n_accept_total = jnp.where(is_uninitialized, default_n_accept_total, prev_params.n_accept_total.astype(jnp.int32))
-    current_walks = jnp.where(is_uninitialized, default_current_walks, prev_params.num_walks.astype(jnp.int32))
+    walks_float = jnp.where(
+        is_uninitialized,
+        default_walks_float,
+        prev_params.walks_float.astype(jnp.float32),
+    )
+    n_accept_total = jnp.where(
+        is_uninitialized,
+        default_n_accept_total,
+        prev_params.n_accept_total.astype(jnp.int32),
+    )
+    current_walks = jnp.where(
+        is_uninitialized, default_current_walks, prev_params.num_walks.astype(jnp.int32)
+    )
     n_likelihood_evals_total = jnp.where(
-        is_uninitialized, default_n_likelihood_evals_total, prev_params.n_likelihood_evals_total.astype(jnp.int32)
+        is_uninitialized,
+        default_n_likelihood_evals_total,
+        prev_params.n_likelihood_evals_total.astype(jnp.int32),
     )
 
     leaves: list[jax.Array] = jax.tree_util.tree_leaves(ns_state.particles)  # type: ignore[assignment]
@@ -209,12 +240,16 @@ def _update_bilby_walks(
     delay = jnp.maximum(og_delay // n_delete, 1)
 
     avg_accept_per_particle = n_accept_total / n_delete  # type: ignore[operator]
-    accept_prob = jnp.maximum(0.5, avg_accept_per_particle) / jnp.maximum(1.0, current_walks)  # type: ignore[arg-type]
+    accept_prob = jnp.maximum(0.5, avg_accept_per_particle) / jnp.maximum(
+        1.0, current_walks
+    )  # type: ignore[arg-type]
     new_walks_float = (walks_float * delay + n_target / accept_prob) / (delay + 1)  # type: ignore[operator]
     new_walks_float = jnp.where(n_accept_total == 0, walks_float, new_walks_float)  # type: ignore[arg-type]
     num_walks_int = jnp.minimum(jnp.ceil(new_walks_float).astype(jnp.int32), max_mcmc)
 
-    example_particle = jax.tree_util.tree_map(lambda x: x[0], ns_state.particles.position)
+    example_particle = jax.tree_util.tree_map(
+        lambda x: x[0], ns_state.particles.position
+    )
     flat_particle, _ = jax.flatten_util.ravel_pytree(example_particle)
     n_dim = flat_particle.shape[0]
 
@@ -269,7 +304,9 @@ def bilby_adaptive_de_sampler(
         particles = state.particles
         loglikelihoods: jax.Array = particles.loglikelihood  # type: ignore[assignment]
         weights = (loglikelihoods > loglikelihood_0).astype(jnp.float32)
-        weights: jax.Array = jnp.where(weights.sum() > 0.0, weights, jnp.ones_like(weights))  # type: ignore[assignment]
+        weights: jax.Array = jnp.where(
+            weights.sum() > 0.0, weights, jnp.ones_like(weights)
+        )  # type: ignore[assignment]
         start_idx = jax.random.choice(
             choice_key,
             weights.shape[0],
@@ -306,7 +343,9 @@ def bilby_adaptive_de_sampler(
         )
 
         def init_params_fn(rng_key, ns_state, info, current_params):
-            example_particle = jax.tree_util.tree_map(lambda x: x[0], ns_state.particles.position)
+            example_particle = jax.tree_util.tree_map(
+                lambda x: x[0], ns_state.particles.position
+            )
             flat_particle, _ = jax.flatten_util.ravel_pytree(example_particle)
             n_dim = flat_particle.shape[0]
             scale = 2.38 / jnp.sqrt(2 * n_dim)
@@ -322,7 +361,9 @@ def bilby_adaptive_de_sampler(
             )
             return {"params": initial_de_params}
 
-        return adaptive_init(particles, _init_state_fn, update_inner_kernel_params_fn=init_params_fn)
+        return adaptive_init(
+            particles, _init_state_fn, update_inner_kernel_params_fn=init_params_fn
+        )
 
     def step_fn(rng_key, state: AdaptiveNSState):
         return base_kernel_step(rng_key, state)
