@@ -13,7 +13,15 @@ from jax import config
 import jax.numpy as jnp
 from jaxtyping import Float, Int
 
-config.update("jax_enable_x64", True)
+if not config.read("jax_enable_x64"):
+    raise RuntimeError(
+        "time_utils requires JAX to run in 64-bit (float64) mode, "
+        "but jax_enable_x64 is currently False.\n\n"
+        "Please enable float64 before importing jimgw by putting at the very top of your script:\n"
+        "    import jax\n"
+        "    jax.config.update('jax_enable_x64', True)\n"
+        "and then re-run."
+    )
 
 # This UNIX timestamp is computed by:
 # datetime(1980, 1, 6, 0, 0, 0, tzinfo=timezone.utc).timestamp()
