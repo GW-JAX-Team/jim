@@ -10,7 +10,7 @@ Jim is a JAX-based toolkit for Bayesian parameter estimation of gravitational-wa
 
 - [flowMC](https://github.com/GW-JAX-Team/flowMC) — normalizing-flow-enhanced MCMC
 
-For a quick introduction, see the [Quick Start guide](https://jim.readthedocs.io/en/stable/quickstart/).
+For a quick introduction, see the [Quick Start guide](https://gw-jax-team.github.io/jim/stable/quickstart/).
 
 > [!WARNING]
 > Jim has not yet reached v1.0.0 and the API may change. Use at your own risk. Consider pinning to a specific version if you need API stability.
