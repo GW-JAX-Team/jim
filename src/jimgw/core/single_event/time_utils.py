@@ -9,7 +9,7 @@ There is the new `jax_datetime` package, but it does not compute the year and mo
 See: https://github.com/google/jax-datetime/
 """
 
-from jax import config, jit
+from jax import config
 import jax.numpy as jnp
 from jaxtyping import Float, Int
 
@@ -184,7 +184,6 @@ def gps_to_utc_date(gps_time: Float) -> tuple[Int, Int, Int, Int]:
     return utc_date_from_timestamp(GPS_EPOCH + _sec.astype(int))
 
 
-@jit
 def gps_to_julian_day(gps_time: Float) -> Float:
     """
     Convert from UTC to Julian day, this is a necessary intermediate step in
@@ -213,7 +212,6 @@ def gps_to_julian_day(gps_time: Float) -> Float:
     )
 
 
-@jit
 def greenwich_mean_sidereal_time(gps_time: Float) -> Float:
     """Compute the Greenwich Mean Sidereal Time (GMST) from the GPS time.
 
@@ -226,7 +224,6 @@ def greenwich_mean_sidereal_time(gps_time: Float) -> Float:
     return greenwich_sidereal_time(gps_time, 0.0)
 
 
-@jit
 def greenwich_sidereal_time(gps_time: Float, equation_of_equinoxes: Float) -> Float:
     """
     Compute the Greenwich mean sidereal time from the GPS time and equation of
