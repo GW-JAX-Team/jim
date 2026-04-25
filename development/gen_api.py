@@ -53,8 +53,16 @@ def build_nav_tree(modules: list[tuple[list[str], Path]]) -> list:
     for parts, stub_path in modules:
         node = tree
         for part in parts[:-1]:
+            existing = node.get(part)
+            if isinstance(existing, str):
+                node[part] = {"__init__": existing}
             node = node.setdefault(part, {})
-        node[parts[-1]] = stub_path.as_posix()
+        leaf = stub_path.as_posix()
+        existing = node.get(parts[-1])
+        if isinstance(existing, dict):
+            existing["__init__"] = leaf
+        else:
+            node[parts[-1]] = leaf
 
     def dict_to_nav(d: dict) -> list:
         return [
