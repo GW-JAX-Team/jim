@@ -30,7 +30,7 @@ def scan_modules(src_dir: Path) -> list[tuple[list[str], Path]]:
         if parts[-1] in ("__init__", "__main__"):
             continue
         rel = "/".join(parts)
-        if any(rel.startswith(skip) for skip in SKIP_PREFIXES):
+        if any(rel == skip or rel.startswith(skip + "/") for skip in SKIP_PREFIXES):
             continue
         stub_path = Path("api", *parts).with_suffix(".md")
         results.append((parts, stub_path))
@@ -159,8 +159,12 @@ def main() -> None:
     # Optionally set versioned site_url
     alias = os.environ.get("VERSION_ALIAS", "").strip()
     if alias:
-        base_url = config["project"]["site_url"].rstrip("/") + "/"
-        new_toml = patch_site_url(new_toml, f"{base_url}{alias}/")
+        site_url = config.get("project", {}).get("site_url")
+        if site_url:
+            base_url = site_url.rstrip("/") + "/"
+            new_toml = patch_site_url(new_toml, f"{base_url}{alias}/")
+        else:
+            print("Warning: VERSION_ALIAS set but site_url not found in zensical.toml; skipping URL patch")
 
     out_path.write_text(new_toml)
     print(f"Written {out_path}")
