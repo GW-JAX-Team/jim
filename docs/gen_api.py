@@ -151,7 +151,7 @@ def main() -> None:
     print(f"Generated {len(modules)} API stubs")
 
     # Rebuild nav: keep everything except existing API entry, append new one
-    base_nav = [item for item in config["project"]["nav"] if "API" not in item]
+    base_nav = [item for item in config["project"]["nav"] if not (isinstance(item, dict) and "API" in item)]
     new_nav = base_nav + [{"API": api_nav}]
 
     new_toml = replace_nav(toml_text, new_nav)
