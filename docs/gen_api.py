@@ -84,6 +84,11 @@ def build_nav_tree(modules: list[tuple[list[str], Path]]) -> list:
         return result
 
 
+def _toml_escape(s: str) -> str:
+    """Escape backslashes and double-quotes for TOML basic strings."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def nav_to_toml_str(nav: list, depth: int = 0) -> str:
     """Serialize a nav list to the TOML array-of-inline-tables format."""
     inner = "    " * (depth + 1)
