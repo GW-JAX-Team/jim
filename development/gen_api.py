@@ -192,7 +192,11 @@ def main() -> None:
     print(f"Generated {len(modules)} API stubs")
 
     # Rebuild nav: keep everything except existing API entry, append new one
-    base_nav = [item for item in config.get("project", {}).get("nav", []) if not (isinstance(item, dict) and "API" in item)]
+    def drop_api_entries(nav):
+        """Return a copy of *nav* with any dict that has an "API" key removed."""
+        return [item for item in nav if not (isinstance(item, dict) and "API" in item)]
+
+    base_nav = drop_api_entries(config.get("project", {}).get("nav", []))
     new_nav = base_nav + [{"API": api_nav}]
 
     new_toml = replace_nav(toml_text, new_nav)
