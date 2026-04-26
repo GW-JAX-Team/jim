@@ -49,6 +49,11 @@ def write_stubs(modules: list[tuple[list[str], Path]], docs_dir: Path) -> None:
         full_path = docs_dir / stub_path
         full_path.parent.mkdir(parents=True, exist_ok=True)
         full_path.write_text(f"::: {'.'.join(parts)}\n")
+    # Prune empty directories left behind by removed stubs
+    if api_dir.exists():
+        for d in sorted(api_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+            if d.is_dir() and d != api_dir and not any(d.iterdir()):
+                d.rmdir()
 
 
 # ── nav generation ────────────────────────────────────────────────────────────
@@ -141,9 +146,10 @@ def replace_nav(toml_text: str, new_nav: list) -> str:
 
 def patch_site_url(toml_text: str, new_url: str) -> str:
     """Replace site_url value in TOML text."""
+    escaped_url = _toml_escape(new_url)
     new_text, count = re.subn(
         r'^(site_url\s*=\s*")([^"]*)(")',
-        lambda m: f"{m.group(1)}{new_url}{m.group(3)}",
+        lambda m: f"{m.group(1)}{escaped_url}{m.group(3)}",
         toml_text,
         flags=re.MULTILINE,
     )
@@ -176,7 +182,7 @@ def main() -> None:
     print(f"Generated {len(modules)} API stubs")
 
     # Rebuild nav: keep everything except existing API entry, append new one
-    base_nav = [item for item in config["project"]["nav"] if not (isinstance(item, dict) and "API" in item)]
+    base_nav = [item for item in config.get("project", {}).get("nav", []) if not (isinstance(item, dict) and "API" in item)]
     new_nav = base_nav + [{"API": api_nav}]
 
     new_toml = replace_nav(toml_text, new_nav)
