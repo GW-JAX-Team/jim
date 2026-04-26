@@ -610,12 +610,11 @@ class TestJimPriorLikelihoodConsistencyChecks:
         prior = CombinePrior(
             [
                 UniformPrior(10.0, 80.0, parameter_names=["M_c"]),
-                UniformPrior(0.125, 1.0, parameter_names=["q"]),
             ]
         )
         # M_c is in the prior AND in fixed_parameters — should conflict
         lh = self._make_mock_single_event_likelihood(
-            waveform_parameter_names=("M_c", "eta", "ra", "dec", "psi", "t_c"),
+            waveform_parameter_names=("M_c", "ra", "dec", "psi", "t_c"),
             fixed_parameters={"M_c": 30.0},
         )
 
@@ -704,21 +703,25 @@ class TestJimNaNPosteriorCheck:
                 global_thinning=1,
             )
 
-    def test_some_nan_posterior_warns(self, caplog):
-        """1–5 NaN log-posteriors out of 10 issues a warning but no error."""
+    def test_some_nan_posterior_warns(self, caplog, monkeypatch):
+        """1-5 NaN log-posteriors out of 10 issues a warning but no error."""
 
         class SometimesNaNLikelihood:
-            """Returns NaN when M_c > 70; finite otherwise.
-
-            With Uniform(10, 80) that is ~14% of the range, reliably producing
-            1-2 NaN out of 10 samples — enough to trigger the warning but not
-            the error (which requires > 5).
-            """
-
             def evaluate(self, params, data):
                 return jnp.where(params["M_c"] > 70.0, jnp.nan, -1.0)
 
         prior = CombinePrior([UniformPrior(10.0, 80.0, parameter_names=["M_c"])])
+
+        # Provide fixed test positions (shape n_points x n_dims) so the NaN
+        # count is deterministic: 2 out of 10 have M_c > 70.
+        _fixed_positions = jnp.array(
+            [[20.0], [30.0], [40.0], [45.0], [50.0], [55.0], [60.0], [65.0], [75.0], [78.0]]
+        )
+        monkeypatch.setattr(
+            Jim,
+            "sample_initial_positions",
+            lambda self, n_points=None, rng_key=None: _fixed_positions,
+        )
 
         with caplog.at_level("WARNING"):
             Jim(
