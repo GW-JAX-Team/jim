@@ -161,6 +161,7 @@ def patch_site_url(toml_text: str, new_url: str) -> str:
         r'^(site_url\s*=\s*")([^"]*)(")',
         lambda m: f"{m.group(1)}{escaped_url}{m.group(3)}",
         toml_text,
+        count=1,
         flags=re.MULTILINE,
     )
     if count == 0:

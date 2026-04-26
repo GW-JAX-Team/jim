@@ -11,14 +11,18 @@ window.MathJax = {
   }
 };
 
-document$.subscribe(() => {
-  MathJax.startup.output.clearCache()
-  MathJax.typesetClear()
-  MathJax.texReset()
-  MathJax.typesetPromise()
-})
+if (typeof document$ !== "undefined") {
+  document$.subscribe(() => {
+    MathJax.startup.output.clearCache()
+    MathJax.typesetClear()
+    MathJax.texReset()
+    MathJax.typesetPromise()
+  })
+}
 
-component$.subscribe(({ ref }) => {
-  if (ref.classList.contains("md-annotation"))
-    MathJax.typesetPromise([ref])
-})
+if (typeof component$ !== "undefined") {
+  component$.subscribe(({ ref }) => {
+    if (ref.classList.contains("md-annotation"))
+      MathJax.typesetPromise([ref])
+  })
+}
