@@ -83,6 +83,8 @@ def build_nav_tree(modules: list[tuple[list[str], Path]]) -> list:
                 result.append({k: v})
         return result
 
+    return dict_to_nav(tree)
+
 
 def _toml_escape(s: str) -> str:
     """Escape backslashes and double-quotes for TOML basic strings."""
