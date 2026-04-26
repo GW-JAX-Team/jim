@@ -73,6 +73,11 @@ def build_nav_tree(modules: list[tuple[list[str], Path]]) -> list:
     return dict_to_nav(tree)
 
 
+def _toml_escape(s: str) -> str:
+    """Escape backslashes and double-quotes for TOML basic strings."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def nav_to_toml_str(nav: list, depth: int = 0) -> str:
     """Serialize a nav list to the TOML array-of-inline-tables format."""
     inner = "    " * (depth + 1)
@@ -80,14 +85,14 @@ def nav_to_toml_str(nav: list, depth: int = 0) -> str:
     for item in nav:
         if isinstance(item, str):
             # Bare path entry (no label), e.g. "tutorials/index.md"
-            lines.append(f'{inner}"{item}",')
+            lines.append(f'{inner}"{_toml_escape(item)}",')
         else:
             for k, v in item.items():
                 if isinstance(v, str):
-                    lines.append(f'{inner}{{"{k}" = "{v}"}},')
+                    lines.append(f'{inner}{{"{_toml_escape(k)}" = "{_toml_escape(v)}"}},')
                 else:
                     nested = nav_to_toml_str(v, depth + 1)
-                    lines.append(f'{inner}{{"{k}" = {nested}}},')
+                    lines.append(f'{inner}{{"{_toml_escape(k)}" = {nested}}},')
     lines.append("    " * depth + "]")
     return "\n".join(lines)
 
@@ -100,19 +105,23 @@ def replace_nav(toml_text: str, new_nav: list) -> str:
     start = end = None
     depth = 0
     for i, line in enumerate(lines):
+        # Strip quoted strings so brackets inside strings don't skew the count
+        stripped = re.sub(r'"[^"]*"', "", line)
         if start is None and re.match(r"^nav\s*=\s*\[", line):
             start = i
-            depth = line.count("[") - line.count("]")
+            depth = stripped.count("[") - stripped.count("]")
             if depth == 0:
                 end = i
                 break
         elif start is not None:
-            depth += line.count("[") - line.count("]")
+            depth += stripped.count("[") - stripped.count("]")
             if depth <= 0:
                 end = i
                 break
     if start is None:
         raise ValueError("nav key not found in zensical.toml")
+    if end is None:
+        raise ValueError("unterminated nav array in zensical.toml")
     new_block = "nav = " + nav_to_toml_str(new_nav) + "\n"
     return "".join(lines[:start] + [new_block] + lines[end + 1:])
 
