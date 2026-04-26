@@ -529,12 +529,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         optimizer_popsize: int = 500,
         optimizer_n_steps: int = 1000,
         reference_parameters: Optional[dict] = None,
-        reference_waveform: Optional[
-            Callable[
-                [Float[Array, " n_freq"], dict[str, Float]],
-                dict[str, Float[Array, " n_freq"]],
-            ]
-        ] = None,
+        reference_waveform: Optional[Waveform] = None,
         prior: Optional[Prior] = None,
         likelihood_transforms: Optional[list[NtoMTransform]] = None,
         marginalize_phase: bool = False,
