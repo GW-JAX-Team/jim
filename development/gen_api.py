@@ -29,6 +29,8 @@ def scan_modules(src_dir: Path) -> list[tuple[list[str], Path]]:
         parts = list(py_file.relative_to(src_dir).with_suffix("").parts)
         if parts[-1] in ("__init__", "__main__"):
             continue
+        if any(part.startswith("_") for part in parts):
+            continue
         rel = "/".join(parts)
         if any(rel == skip or rel.startswith(skip + "/") for skip in SKIP_PREFIXES):
             continue
@@ -135,7 +137,7 @@ def replace_nav(toml_text: str, new_nav: list) -> str:
         # double-quoted single-line strings in the nav block, so this is
         # sufficient, but a full TOML parser would be more robust.
         stripped = re.sub(r'"[^"]*"', "", line)
-        if start is None and re.match(r"^nav\s*=\s*\[", line):
+        if start is None and re.match(r"^\s*nav\s*=\s*\[", line):
             start = i
             depth = stripped.count("[") - stripped.count("]")
             if depth == 0:
@@ -158,7 +160,7 @@ def patch_site_url(toml_text: str, new_url: str) -> str:
     """Replace site_url value in TOML text."""
     escaped_url = _toml_escape(new_url)
     new_text, count = re.subn(
-        r'^(site_url\s*=\s*")([^"]*)(")',
+        r'^(\s*site_url\s*=\s*")([^"]*)(")',
         lambda m: f"{m.group(1)}{escaped_url}{m.group(3)}",
         toml_text,
         count=1,
@@ -198,7 +200,7 @@ def main() -> None:
         return [item for item in nav if not (isinstance(item, dict) and "API" in item)]
 
     base_nav = drop_api_entries(config.get("project", {}).get("nav", []))
-    new_nav = base_nav + [{"API": api_nav}]
+    new_nav = [*base_nav, {"API": api_nav}]
 
     new_toml = replace_nav(toml_text, new_nav)
 
