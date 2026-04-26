@@ -47,8 +47,14 @@ def write_stubs(modules: list[tuple[list[str], Path]], docs_dir: Path) -> None:
                 existing.unlink()
     for parts, stub_path in modules:
         full_path = docs_dir / stub_path
+        # Remove any conflicting stale entry left from a previous run
+        assert api_dir in full_path.parents, f"stub path escapes api_dir: {full_path}"
+        if full_path.exists() and full_path.is_dir():
+            shutil.rmtree(full_path)
+        if full_path.parent.exists() and full_path.parent.is_file():
+            full_path.parent.unlink()
         full_path.parent.mkdir(parents=True, exist_ok=True)
-        full_path.write_text(f"::: {'.'.join(parts)}\n")
+        full_path.write_text(f"::: {'.'.join(parts)}\n", encoding="utf-8")
     # Prune empty directories left behind by removed stubs
     if api_dir.exists():
         for d in sorted(api_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
@@ -123,7 +129,11 @@ def replace_nav(toml_text: str, new_nav: list) -> str:
     start = end = None
     depth = 0
     for i, line in enumerate(lines):
-        # Strip quoted strings so brackets inside strings don't skew the count
+        # NOTE: This regex only strips double-quoted strings on a single line.
+        # It does not handle single-quoted strings, triple-quoted strings, or
+        # backslash-escaped quotes. In practice zensical.toml uses only
+        # double-quoted single-line strings in the nav block, so this is
+        # sufficient, but a full TOML parser would be more robust.
         stripped = re.sub(r'"[^"]*"', "", line)
         if start is None and re.match(r"^nav\s*=\s*\[", line):
             start = i
@@ -141,7 +151,7 @@ def replace_nav(toml_text: str, new_nav: list) -> str:
     if end is None:
         raise ValueError("unterminated nav array in zensical.toml")
     new_block = "nav = " + nav_to_toml_str(new_nav) + "\n"
-    return "".join(lines[:start] + [new_block] + lines[end + 1:])
+    return "".join([*lines[:start], new_block, *lines[end + 1:]])
 
 
 def patch_site_url(toml_text: str, new_url: str) -> str:
@@ -167,7 +177,7 @@ def main() -> None:
     toml_path = repo_root / "zensical.toml"
     out_path = repo_root / "_zensical_build.toml"
 
-    toml_text = toml_path.read_text()
+    toml_text = toml_path.read_text(encoding="utf-8")
     with toml_path.open("rb") as f:
         config = tomllib.load(f)
 
@@ -197,7 +207,7 @@ def main() -> None:
         else:
             print("Warning: VERSION_ALIAS set but site_url not found in zensical.toml; skipping URL patch")
 
-    out_path.write_text(new_toml)
+    out_path.write_text(new_toml, encoding="utf-8")
     print(f"Written {out_path}")
 
 
