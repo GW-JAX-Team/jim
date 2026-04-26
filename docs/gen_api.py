@@ -39,6 +39,12 @@ def scan_modules(src_dir: Path) -> list[tuple[list[str], Path]]:
 
 def write_stubs(modules: list[tuple[list[str], Path]], docs_dir: Path) -> None:
     """Write (or overwrite) ::: identifier stubs under docs/api/."""
+    api_dir = docs_dir / "api"
+    keep = {docs_dir / stub_path for _, stub_path in modules}
+    if api_dir.exists():
+        for existing in api_dir.rglob("*.md"):
+            if existing not in keep:
+                existing.unlink()
     for parts, stub_path in modules:
         full_path = docs_dir / stub_path
         full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -65,17 +71,17 @@ def build_nav_tree(modules: list[tuple[list[str], Path]]) -> list:
             node[parts[-1]] = leaf
 
     def dict_to_nav(d: dict) -> list:
-        return [
-            {k: dict_to_nav(v) if isinstance(v, dict) else v}
-            for k, v in d.items()
-        ]
-
-    return dict_to_nav(tree)
-
-
-def _toml_escape(s: str) -> str:
-    """Escape backslashes and double-quotes for TOML basic strings."""
-    return s.replace("\\", "\\\\").replace('"', '\\"')
+        result = []
+        for k, v in d.items():
+            if isinstance(v, dict):
+                children = []
+                if "__init__" in v:
+                    children.append({"Overview": v["__init__"]})
+                children.extend(dict_to_nav({ck: cv for ck, cv in v.items() if ck != "__init__"}))
+                result.append({k: children})
+            else:
+                result.append({k: v})
+        return result
 
 
 def nav_to_toml_str(nav: list, depth: int = 0) -> str:
@@ -128,12 +134,15 @@ def replace_nav(toml_text: str, new_nav: list) -> str:
 
 def patch_site_url(toml_text: str, new_url: str) -> str:
     """Replace site_url value in TOML text."""
-    return re.sub(
+    new_text, count = re.subn(
         r'^(site_url\s*=\s*")([^"]*)(")',
         lambda m: f"{m.group(1)}{new_url}{m.group(3)}",
         toml_text,
         flags=re.MULTILINE,
     )
+    if count == 0:
+        raise ValueError("site_url not found in zensical.toml; cannot patch versioned URL")
+    return new_text
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
