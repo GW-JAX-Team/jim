@@ -1323,7 +1323,7 @@ requires-dist = [
     { name = "jaxtyping", specifier = ">=0.3.3" },
     { name = "matplotlib", marker = "extra == 'visualize'", specifier = ">=3.10.7" },
     { name = "numpy", marker = "extra == 'visualize'" },
-    { name = "ripplegw", specifier = ">=0.1.0" },
+    { name = "ripplegw", specifier = ">=0.1.1" },
     { name = "scipy", specifier = ">=1.17.1" },
 ]
 provides-extras = ["cuda", "visualize"]
@@ -2928,15 +2928,15 @@ wheels = [
 
 [[package]]
 name = "ripplegw"
-version = "0.1.0"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jax" },
     { name = "jaxtyping" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b9/e3/34e7c912de48999174c1aa345acb059453dd2185ba6f06a223598fa1ff41/ripplegw-0.1.0.tar.gz", hash = "sha256:1df54bd681cbc1baf4fbb484f9869e69c02c39b065b611bc90ed9c66d48f6a4a", size = 388170, upload-time = "2026-04-08T13:40:34.385Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/39/38da018433be712287c65400f5bf6ba6469f5886deb68c508d49fd6a5cdd/ripplegw-0.1.1.tar.gz", hash = "sha256:87b986b82f6e9aa8802da1337f0b3c92965e0bd770ce82f141203c2aa70bbdaf", size = 372206, upload-time = "2026-04-26T21:08:53.941Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/9f/ebd5cd04e4b36719dd287e4449f19425f0f1eef3d067ae2942f73a3e1f99/ripplegw-0.1.0-py3-none-any.whl", hash = "sha256:3bcb73acc451b46a6a4ec5c1dd136ad1a9678dd3186bc324cb895e8b01c41444", size = 119915, upload-time = "2026-04-08T13:40:33.056Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/35/0721c627fee327896ebbf831c11749e73dc402f26281cc29abb385caae35/ripplegw-0.1.1-py3-none-any.whl", hash = "sha256:b80d76f0f3b5fa89adc749af08519790f76b99614a04c812b3e4a63e7c336c67", size = 120181, upload-time = "2026-04-26T21:08:52.833Z" },
 ]
 
 [[package]]
