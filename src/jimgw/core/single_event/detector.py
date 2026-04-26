@@ -809,7 +809,7 @@ def get_ET() -> list[GroundBased2G]:
     xarm_tilt = 0
     yarm_tilt = 0
     elevation = 51.884
-    length = 1e4  # arm length in metres
+    length: float = 1e4  # arm length in metres
 
     a = EARTH_SEMI_MAJOR_AXIS / 1e3  # Numerical instability avoidance
     b = EARTH_SEMI_MINOR_AXIS / 1e3
@@ -851,7 +851,7 @@ def get_ET() -> list[GroundBased2G]:
             jnp.cos(d) - jnp.sin(phi1) * jnp.sin(phi2),
         )
         latitude = phi2
-        # Rotate arms and bearing for the next detector vertex (120° around triangle)
+        # Rotate arms and bearing for the next detector vertex (240°, i.e. 4π/3, per vertex)
         xarm_azimuth += (4 / 3) * jnp.pi
         yarm_azimuth += (4 / 3) * jnp.pi
         brng += (4 / 3) * jnp.pi

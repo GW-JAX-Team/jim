@@ -156,7 +156,7 @@ class TestET:
             )
 
     def test_arms_rotated_120_degrees_between_detectors(self):
-        """Consecutive sub-detectors have arm azimuths rotated by 120° (4π/3 rad)."""
+        """Consecutive sub-detectors have arm azimuths rotated by 240° (4π/3 rad)."""
         rotation = (4 / 3) * np.pi
         for i in range(2):
             dx = self.ifos[i + 1].xarm_azimuth - self.ifos[i].xarm_azimuth
@@ -186,7 +186,7 @@ class TestET:
             dlon = lon2 - lon1
             a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
             dist = R * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
-            assert abs(dist - self.ET_ARM_LENGTH_M) < 1000.0, (
+            assert abs(dist - self.ET_ARM_LENGTH_M) < 50.0, (
                 f"{ifo_a.name}↔{ifo_b.name}: {dist:.0f} m "
-                f"(expected ~{self.ET_ARM_LENGTH_M:.0f} m ± 1000 m)"
+                f"(expected ~{self.ET_ARM_LENGTH_M:.0f} m ± 50 m)"
             )
