@@ -155,7 +155,7 @@ class TestET:
                 f"{ifo.name}: arm opening angle is {np.degrees(delta):.4f}°, expected 60°"
             )
 
-    def test_arms_rotated_120_degrees_between_detectors(self):
+    def test_arms_rotated_240_degrees_between_detectors(self):
         """Consecutive sub-detectors have arm azimuths rotated by 240° (4π/3 rad)."""
         rotation = (4 / 3) * np.pi
         for i in range(2):
@@ -171,7 +171,7 @@ class TestET:
     def test_vertex_separations_match_arm_length(self):
         """
         Haversine distance between every pair of ET vertex positions should
-        equal the arm length (10 km) to within 1 km.
+        equal the arm length (10 km) to within 50 m.
 
         This checks both the propagation formula and that the triangle closes,
         following the approach used in Bilby's TriangularInterferometerTest.
