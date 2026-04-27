@@ -181,8 +181,7 @@ def main() -> None:
     out_path = repo_root / "_zensical_build.toml"
 
     toml_text = toml_path.read_text(encoding="utf-8")
-    with toml_path.open("rb") as f:
-        config = tomllib.load(f)
+    config = tomllib.loads(toml_text)
 
     # Copy CONTRIBUTING.md so Zensical picks it up (symlinks and the name
     # "contributing.md" are both excluded by Zensical at build time)
