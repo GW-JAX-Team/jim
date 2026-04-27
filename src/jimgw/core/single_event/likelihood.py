@@ -18,7 +18,7 @@ from jimgw.core.single_event.utils import (
 from jimgw.core.single_event.time_utils import (
     greenwich_mean_sidereal_time as compute_gmst,
 )
-from jimgw.core.single_event.waveform import WaveformCallable
+from ripplegw.interfaces import Waveform
 import logging
 from typing import Sequence
 from abc import abstractmethod
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class SingleEventLikelihood(LikelihoodBase):
     detectors: Sequence[Detector]
-    waveform: WaveformCallable
+    waveform: Waveform
     fixed_parameters: dict[
         str, Float | Callable[[dict[str, Float]], Float | dict[str, Float]]
     ]
@@ -46,7 +46,7 @@ class SingleEventLikelihood(LikelihoodBase):
     def __init__(
         self,
         detectors: Sequence[Detector],
-        waveform: WaveformCallable,
+        waveform: Waveform,
         fixed_parameters: Optional[
             dict[
                 str,
@@ -57,7 +57,7 @@ class SingleEventLikelihood(LikelihoodBase):
         """
         Args:
             detectors (Sequence[Detector]): Detectors with initialized data and PSD.
-            waveform (WaveformCallable): Waveform model to evaluate.
+            waveform (Waveform): Waveform model to evaluate.
             fixed_parameters (Optional[dict]): Parameters held constant during
                 sampling. Values may be scalars or callables
                 ``f(params) -> Float | dict``; callables are applied in insertion
@@ -169,7 +169,7 @@ class TransientLikelihoodFD(SingleEventLikelihood):
     def __init__(
         self,
         detectors: Sequence[Detector],
-        waveform: WaveformCallable,
+        waveform: Waveform,
         fixed_parameters: Optional[
             dict[
                 str,
@@ -492,8 +492,9 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         optimizer_n_steps: Maximum number of CMA-ES generations.  Defaults to 1000.
         reference_parameters: Pre-computed reference parameters (dict).  If
             supplied, the optimizer is skipped entirely.
-        reference_waveform: Callable ``f(freq, params) -> {"p": ..., "c": ...}``
-            used to compute the reference waveform.  Defaults to ``waveform``.
+        reference_waveform: Optional :class:`~ripplegw.interfaces.Waveform` instance
+            used to compute the reference waveform.  Defaults to ``waveform`` when
+            not provided.
         prior: Prior distribution from which the initial CMA-ES mean is
             drawn.  Required when ``reference_parameters`` is not provided.
         likelihood_transforms: Transforms mapping sampling parameters to
@@ -515,7 +516,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
     def __init__(
         self,
         detectors: Sequence[Detector],
-        waveform: WaveformCallable,
+        waveform: Waveform,
         fixed_parameters: Optional[
             dict[
                 str,
@@ -529,12 +530,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         optimizer_popsize: int = 500,
         optimizer_n_steps: int = 1000,
         reference_parameters: Optional[dict] = None,
-        reference_waveform: Optional[
-            Callable[
-                [Float[Array, " n_freq"], dict[str, Float]],
-                dict[str, Float[Array, " n_freq"]],
-            ]
-        ] = None,
+        reference_waveform: Optional[Waveform] = None,
         prior: Optional[Prior] = None,
         likelihood_transforms: Optional[list[NtoMTransform]] = None,
         marginalize_phase: bool = False,

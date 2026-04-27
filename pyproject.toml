@@ -1,7 +1,7 @@
 [project]
 name = "jimgw"
 dynamic = ["version"]
-description = "Gravitational wave data analysis tool in Jax"
+description = "A JAX-based gravitational-wave inference toolkit"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
@@ -28,7 +28,7 @@ dependencies = [
     "gwpy>=3.0.12",
     "jax>=0.8.2",
     "jaxtyping>=0.3.3",
-    "ripplegw>=0.1.0",
+    "ripplegw>=0.1.1",
     "scipy>=1.17.1",
 ]
 
@@ -57,18 +57,15 @@ cross-validation = [
     "bilby[gw]>=2.8.0",
 ]
 doc = [
-    "mkdocs-gen-files",
-    "mkdocs-jupyter<0.26.0",
-    "mkdocs-literate-nav",
-    "mkdocs-material",
-    "mkdocs",
+    "jupytext",
     "mkdocstrings[python]",
     "pymdown-extensions",
+    "zensical",
 ]
 
 [project.urls]
 Homepage = "https://github.com/GW-JAX-Team/jim"
-Documentation = "https://jim.readthedocs.io"
+Documentation = "https://gw-jax-team.github.io/jim/"
 Repository = "https://github.com/GW-JAX-Team/jim"
 "Bug Tracker" = "https://github.com/GW-JAX-Team/jim/issues"
 Changelog = "https://github.com/GW-JAX-Team/jim/releases"

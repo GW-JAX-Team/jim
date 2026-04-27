@@ -1,5 +1,6 @@
 """Unit tests for the Jim sampler class."""
 
+from typing import Optional
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -414,7 +415,7 @@ class TestJimPosteriorEvaluation:
 
 
 class TestJimUtilityMethods:
-    """Test utility methods like add_name, evaluate_prior, sample_initial_condition."""
+    """Test utility methods like add_name, evaluate_prior, sample_initial_positions."""
 
     def test_add_name(self, basic_jim):
         """Test add_name converts array to dictionary with parameter names."""
@@ -449,9 +450,9 @@ class TestJimUtilityMethods:
         # Prior evaluation should include transform jacobian
         assert isinstance(log_prior, (float, jnp.ndarray))
 
-    def test_sample_initial_condition(self, basic_jim):
-        """Test sample_initial_condition samples from prior."""
-        initial_samples = basic_jim.sample_initial_condition()
+    def test_sample_initial_positions(self, basic_jim):
+        """Test sample_initial_positions samples from prior."""
+        initial_samples = basic_jim.sample_initial_positions()
 
         # Check shape: (n_chains, n_dims)
         assert initial_samples.shape == (5, 2)
@@ -459,11 +460,17 @@ class TestJimUtilityMethods:
         # Check all samples are finite
         assert_all_finite(initial_samples)
 
-    def test_sample_initial_condition_with_sample_transforms(
+    def test_sample_initial_positions_with_n_points(self, basic_jim):
+        """Test sample_initial_positions with explicit n_points."""
+        initial_samples = basic_jim.sample_initial_positions(n_points=7)
+        assert initial_samples.shape == (7, 2)
+        assert_all_finite(initial_samples)
+
+    def test_sample_initial_positions_with_sample_transforms(
         self, jim_with_sample_transforms
     ):
-        """Test sample_initial_condition with sample transforms applied."""
-        initial_samples = jim_with_sample_transforms.sample_initial_condition()
+        """Test sample_initial_positions with sample transforms applied."""
+        initial_samples = jim_with_sample_transforms.sample_initial_positions()
 
         # Check shape: (n_chains, n_dims) - should still be (5, 2)
         assert initial_samples.shape == (5, 2)
@@ -476,8 +483,8 @@ class TestJimUtilityMethods:
         # M_c_unbounded can be any finite value (unbounded)
         # q is still in the dict but ordered according to parameter_names
 
-    def test_sample_initial_condition_raises_on_non_finite(self, mock_likelihood):
-        """Test that sample_initial_condition raises ValueError on non-finite samples."""
+    def test_sample_initial_positions_raises_on_non_finite(self, mock_likelihood):
+        """Test that a prior producing NaN values raises ValueError during Jim.__init__."""
 
         # Create a prior that produces NaN values
         class BadPrior:
@@ -491,21 +498,19 @@ class TestJimUtilityMethods:
                     "param2": jnp.full(n_samples, jnp.nan),
                 }
 
-        jim = Jim(
-            likelihood=mock_likelihood,
-            prior=BadPrior(),
-            rng_key=jax.random.key(42),
-            n_chains=5,
-            n_local_steps=2,
-            n_global_steps=2,
-            global_thinning=1,
-        )
-
         with pytest.raises(
             ValueError,
             match="Initial positions contain non-finite values.*Check your priors and transforms",
         ):
-            jim.sample_initial_condition()
+            Jim(
+                likelihood=mock_likelihood,
+                prior=BadPrior(),
+                rng_key=jax.random.key(42),
+                n_chains=5,
+                n_local_steps=2,
+                n_global_steps=2,
+                global_thinning=1,
+            )
 
 
 class TestJimSampleMethod:
@@ -558,3 +563,198 @@ class TestJimSampleMethod:
             match="initial_position must have shape.*Got shape",
         ):
             basic_jim.sample(initial_position=initial_pos)
+
+
+class TestJimPriorLikelihoodConsistencyChecks:
+    """Tests for the parameter-consistency checks in Jim.__init__."""
+
+    def _make_mock_single_event_likelihood(
+        self,
+        waveform_parameter_names: tuple[str, ...],
+        fixed_parameters: Optional[dict] = None,
+    ):
+        """Build a minimal SingleEventLikelihood-like object without real detectors."""
+        from jimgw.core.single_event.likelihood import SingleEventLikelihood
+        from ripplegw.interfaces import Waveform as RippleWaveform
+        from jaxtyping import Float
+
+        class MockWaveform(RippleWaveform):
+            """Waveform stub that satisfies the ripplegw.interfaces.Waveform ABC."""
+
+            def __init__(self, param_names):
+                self._param_names = param_names
+
+            @property
+            def parameter_names(self) -> tuple[str, ...]:
+                return self._param_names
+
+            def __call__(self, axis, params):
+                return {"p": axis, "c": axis}
+
+        class FakeSingleEventLikelihood(SingleEventLikelihood):
+            def __init__(self, waveform, fixed_parameters):
+                # Bypass the real __init__ (which needs real detectors)
+                self.waveform = waveform
+                self.fixed_parameters = fixed_parameters or {}
+
+            def _likelihood(self, params, data) -> Float:
+                return 0.0
+
+        return FakeSingleEventLikelihood(
+            waveform=MockWaveform(waveform_parameter_names),
+            fixed_parameters=fixed_parameters or {},
+        )
+
+    def test_prior_shadows_fixed_parameter_raises(self):
+        """Prior defining a parameter that is also in fixed_parameters raises ValueError."""
+        prior = CombinePrior(
+            [
+                UniformPrior(10.0, 80.0, parameter_names=["M_c"]),
+            ]
+        )
+        # M_c is in the prior AND in fixed_parameters — should conflict
+        lh = self._make_mock_single_event_likelihood(
+            waveform_parameter_names=("M_c", "ra", "dec", "psi", "t_c"),
+            fixed_parameters={"M_c": 30.0},
+        )
+
+        with pytest.raises(ValueError, match="also in fixed_parameters"):
+            Jim(
+                likelihood=lh,
+                prior=prior,
+                rng_key=jax.random.key(0),
+                n_chains=5,
+                n_local_steps=2,
+                n_global_steps=2,
+                global_thinning=1,
+            )
+
+    def test_prior_with_unused_parameter_raises(self):
+        """Prior defining a parameter not consumed by the likelihood raises ValueError."""
+        prior = CombinePrior(
+            [
+                UniformPrior(10.0, 80.0, parameter_names=["M_c"]),
+                UniformPrior(0.125, 1.0, parameter_names=["q"]),  # q not consumed
+            ]
+        )
+        # Waveform consumes M_c + sky/time, but not q
+        lh = self._make_mock_single_event_likelihood(
+            waveform_parameter_names=("M_c", "ra", "dec", "psi", "t_c"),
+        )
+
+        with pytest.raises(ValueError, match="not consumed by the likelihood"):
+            Jim(
+                likelihood=lh,
+                prior=prior,
+                rng_key=jax.random.key(0),
+                n_chains=5,
+                n_local_steps=2,
+                n_global_steps=2,
+                global_thinning=1,
+            )
+
+    def test_prior_all_consumed_no_error(self):
+        """No error when all prior parameters are consumed by the likelihood."""
+        prior = CombinePrior(
+            [
+                UniformPrior(10.0, 80.0, parameter_names=["M_c"]),
+                UniformPrior(0.0, 3.14, parameter_names=["ra"]),
+                UniformPrior(-1.57, 1.57, parameter_names=["dec"]),
+                UniformPrior(0.0, 3.14, parameter_names=["psi"]),
+                UniformPrior(-0.1, 0.1, parameter_names=["t_c"]),
+            ]
+        )
+        lh = self._make_mock_single_event_likelihood(
+            waveform_parameter_names=("M_c", "ra", "dec", "psi", "t_c"),
+        )
+
+        # Should construct without error
+        Jim(
+            likelihood=lh,
+            prior=prior,
+            rng_key=jax.random.key(0),
+            n_chains=5,
+            n_local_steps=2,
+            n_global_steps=2,
+            global_thinning=1,
+        )
+
+
+class TestJimNaNPosteriorCheck:
+    """Tests for the NaN posterior sanity check in Jim.__init__."""
+
+    def test_all_nan_posterior_raises(self):
+        """More than 5/10 NaN log-posteriors raises ValueError."""
+
+        class NaNLikelihood:
+            def evaluate(self, params, data):
+                return jnp.nan
+
+        prior = CombinePrior([UniformPrior(10.0, 80.0, parameter_names=["M_c"])])
+
+        with pytest.raises(ValueError, match="posterior returned NaN"):
+            Jim(
+                likelihood=NaNLikelihood(),
+                prior=prior,
+                rng_key=jax.random.key(0),
+                n_chains=5,
+                n_local_steps=2,
+                n_global_steps=2,
+                global_thinning=1,
+            )
+
+    def test_some_nan_posterior_warns(self, caplog, monkeypatch):
+        """1-5 NaN log-posteriors out of 10 issues a warning but no error."""
+
+        class SometimesNaNLikelihood:
+            def evaluate(self, params, data):
+                return jnp.where(params["M_c"] > 70.0, jnp.nan, -1.0)
+
+        prior = CombinePrior([UniformPrior(10.0, 80.0, parameter_names=["M_c"])])
+
+        # Provide fixed test positions (shape n_points x n_dims) so the NaN
+        # count is deterministic: 2 out of 10 have M_c > 70.
+        _fixed_positions = jnp.array(
+            [[20.0], [30.0], [40.0], [45.0], [50.0], [55.0], [60.0], [65.0], [75.0], [78.0]]
+        )
+        monkeypatch.setattr(
+            Jim,
+            "sample_initial_positions",
+            lambda self, n_points=None, rng_key=None: _fixed_positions,
+        )
+
+        with caplog.at_level("WARNING"):
+            Jim(
+                likelihood=SometimesNaNLikelihood(),
+                prior=prior,
+                rng_key=jax.random.key(0),
+                n_chains=5,
+                n_local_steps=2,
+                n_global_steps=2,
+                global_thinning=1,
+            )
+
+        assert any(
+            "NaN posterior" in record.message or "NaN" in record.message
+            for record in caplog.records
+        )
+
+    def test_no_nan_posterior_no_error(self):
+        """All-finite log-posteriors produce no error or warning."""
+
+        class FiniteLikelihood:
+            def evaluate(self, params, data):
+                return -1.0
+
+        prior = CombinePrior([UniformPrior(10.0, 80.0, parameter_names=["M_c"])])
+
+        # Should construct silently
+        Jim(
+            likelihood=FiniteLikelihood(),
+            prior=prior,
+            rng_key=jax.random.key(0),
+            n_chains=5,
+            n_local_steps=2,
+            n_global_steps=2,
+            global_thinning=1,
+        )

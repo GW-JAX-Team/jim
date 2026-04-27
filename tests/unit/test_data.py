@@ -19,7 +19,10 @@ class TestData:
         delta_t = 1 / self.f_samp
         n_time = int(self.duration / delta_t)
         self.data = Data(
-            td=jnp.ones(n_time), delta_t=delta_t, name=self.name, start_time=self.start_time
+            td=jnp.ones(n_time),
+            delta_t=delta_t,
+            name=self.name,
+            start_time=self.start_time,
         )
 
     def test_basic_attributes(self):

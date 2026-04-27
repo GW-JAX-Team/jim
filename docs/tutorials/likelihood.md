@@ -12,7 +12,7 @@ from jimgw.core.single_event.waveform import RippleIMRPhenomD
 waveform = RippleIMRPhenomD(f_ref=20.0)
 ```
 
-See the [ripple documentation](https://ripplegw.readthedocs.io) for the full list of available waveforms (aligned-spin, precessing, tidal, burst, etc.).
+See the [ripple documentation](https://gw-jax-team.github.io/ripple/) for the full list of available waveforms (aligned-spin, precessing, tidal, burst, etc.).
 
 ## TransientLikelihoodFD
 
@@ -33,7 +33,7 @@ likelihood = TransientLikelihoodFD(
 ### Key Parameters
 
 | Parameter | Description |
-|---|---|
+| --- | --- |
 | `detectors` | List of `Detector` objects with data and PSD already set |
 | `waveform` | A ripple waveform model instance |
 | `trigger_time` | GPS trigger time of the event |

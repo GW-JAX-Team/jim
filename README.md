@@ -2,7 +2,7 @@
 
 ### A JAX-based gravitational-wave inference toolkit
 
-[![doc](https://badgen.net/badge/Read/the%20doc/blue)](https://jim.readthedocs.io/en/main/) [![license](https://badgen.net/badge/License/MIT/blue)](https://github.com/GW-JAX-Team/jim/blob/main/LICENSE) [![coverage](https://badgen.net/coveralls/c/github/GW-JAX-Team/jim/main)](https://coveralls.io/github/GW-JAX-Team/jim?branch=main) [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/GW-JAX-Team/jim/main.svg)](https://results.pre-commit.ci/latest/github/GW-JAX-Team/jim/main)
+[![docs](https://img.shields.io/badge/docs-online-blue)](https://gw-jax-team.github.io/jim/) [![license](https://img.shields.io/badge/License-MIT-blue)](https://github.com/GW-JAX-Team/jim/blob/main/LICENSE) [![coverage](https://img.shields.io/coveralls/github/GW-JAX-Team/jim/main)](https://coveralls.io/github/GW-JAX-Team/jim?branch=main) [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/GW-JAX-Team/jim/main.svg)](https://results.pre-commit.ci/latest/github/GW-JAX-Team/jim/main)
 
 Jim is a JAX-based toolkit for Bayesian parameter estimation of gravitational-wave sources. It pairs differentiable waveform models from [ripple](https://github.com/GW-JAX-Team/ripple) with GPU-accelerated JAX-based samplers, enabling massively parallel inference.
 
@@ -10,7 +10,7 @@ Jim is a JAX-based toolkit for Bayesian parameter estimation of gravitational-wa
 
 - [flowMC](https://github.com/GW-JAX-Team/flowMC) — normalizing-flow-enhanced MCMC
 
-For a quick introduction, see the [Quick Start guide](https://jim.readthedocs.io/en/stable/quickstart/).
+For a quick introduction, see the [Quick Start guide](https://gw-jax-team.github.io/jim/stable/quickstart/).
 
 > [!WARNING]
 > Jim has not yet reached v1.0.0 and the API may change. Use at your own risk. Consider pinning to a specific version if you need API stability.
