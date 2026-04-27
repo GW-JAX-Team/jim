@@ -8,6 +8,7 @@ from itertools import combinations
 from pathlib import Path
 from jimgw.core.single_event.data import PowerSpectrum
 from jimgw.core.single_event.detector import get_ET, get_H1
+from jimgw.core.constants import EARTH_SEMI_MAJOR_AXIS, EARTH_SEMI_MINOR_AXIS
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
 from tests.utils import assert_all_in_range
 
@@ -176,7 +177,12 @@ class TestET:
         This checks both the propagation formula and that the triangle closes,
         following the approach used in Bilby's TriangularInterferometerTest.
         """
-        R = 6371000.0  # mean Earth radius in metres
+        # Use the same WGS-84 radius get_ET uses: computed at ET1's latitude
+        # (the initial latitude, before any vertex propagation).
+        _a = EARTH_SEMI_MAJOR_AXIS / 1e3
+        _b = EARTH_SEMI_MINOR_AXIS / 1e3
+        lat0 = float(self.ifos[0].latitude)
+        R = (_a * _b / np.sqrt(_a**2 * np.sin(lat0)**2 + _b**2 * np.cos(lat0)**2)) * 1e3
         for ifo_a, ifo_b in combinations(self.ifos, 2):
             lat1 = float(ifo_a.latitude)
             lon1 = float(ifo_a.longitude)
