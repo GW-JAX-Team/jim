@@ -23,10 +23,9 @@ from jimgw.core.single_event.transforms import (
     SkyFrameToDetectorFrameSkyPositionTransform,
     SphereSpinToCartesianSpinTransform,
     MassRatioToSymmetricMassRatioTransform,
-    DistanceToSNRWeightedDistanceTransform,
     GeocentricArrivalTimeToDetectorArrivalTimeTransform,
-    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform,
 )
+from jimgw.samplers.config import FlowMCConfig
 
 jax.config.update("jax_enable_x64", True)
 
@@ -137,8 +136,6 @@ prior = CombinePrior(prior)
 # --- Define transforms ---
 
 sample_transforms = [
-    DistanceToSNRWeightedDistanceTransform(trigger_time=gps_time, ifos=ifos),
-    GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(trigger_time=gps_time, ifo=ifos[0]),
     GeocentricArrivalTimeToDetectorArrivalTimeTransform(trigger_time=gps_time, ifo=ifos[0]),
     SkyFrameToDetectorFrameSkyPositionTransform(trigger_time=gps_time, ifos=ifos),
 ]
@@ -164,29 +161,29 @@ likelihood = TransientLikelihoodFD(
 jim = Jim(
     likelihood,
     prior,
+    sampler_config=FlowMCConfig(
+        n_chains=1000,
+        n_local_steps=100,
+        n_global_steps=1000,
+        n_training_loops=20,
+        n_production_loops=10,
+        n_epochs=20,
+        mala={"step_size": 1e-2},
+        parallel_tempering={"enabled": True, "n_temperatures": 5, "max_temperature": 10.0, "n_tempered_steps": 5},
+        rq_spline_hidden_units=[128, 128],
+        rq_spline_n_bins=10,
+        rq_spline_n_layers=8,
+        learning_rate=1e-3,
+        batch_size=10000,
+        n_max_examples=30000,
+        n_NFproposal_batch_size=100,
+        local_thinning=1,
+        global_thinning=100,
+        history_window=100,
+        verbose=True,
+    ),
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    n_chains=1000,
-    n_local_steps=100,
-    n_global_steps=1000,
-    n_training_loops=20,
-    n_production_loops=10,
-    n_epochs=20,
-    mala_step_size=1e-2,
-    rq_spline_hidden_units=[128, 128],
-    rq_spline_n_bins=10,
-    rq_spline_n_layers=8,
-    learning_rate=1e-3,
-    batch_size=10000,
-    n_max_examples=30000,
-    n_NFproposal_batch_size=100,
-    local_thinning=1,
-    global_thinning=100,
-    history_window=100,
-    n_temperatures=5,
-    max_temperature=10.0,
-    n_tempered_steps=5,
-    verbose=True,
 )
 
 start_time = time.time()

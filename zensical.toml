@@ -1,6 +1,6 @@
 [project]
 site_name = "Jim"
-site_url = "https://gw-jax-team.github.io/Jim/"
+site_url = "https://gw-jax-team.github.io/jim/"
 site_description = "A JAX-based gravitational-wave inference toolkit"
 site_author = "GW JAX Team"
 repo_url = "https://github.com/GW-JAX-Team/jim"
@@ -21,6 +21,7 @@ nav = [
         {"Data" = "tutorials/data.md"},
         {"Likelihood" = "tutorials/likelihood.md"},
         {"Prior" = "tutorials/prior.md"},
+        {"Samplers" = "tutorials/samplers.md"},
         {"Transforms" = "tutorials/transforms.md"},
     ]},
     {"FAQ" = "FAQ.md"},

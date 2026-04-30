@@ -42,27 +42,30 @@ likelihood = TransientLikelihoodFD(
 
 ### Analytic Marginalisation
 
-The likelihood supports analytic marginalisation over coalescence time, phase, and/or luminosity distance. Each is toggled by a boolean flag:
+The likelihood supports analytic marginalisation over coalescence time, phase, and/or luminosity distance. Each is activated by passing a typed config object or a plain dict shorthand:
 
 ```python
+from jimgw.core.prior import PowerLawPrior
+
+distance_prior = PowerLawPrior(xmin=100.0, xmax=5000.0, alpha=2.0, parameter_names=["d_L"])
+
 likelihood = TransientLikelihoodFD(
     detectors=[H1, L1],
     waveform=waveform,
     trigger_time=gps_time,
     f_min=20.0,
     f_max=1024.0,
-    marginalize_time=True,
-    marginalize_phase=True,
-    marginalize_distance=True,
-    dist_prior=distance_prior,  # required when marginalizing distance
+    time_marginalization={"tc_range": (-0.1, 0.1)},   # or time_marginalization={} for defaults
+    phase_marginalization=True,                         # shorthand for PhaseMargConfig()
+    distance_marginalization={"dist_prior": distance_prior},  # required: dist_prior
 )
 ```
 
 Marginalising over these parameters reduces the effective dimensionality of the problem and can significantly speed up sampling.
 
-- `marginalize_time` — marginalises over `t_c` within the range set by `tc_range` (default `(-0.12, 0.12)`).
-- `marginalize_phase` — marginalises over `phase_c`.
-- `marginalize_distance` — marginalises over `d_L`. Requires `dist_prior` (a 1-D prior over luminosity distance).
+- `time_marginalization` — marginalises over `t_c` within the range set by `tc_range` (default `(-0.1, 0.1)`). Pass `{}` to use the default range, or `{"tc_range": (lo, hi)}` for a custom range.
+- `phase_marginalization` — marginalises over `phase_c`. Pass `True`, `{}`, or a `PhaseMargConfig()` instance.
+- `distance_marginalization` — marginalises over `d_L`. Pass a dict with `dist_prior` (a 1-D prior over luminosity distance) and optionally `n_dist_points` and `ref_dist`.
 
 ### Fixing Parameters
 
@@ -152,7 +155,7 @@ likelihood = HeterodynedTransientLikelihoodFD(
     f_min=20.0,
     f_max=1024.0,
     reference_parameters=ref_params,  # dict with all waveform parameters
-    marginalize_phase=True,
+    phase_marginalization=True,
 )
 ```
 

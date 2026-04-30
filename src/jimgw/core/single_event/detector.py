@@ -143,7 +143,7 @@ class Detector(ABC):
             bounds[0] = f_min
         if f_max is not None:
             bounds[1] = f_max
-        self.frequency_bounds = tuple(bounds)  # type: ignore
+        self.frequency_bounds = (bounds[0], bounds[1])
 
         # Compute sliced frequencies, data and psd.
         data, freqs_1 = self.data.frequency_slice(*self.frequency_bounds)

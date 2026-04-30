@@ -96,16 +96,19 @@ Prior Space
 
 ```python
 from jimgw.core.jim import Jim
+from jimgw.samplers.config import FlowMCConfig
 
 jim = Jim(
     likelihood=likelihood,
     prior=prior,
+    sampler_config=FlowMCConfig(
+        n_chains=500,
+        n_training_loops=20,
+        n_production_loops=10,
+        # ... other hyperparameters
+    ),
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    n_chains=500,
-    n_training_loops=20,
-    n_production_loops=10,
-    # ... other hyperparameters
 )
 
 jim.sample()

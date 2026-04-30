@@ -5,13 +5,13 @@ All seven likelihood classes are tested:
     Jim class                                              Bilby equivalent
     ─────────────────────────────────────────────────────  ────────────────────────────────────────────────────────────
     TransientLikelihoodFD                                  GravitationalWaveTransient (no marginalization)
-    TransientLikelihoodFD(marginalize_phase=True)          GravitationalWaveTransient (phase_marginalization=True)
-    TransientLikelihoodFD(marginalize_time=True)           GravitationalWaveTransient (time_marginalization=True)
-    TransientLikelihoodFD(marginalize_distance=True)       GravitationalWaveTransient (distance_marginalization=True)
-    TransientLikelihoodFD(marg_phase+distance)             GravitationalWaveTransient (phase+distance marginalization)
-    TransientLikelihoodFD(marg_time+phase)                 GravitationalWaveTransient (time+phase marginalization)
+    TransientLikelihoodFD(phase_marginalization=True)      GravitationalWaveTransient (phase_marginalization=True)
+    TransientLikelihoodFD(time_marginalization={})         GravitationalWaveTransient (time_marginalization=True)
+    TransientLikelihoodFD(distance_marginalization={...})  GravitationalWaveTransient (distance_marginalization=True)
+    TransientLikelihoodFD(phase+distance marg)             GravitationalWaveTransient (phase+distance marginalization)
+    TransientLikelihoodFD(time+phase marg)                 GravitationalWaveTransient (time+phase marginalization)
     HeterodynedTransientLikelihoodFD                       RelativeBinningGravitationalWaveTransient
-    HeterodynedTransientLikelihoodFD(marg_phase=True)      RelativeBinningGravitationalWaveTransient (phase_marg=True)
+    HeterodynedTransientLikelihoodFD(phase_marg=True)      RelativeBinningGravitationalWaveTransient (phase_marg=True)
 
 Uses IMRPhenomPv2 with GW150914 data fixtures.
 
@@ -364,10 +364,10 @@ class TestBaseTransientLikelihood:
 
 
 class TestPhaseMarginalizedLikelihood:
-    """TransientLikelihoodFD(marginalize_phase=True) vs GravitationalWaveTransient(phase_marginalization=True).
+    """TransientLikelihoodFD(phase_marginalization=True) vs GravitationalWaveTransient(phase_marginalization=True).
 
     TransientLikelihoodFD.evaluate() always overrides phase_c=0 when
-    marginalize_phase=True before projecting the waveform.  The Cartesian spin
+    phase_marginalization is active before projecting the waveform.  The Cartesian spin
     components in jim_params are derived from bilby_to_lalsimulation_spins(phase=...).
     If those spins were computed for a non-zero phase, the resulting (spins, phase_c=0)
     pair is inconsistent and gives a different waveform than bilby evaluates.
@@ -392,7 +392,7 @@ class TestPhaseMarginalizedLikelihood:
             f_min=F_MIN,
             f_max=F_MAX,
             trigger_time=GPS,
-            marginalize_phase=True,
+            phase_marginalization=True,
         ).evaluate(jim_params_ph0, {})
 
         priors = bilby.core.prior.PriorDict()
@@ -415,7 +415,7 @@ class TestPhaseMarginalizedLikelihood:
 
 
 class TestTimeMarginalizedLikelihood:
-    """TransientLikelihoodFD(marginalize_time=True) vs GravitationalWaveTransient(time_marginalization=True).
+    """TransientLikelihoodFD(time_marginalization={...}) vs GravitationalWaveTransient(time_marginalization=True).
 
     To get exact normalisation agreement we make both sides integrate over the
     **full segment** [start_time, start_time+duration]:
@@ -444,8 +444,7 @@ class TestTimeMarginalizedLikelihood:
             f_min=F_MIN,
             f_max=F_MAX,
             trigger_time=GPS,
-            marginalize_time=True,
-            tc_range=tc_range,
+            time_marginalization={"tc_range": tc_range},
         ).evaluate(setup["jim_params"].copy(), {})
 
         priors = bilby.core.prior.PriorDict()
@@ -471,12 +470,13 @@ class TestTimeMarginalizedLikelihood:
 
 
 class TestDistanceMarginalizedLikelihood:
-    """TransientLikelihoodFD(marginalize_distance=True) vs GravitationalWaveTransient(distance_marginalization=True).
+    """TransientLikelihoodFD(distance_marginalization={...}) vs GravitationalWaveTransient(distance_marginalization=True).
 
     Jim uses direct logsumexp over a fine distance grid;
     bilby uses a 2-D spline look-up table.
     """
 
+    @pytest.mark.slow
     def test_log_likelihood_ratio(self, setup):
         from jimgw.core.single_event.likelihood import TransientLikelihoodFD
         from jimgw.core.prior import PowerLawPrior
@@ -496,9 +496,7 @@ class TestDistanceMarginalizedLikelihood:
             f_min=F_MIN,
             f_max=F_MAX,
             trigger_time=GPS,
-            marginalize_distance=True,
-            dist_prior=jim_dist_prior,
-            n_dist_points=10000,
+            distance_marginalization={"dist_prior": jim_dist_prior, "n_dist_points": 10000},
         ).evaluate(setup["jim_params"].copy(), {})
 
         bilby_priors = bilby.core.prior.PriorDict()
@@ -530,12 +528,13 @@ class TestDistanceMarginalizedLikelihood:
 
 
 class TestPhaseDistanceMarginalizedLikelihood:
-    """TransientLikelihoodFD(marginalize_phase+distance) vs bilby phase+distance marginalization.
+    """TransientLikelihoodFD(phase+distance marginalization) vs bilby phase+distance marginalization.
 
     Uses phase=0 for parameter conversion so that jim's forced ``phase_c=0`` remains
     consistent with the cartesian spin components.
     """
 
+    @pytest.mark.slow
     def test_log_likelihood_ratio(self, setup):
         from jimgw.core.single_event.likelihood import TransientLikelihoodFD
         from jimgw.core.prior import PowerLawPrior
@@ -558,10 +557,8 @@ class TestPhaseDistanceMarginalizedLikelihood:
             f_min=F_MIN,
             f_max=F_MAX,
             trigger_time=GPS,
-            marginalize_phase=True,
-            marginalize_distance=True,
-            dist_prior=jim_dist_prior,
-            n_dist_points=10000,
+            phase_marginalization=True,
+            distance_marginalization={"dist_prior": jim_dist_prior, "n_dist_points": 10000},
         ).evaluate(jim_params_ph0.copy(), {})
 
         bilby_priors = bilby.core.prior.PriorDict()
@@ -599,7 +596,7 @@ class TestPhaseDistanceMarginalizedLikelihood:
 
 
 class TestPhaseTimeMarginalizedLikelihood:
-    """TransientLikelihoodFD(marginalize_time+phase) vs GravitationalWaveTransient(time+phase marginalization).
+    """TransientLikelihoodFD(time+phase marginalization) vs GravitationalWaveTransient(time+phase marginalization).
 
     Same phase-consistency caveat as TestPhaseMarginalizedLikelihood: jim_params
     must be derived with phase=0 so that the cartesian spins and the phase_c=0
@@ -625,9 +622,8 @@ class TestPhaseTimeMarginalizedLikelihood:
             f_min=F_MIN,
             f_max=F_MAX,
             trigger_time=GPS,
-            marginalize_time=True,
-            marginalize_phase=True,
-            tc_range=tc_range,
+            time_marginalization={"tc_range": tc_range},
+            phase_marginalization=True,
         ).evaluate(jim_params_ph0, {})
 
         priors = bilby.core.prior.PriorDict()
@@ -715,7 +711,7 @@ class TestHeterodynedLikelihood:
 
 
 class TestHeterodynedPhaseMarginalizedLikelihood:
-    """HeterodynedTransientLikelihoodFD(marginalize_phase=True) vs RelativeBinningGravitationalWaveTransient
+    """HeterodynedTransientLikelihoodFD(phase_marginalization=True) vs RelativeBinningGravitationalWaveTransient
     with phase_marginalization=True.
     """
 
@@ -758,7 +754,7 @@ class TestHeterodynedPhaseMarginalizedLikelihood:
             trigger_time=GPS,
             n_bins=n_bins,
             reference_parameters=jim_ref_params,
-            marginalize_phase=True,
+            phase_marginalization=True,
         )
 
         # Slightly perturb to move away from reference point; keep phase=0 so

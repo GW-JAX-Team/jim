@@ -98,13 +98,14 @@ Both lists are passed to the `Jim` constructor:
 
 ```python
 from jimgw.core.jim import Jim
+from jimgw.samplers.config import FlowMCConfig
 
 jim = Jim(
     likelihood=likelihood,
     prior=prior,
+    sampler_config=FlowMCConfig(),
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    ...
 )
 ```
 

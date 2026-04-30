@@ -33,6 +33,19 @@ class Prior(eqx.Module):
     def n_dims(self) -> int:
         return len(self.parameter_names)
 
+    @property
+    def is_normalized(self) -> bool:
+        """Return True if this prior is a proper probability distribution (integrates to 1).
+
+        Defaults to False for safety. All built-in Jim priors override this to True.
+        Custom priors must explicitly set ``is_normalized = True`` (by overriding this
+        property) only after verifying that ``∫ exp(log_prob(x)) dx == 1``.
+
+        Samplers that compute Bayesian evidence (NSS, SMC) require a normalized prior.
+        Jim will raise at construction time if this returns False for those backends.
+        """
+        return False
+
     def __init__(self, parameter_names: list[str]):
         """
         Args:
@@ -118,6 +131,10 @@ class LogisticDistribution(Prior):
         parameter_names (list[str]): Name of the parameter.
     """
 
+    @property
+    def is_normalized(self) -> bool:
+        return True
+
     def __repr__(self):
         return f"LogisticDistribution(parameter_names={self.parameter_names})"
 
@@ -155,6 +172,10 @@ class StandardNormalDistribution(Prior):
     Attributes:
         parameter_names (list[str]): Name of the parameter.
     """
+
+    @property
+    def is_normalized(self) -> bool:
+        return True
 
     def __repr__(self):
         return f"StandardNormalDistribution(parameter_names={self.parameter_names})"
@@ -198,6 +219,10 @@ class UniformDistribution(Prior):
     xmin: float = 0.0
     xmax: float = 1.0
 
+    @property
+    def is_normalized(self) -> bool:
+        return True
+
     def __repr__(self):
         return f"UniformDistribution(parameter_names={self.parameter_names})"
 
@@ -239,6 +264,10 @@ class SequentialTransformPrior(CompositePrior):
     """
 
     transforms: tuple[BijectiveTransform, ...]
+
+    @property
+    def is_normalized(self) -> bool:
+        return self.base_prior[0].is_normalized
 
     def __repr__(self):
         return f"Sequential(priors={self.base_prior}, parameter_names={self.parameter_names})"
@@ -332,9 +361,13 @@ class BoundedMixin:
     xmin: float = -jnp.inf
     xmax: float = jnp.inf
 
+    @property
+    def is_normalized(self) -> bool:
+        return False
+
     def log_prob(self, z: dict[str, Float]) -> Float:
         x = z[self.parameter_names[0]]  # type: ignore
-        base_log_prob = super().log_prob(z)  # type: ignore
+        base_log_prob = super().log_prob(z)  # type: ignore[misc]
         return jnp.where(
             jnp.logical_and(x >= self.xmin, x <= self.xmax),
             base_log_prob,
@@ -354,6 +387,10 @@ class CombinePrior(CompositePrior):
     """
 
     base_prior: tuple[Prior, ...] = field(default_factory=tuple)
+
+    @property
+    def is_normalized(self) -> bool:
+        return all(p.is_normalized for p in self.base_prior)
 
     def __repr__(self):
         return (
@@ -513,6 +550,10 @@ class SinePrior(BoundedMixin, SequentialTransformPrior):
     xmin: float = 0.0
     xmax: float = jnp.pi
 
+    @property
+    def is_normalized(self) -> bool:
+        return True
+
     def __repr__(self):
         return f"SinePrior(parameter_names={self.parameter_names})"
 
@@ -544,6 +585,10 @@ class CosinePrior(BoundedMixin, SequentialTransformPrior):
 
     xmin: float = -jnp.pi / 2
     xmax: float = jnp.pi / 2
+
+    @property
+    def is_normalized(self) -> bool:
+        return True
 
     def __repr__(self):
         return f"CosinePrior(parameter_names={self.parameter_names})"
@@ -607,6 +652,10 @@ class RayleighPrior(BoundedMixin, SequentialTransformPrior):
     sigma: float
     xmin: float = 0.0
     xmax: float = jnp.inf
+
+    @property
+    def is_normalized(self) -> bool:
+        return True
 
     def __repr__(self):
         return (
