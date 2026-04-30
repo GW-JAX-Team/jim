@@ -2,10 +2,13 @@ import jax
 
 jax.config.update("jax_enable_x64", True)
 
+import numpy as np
 import jax.numpy as jnp
+from itertools import combinations
 from pathlib import Path
 from jimgw.core.single_event.data import PowerSpectrum
-from jimgw.core.single_event.detector import get_H1
+from jimgw.core.single_event.detector import get_ET, get_H1
+from jimgw.core.constants import EARTH_SEMI_MAJOR_AXIS, EARTH_SEMI_MINOR_AXIS
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
 from tests.utils import assert_all_in_range
 
@@ -122,3 +125,74 @@ class TestInjectSignal:
             rtol=1e-05,
             atol=1e-23,
         )
+
+
+# ---------------------------------------------------------------------------
+# ET geometry tests
+# ---------------------------------------------------------------------------
+
+
+class TestET:
+    """Tests for get_ET(): geometric consistency of the triangular ET configuration."""
+
+    ET_ARM_LENGTH_M = 1e4  # 10 km
+
+    def setup_method(self):
+        self.ifos = get_ET()
+
+    def test_returns_three_detectors(self):
+        """get_ET returns exactly three GroundBased2G instances."""
+        assert len(self.ifos) == 3
+
+    def test_detector_names(self):
+        """Sub-detectors are named ET1, ET2, ET3 in order."""
+        assert [ifo.name for ifo in self.ifos] == ["ET1", "ET2", "ET3"]
+
+    def test_arm_opening_angle_is_60_degrees(self):
+        """Each sub-detector has 60° (π/3) between its x and y arms."""
+        for ifo in self.ifos:
+            delta = ifo.yarm_azimuth - ifo.xarm_azimuth
+            assert abs(delta - np.pi / 3) < 1e-10, (
+                f"{ifo.name}: arm opening angle is {np.degrees(delta):.4f}°, expected 60°"
+            )
+
+    def test_arms_rotated_240_degrees_between_detectors(self):
+        """Consecutive sub-detectors have arm azimuths rotated by 240° (4π/3 rad)."""
+        rotation = (4 / 3) * np.pi
+        for i in range(2):
+            dx = self.ifos[i + 1].xarm_azimuth - self.ifos[i].xarm_azimuth
+            dy = self.ifos[i + 1].yarm_azimuth - self.ifos[i].yarm_azimuth
+            assert abs(dx - rotation) < 1e-10, (
+                f"ET{i + 1}→ET{i + 2} xarm rotation: {dx:.6f} rad, expected {rotation:.6f} rad"
+            )
+            assert abs(dy - rotation) < 1e-10, (
+                f"ET{i + 1}→ET{i + 2} yarm rotation: {dy:.6f} rad, expected {rotation:.6f} rad"
+            )
+
+    def test_vertex_separations_match_arm_length(self):
+        """
+        Haversine distance between every pair of ET vertex positions should
+        equal the arm length (10 km) to within 50 m.
+
+        This checks both the propagation formula and that the triangle closes,
+        following the approach used in Bilby's TriangularInterferometerTest.
+        """
+        # Use the same WGS-84 radius get_ET uses: computed at ET1's latitude
+        # (the initial latitude, before any vertex propagation).
+        _a = EARTH_SEMI_MAJOR_AXIS / 1e3
+        _b = EARTH_SEMI_MINOR_AXIS / 1e3
+        lat0 = float(self.ifos[0].latitude)
+        R = (_a * _b / np.sqrt(_a**2 * np.sin(lat0)**2 + _b**2 * np.cos(lat0)**2)) * 1e3
+        for ifo_a, ifo_b in combinations(self.ifos, 2):
+            lat1 = float(ifo_a.latitude)
+            lon1 = float(ifo_a.longitude)
+            lat2 = float(ifo_b.latitude)
+            lon2 = float(ifo_b.longitude)
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+            dist = R * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+            assert abs(dist - self.ET_ARM_LENGTH_M) < 50.0, (
+                f"{ifo_a.name}↔{ifo_b.name}: {dist:.0f} m "
+                f"(expected ~{self.ET_ARM_LENGTH_M:.0f} m ± 50 m)"
+            )

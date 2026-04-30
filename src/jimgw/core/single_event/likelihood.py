@@ -507,8 +507,9 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         optimizer_n_steps: Maximum number of CMA-ES generations.  Defaults to 1000.
         reference_parameters: Pre-computed reference parameters (dict).  If
             supplied, the optimizer is skipped entirely.
-        reference_waveform: Callable ``f(freq, params) -> {"p": ..., "c": ...}``
-            used to compute the reference waveform.  Defaults to ``waveform``.
+        reference_waveform: Optional :class:`~ripplegw.interfaces.Waveform` instance
+            used to compute the reference waveform.  Defaults to ``waveform`` when
+            not provided.
         prior: Prior distribution from which the initial CMA-ES mean is
             drawn.  Required when ``reference_parameters`` is not provided.
         likelihood_transforms: Transforms mapping sampling parameters to
@@ -547,12 +548,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         optimizer_popsize: int = 500,
         optimizer_n_steps: int = 1000,
         reference_parameters: Optional[dict] = None,
-        reference_waveform: Optional[
-            Callable[
-                [Float[Array, " n_freq"], dict[str, Float]],
-                dict[str, Float[Array, " n_freq"]],
-            ]
-        ] = None,
+        reference_waveform: Optional[Waveform] = None,
         prior: Optional[Prior] = None,
         likelihood_transforms: Optional[list[NtoMTransform]] = None,
         phase_marginalization: Union[PhaseMargConfig, dict, bool, None] = None,

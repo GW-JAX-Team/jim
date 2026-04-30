@@ -1671,7 +1671,7 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'visualize'", specifier = ">=3.10.7" },
     { name = "numpy", marker = "extra == 'visualize'" },
     { name = "pydantic", specifier = ">=2" },
-    { name = "ripplegw", specifier = ">=0.1.0" },
+    { name = "ripplegw", specifier = ">=0.1.1" },
     { name = "scipy", specifier = ">=1.17.1" },
 ]
 provides-extras = ["cuda", "visualize"]

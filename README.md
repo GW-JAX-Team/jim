@@ -13,7 +13,7 @@ Jim is a JAX-based toolkit for Bayesian parameter estimation of gravitational-wa
 - [BlackJAX NSS](https://github.com/handley-lab/blackjax) — nested slice sampling.
 - [BlackJAX SMC](https://github.com/blackjax-devs/blackjax) — sequential Monte Carlo with optional adaptive tempering and persistent sampling.
 
-For a quick introduction, see the [Quick Start guide](https://gw-jax-team.github.io/jim/quickstart/).
+For a quick introduction, see the [Quick Start guide](https://gw-jax-team.github.io/jim/stable/quickstart/).
 
 > [!WARNING]
 > Jim has not yet reached v1.0.0 and the API may change. Use at your own risk. Consider pinning to a specific version if you need API stability.

@@ -796,18 +796,20 @@ def get_V1() -> GroundBased2G:
 def get_ET() -> list[GroundBased2G]:
     """Return a list of three :class:`GroundBased2G` instances for Einstein Telescope (ET).
 
-    ET is modelled as a triangle of three co-located interferometers with arms
-    rotated by 120° relative to each other.
+    ET is modelled as a triangle of three interferometers at adjacent vertices,
+    with arms rotated by 120° relative to each other. Vertex positions are
+    propagated using the spherical forward-azimuth (haversine) formula with a
+    latitude-dependent Earth radius derived from the WGS-84 ellipsoid.
     """
     name = "ET"
     latitude = (43 + 37.0 / 60 + 53.0921 / 3600) * DEG_TO_RAD
-    longitude = (10 + 30.0 / 60 + 16.1887 / 3600) * DEG_TO_RAD
+    longitude = (10 + 30.0 / 60 + 16.1878 / 3600) * DEG_TO_RAD
     xarm_azimuth = 70.5674 * DEG_TO_RAD
     yarm_azimuth = 130.5674 * DEG_TO_RAD
     xarm_tilt = 0
     yarm_tilt = 0
     elevation = 51.884
-    length = 1e4
+    length: float = 1e4  # arm length in metres
 
     a = EARTH_SEMI_MAJOR_AXIS / 1e3  # Numerical instability avoidance
     b = EARTH_SEMI_MINOR_AXIS / 1e3
@@ -818,6 +820,11 @@ def get_ET() -> list[GroundBased2G]:
     )
     earth_approx_radius *= 1e3
 
+    # Navigation bearing (clockwise from North) corresponding to xarm_azimuth
+    # (counter-clockwise from East): brng = pi/2 - azimuth.
+    # Both brng and the arm azimuths are incremented by 240° (4π/3) per vertex.
+    brng = jnp.pi / 2 - xarm_azimuth
+
     ifos = []
     for i in range(3):
         ifos.append(
@@ -825,23 +832,29 @@ def get_ET() -> list[GroundBased2G]:
                 f"{name}{i + 1}",
                 latitude=float(latitude),
                 longitude=float(longitude),
-                xarm_azimuth=xarm_azimuth,
-                yarm_azimuth=yarm_azimuth,
+                xarm_azimuth=float(xarm_azimuth),
+                yarm_azimuth=float(yarm_azimuth),
                 elevation=elevation,
                 xarm_tilt=xarm_tilt,
                 yarm_tilt=yarm_tilt,
             )
         )
-        # Rotate arms
+        # Propagate to next vertex using the spherical forward-azimuth formula.
+        # Coordinate update must precede arm rotation (uses current bearing).
+        d = length / earth_approx_radius
+        phi1 = latitude
+        phi2 = jnp.arcsin(
+            jnp.sin(phi1) * jnp.cos(d) + jnp.cos(phi1) * jnp.sin(d) * jnp.cos(brng)
+        )
+        longitude = longitude + jnp.arctan2(
+            jnp.sin(brng) * jnp.sin(d) * jnp.cos(phi1),
+            jnp.cos(d) - jnp.sin(phi1) * jnp.sin(phi2),
+        )
+        latitude = phi2
+        # Rotate arms and bearing for the next detector vertex (240°, i.e. 4π/3, per vertex)
         xarm_azimuth += (4 / 3) * jnp.pi
         yarm_azimuth += (4 / 3) * jnp.pi
-        # The detector is taken as a chord that cuts across the earth
-        latitude += 2 * jnp.arcsin(
-            0.5 * length * jnp.sin(xarm_azimuth) / earth_approx_radius
-        )
-        longitude += 2 * jnp.arcsin(
-            0.5 * length * jnp.cos(xarm_azimuth) / earth_approx_radius
-        )
+        brng += (4 / 3) * jnp.pi
     return ifos
 
 
