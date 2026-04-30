@@ -67,7 +67,9 @@ class BlackJAXSMCSampler(Sampler):
             config=config,
         )
         self._config = config
-        self._displacement_wrapper = to_displacement_wrapper(config.periodic, parameter_names)
+        self._displacement_wrapper = to_displacement_wrapper(
+            config.periodic, parameter_names
+        )
         self._sampled = False
 
     # ------------------------------------------------------------------
@@ -148,7 +150,8 @@ class BlackJAXSMCSampler(Sampler):
 
             new_scale = jnp.exp(
                 jnp.log(cov_scale)
-                + config.scale_adaptation_gain * (acceptance_rate - config.target_acceptance_rate)
+                + config.scale_adaptation_gain
+                * (acceptance_rate - config.target_acceptance_rate)
             )
             current_cov = s.parameter_override["cov"]  # type: ignore[attr-defined]
             new_params = extend_params({"cov": current_cov[0] * new_scale})  # type: ignore[arg-type]
@@ -156,14 +159,17 @@ class BlackJAXSMCSampler(Sampler):
             return (s, key, new_scale)
 
         state, _, _ = jax.lax.while_loop(
-            cond_fn, body_fn,
+            cond_fn,
+            body_fn,
             (state, rng_key, jnp.array(config.initial_cov_scale)),
         )
 
         self._final_state = state
         self._mode = "ap"
 
-    def _run_fixed_persistent(self, rng_key: Key, initial_particles, ladder: list[float]) -> None:
+    def _run_fixed_persistent(
+        self, rng_key: Key, initial_particles, ladder: list[float]
+    ) -> None:
         """Mode FP: persistent_sampling_smc + scan over explicit temperature ladder."""
         from blackjax import persistent_sampling_smc, rmh  # type: ignore[import]
         from blackjax.smc.resampling import systematic  # type: ignore[import]
@@ -246,7 +252,9 @@ class BlackJAXSMCSampler(Sampler):
         self._final_state = state
         self._mode = "at"
 
-    def _run_fixed_tempered(self, rng_key: Key, initial_particles, ladder: list[float]) -> None:
+    def _run_fixed_tempered(
+        self, rng_key: Key, initial_particles, ladder: list[float]
+    ) -> None:
         """Mode FT: tempered_smc + scan over explicit temperature ladder."""
         from blackjax import rmh, tempered_smc  # type: ignore[import]
         from blackjax.smc.resampling import systematic  # type: ignore[import]

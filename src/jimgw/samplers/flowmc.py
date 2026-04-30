@@ -166,7 +166,9 @@ class FlowMCSampler(Sampler):
         if config.parallel_tempering.enabled:
             common_kwargs["n_temperatures"] = config.parallel_tempering.n_temperatures
             common_kwargs["max_temperature"] = config.parallel_tempering.max_temperature
-            common_kwargs["n_tempered_steps"] = config.parallel_tempering.n_tempered_steps
+            common_kwargs["n_tempered_steps"] = (
+                config.parallel_tempering.n_tempered_steps
+            )
             common_kwargs["logprior"] = self._logprior_flowmc
 
         resource_strategy_bundle = bundle_cls(**common_kwargs)

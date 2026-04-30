@@ -82,9 +82,7 @@ class BlackJAXNSAWSampler(Sampler):
         diag_pts = jnp.stack([jnp.full(n, v) for v in diag_vs])
         random_pts = jax.random.uniform(jax.random.key(123), (5, n))
         in_support = jnp.concatenate([diag_pts, random_pts], axis=0)
-        out_support = jnp.stack(
-            [jnp.full(n, -1e-3), jnp.full(n, 1.0 + 1e-3)]
-        )
+        out_support = jnp.stack([jnp.full(n, -1e-3), jnp.full(n, 1.0 + 1e-3)])
 
         log_prior_vmap = jax.vmap(log_prior_fn)
         lp_in = log_prior_vmap(in_support)

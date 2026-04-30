@@ -218,21 +218,32 @@ def _update_bilby_walks(
     default_walks_float = jnp.array(100.0, dtype=jnp.float32)
     default_n_accept_total = jnp.array(0, dtype=jnp.int32)
     default_current_walks = jnp.array(100, dtype=jnp.int32)
-    default_n_likelihood_evals_total = jnp.array(0, dtype=jnp.int32)
+    # default_n_likelihood_evals_total = jnp.array(0, dtype=jnp.int32)
 
-    walks_float = cast(jax.Array, jnp.where(
-        is_uninitialized,
-        default_walks_float,
-        prev_params.walks_float.astype(jnp.float32),
-    ))
-    n_accept_total = cast(jax.Array, jnp.where(
-        is_uninitialized,
-        default_n_accept_total,
-        prev_params.n_accept_total.astype(jnp.int32),
-    ))
-    current_walks = cast(jax.Array, jnp.where(
-        is_uninitialized, default_current_walks, prev_params.num_walks.astype(jnp.int32)
-    ))
+    walks_float = cast(
+        jax.Array,
+        jnp.where(
+            is_uninitialized,
+            default_walks_float,
+            prev_params.walks_float.astype(jnp.float32),
+        ),
+    )
+    n_accept_total = cast(
+        jax.Array,
+        jnp.where(
+            is_uninitialized,
+            default_n_accept_total,
+            prev_params.n_accept_total.astype(jnp.int32),
+        ),
+    )
+    current_walks = cast(
+        jax.Array,
+        jnp.where(
+            is_uninitialized,
+            default_current_walks,
+            prev_params.num_walks.astype(jnp.int32),
+        ),
+    )
     # n_likelihood_evals_total = cast(jax.Array, jnp.where(
     #     is_uninitialized,
     #     default_n_likelihood_evals_total,
@@ -245,12 +256,13 @@ def _update_bilby_walks(
     delay = jnp.maximum(og_delay // n_delete, 1)
 
     avg_accept_per_particle = n_accept_total / n_delete
-    accept_prob = (
-        jnp.maximum(0.5, avg_accept_per_particle)
-        / jnp.maximum(1.0, current_walks)
+    accept_prob = jnp.maximum(0.5, avg_accept_per_particle) / jnp.maximum(
+        1.0, current_walks
     )
     new_walks_float = (walks_float * delay + n_target / accept_prob) / (delay + 1)
-    new_walks_float = cast(jax.Array, jnp.where(n_accept_total == 0, walks_float, new_walks_float))
+    new_walks_float = cast(
+        jax.Array, jnp.where(n_accept_total == 0, walks_float, new_walks_float)
+    )
     num_walks_int = jnp.minimum(jnp.ceil(new_walks_float).astype(jnp.int32), max_mcmc)
 
     example_particle = jax.tree_util.tree_map(
@@ -312,9 +324,9 @@ def bilby_adaptive_de_sampler(
         particles = state.particles
         loglikelihoods = particles.loglikelihood
         weights = (loglikelihoods > loglikelihood_0).astype(jnp.float32)
-        weights = cast(jax.Array, jnp.where(
-            weights.sum() > 0.0, weights, jnp.ones_like(weights)
-        ))
+        weights = cast(
+            jax.Array, jnp.where(weights.sum() > 0.0, weights, jnp.ones_like(weights))
+        )
         start_idx = jax.random.choice(
             choice_key,
             weights.shape[0],

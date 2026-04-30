@@ -94,7 +94,9 @@ class FlowMCConfig(BaseSamplerConfig):
     n_epochs: int = 20
 
     local_kernel: Literal["MALA", "HMC", "GRW"] = "MALA"
-    parallel_tempering: ParallelTemperingConfig = Field(default_factory=ParallelTemperingConfig)
+    parallel_tempering: ParallelTemperingConfig = Field(
+        default_factory=ParallelTemperingConfig
+    )
     mala: MALAConfig = Field(default_factory=MALAConfig)
     hmc: HMCConfig = Field(default_factory=HMCConfig)
     grw: GRWConfig = Field(default_factory=GRWConfig)
@@ -138,7 +140,10 @@ class FlowMCConfig(BaseSamplerConfig):
                     UserWarning,
                     stacklevel=2,
                 )
-        if not self.parallel_tempering.enabled and self.parallel_tempering != ParallelTemperingConfig():
+        if (
+            not self.parallel_tempering.enabled
+            and self.parallel_tempering != ParallelTemperingConfig()
+        ):
             warnings.warn(
                 "FlowMCConfig: `parallel_tempering` sub-config has non-default values but "
                 "`parallel_tempering.enabled=False` — the parallel tempering settings will be ignored.",
@@ -259,12 +264,16 @@ class BlackJAXSMCConfig(BaseSamplerConfig):
 
     @field_validator("temperature_ladder")
     @classmethod
-    def _validate_temperature_ladder(cls, v: Optional[list[float]]) -> Optional[list[float]]:
+    def _validate_temperature_ladder(
+        cls, v: Optional[list[float]]
+    ) -> Optional[list[float]]:
         if v is None:
             return v
         arr = np.asarray(v, dtype=float)
         if arr.ndim != 1 or arr.size < 2:
-            raise ValueError("temperature_ladder must be a 1-D sequence of length >= 2.")
+            raise ValueError(
+                "temperature_ladder must be a 1-D sequence of length >= 2."
+            )
         if not np.all(np.diff(arr) > 0):
             raise ValueError("temperature_ladder must be strictly increasing.")
         if arr[0] != 0.0 or arr[-1] != 1.0:
