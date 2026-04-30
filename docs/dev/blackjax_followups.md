@@ -70,7 +70,7 @@ is the supported path.
 - `docs/installation.md`:
   - Drop the "BlackJAX samplers" section entirely.
   - Restore `pip install "jimgw[blackjax]"` as the canonical install instruction.
-- `docs/tutorials/samplers.md`:
+- `docs/guides/samplers.md`:
   - Drop the "Prerequisites: maintainer-pinned fork" section.
   - Drop the "Why this dance (PEP 508/735)" paragraph.
   - The verify-your-install snippet can stop probing `compute_persistent_ess`

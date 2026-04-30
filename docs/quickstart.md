@@ -1,6 +1,6 @@
 # Quick Start
 
-This page gives you a bird's-eye view of Jim's main components and how they fit together. For deeper dives into each piece, see the [Tutorials](tutorials/index.md).
+This page gives you a bird's-eye view of Jim's main components and how they fit together. For deeper dives into each piece, see the [Guides](guides/index.md).
 
 ## Overview
 
