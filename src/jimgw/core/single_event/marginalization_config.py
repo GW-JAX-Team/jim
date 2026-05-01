@@ -24,6 +24,6 @@ class DistanceMargConfig(BaseModel):
     """Configuration for distance marginalization."""
 
     model_config = {"extra": "forbid", "arbitrary_types_allowed": True}
-    dist_prior: Prior  # required — no default
+    distance_prior: Prior  # required — no default
     n_dist_points: int = 10000
     ref_dist: Optional[float] = None

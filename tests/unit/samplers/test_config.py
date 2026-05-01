@@ -23,7 +23,7 @@ def test_flowmc_config_defaults():
     assert cfg.n_chains == 1000
     assert cfg.local_kernel == "MALA"
     assert cfg.mala.step_size == 2e-3
-    assert cfg.parallel_tempering.enabled is False
+    assert cfg.parallel_tempering is None
 
 
 def test_blackjax_ns_aw_config_defaults():
@@ -110,15 +110,35 @@ def test_periodic_field_accepts_dict():
 
 def test_flowmc_pt_off_by_default():
     cfg = FlowMCConfig()
-    assert cfg.parallel_tempering.enabled is False
+    assert cfg.parallel_tempering is None
 
 
-def test_flowmc_pt_on():
-    cfg = FlowMCConfig(
-        parallel_tempering=ParallelTemperingConfig(enabled=True, n_temperatures=3)
-    )
-    assert cfg.parallel_tempering.enabled is True
+def test_flowmc_pt_on_with_config():
+    cfg = FlowMCConfig(parallel_tempering=ParallelTemperingConfig(n_temperatures=3))
+    assert cfg.parallel_tempering is not None
     assert cfg.parallel_tempering.n_temperatures == 3
+
+
+def test_flowmc_pt_on_with_true():
+    cfg = FlowMCConfig(parallel_tempering=True)
+    assert cfg.parallel_tempering is not None
+    assert cfg.parallel_tempering.n_temperatures == 5  # default
+
+
+def test_flowmc_pt_on_with_dict():
+    cfg = FlowMCConfig(parallel_tempering={"n_temperatures": 8})
+    assert cfg.parallel_tempering is not None
+    assert cfg.parallel_tempering.n_temperatures == 8
+
+
+def test_flowmc_pt_off_with_false():
+    cfg = FlowMCConfig(parallel_tempering=False)
+    assert cfg.parallel_tempering is None
+
+
+def test_flowmc_pt_off_with_none():
+    cfg = FlowMCConfig(parallel_tempering=None)
+    assert cfg.parallel_tempering is None
 
 
 def test_flowmc_irrelevant_kernel_warns():
@@ -129,12 +149,12 @@ def test_flowmc_irrelevant_kernel_warns():
 
 
 def test_flowmc_irrelevant_parallel_tempering_warns():
+    # No warning expected: passing PT config enables it, nothing is ignored.
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        FlowMCConfig(
-            parallel_tempering=ParallelTemperingConfig(enabled=False, n_temperatures=10)
-        )
-    assert any("parallel_tempering" in str(warning.message).lower() for warning in w)
+        FlowMCConfig(parallel_tempering=ParallelTemperingConfig(n_temperatures=10))
+    pt_warnings = [x for x in w if "parallel_tempering" in str(x.message).lower()]
+    assert len(pt_warnings) == 0
 
 
 def test_flowmc_no_spurious_warning_when_kernel_matches():
@@ -180,4 +200,78 @@ def test_smc_temperature_ladder_warns_ess():
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         BlackJAXSMCConfig(temperature_ladder=[0.0, 0.5, 1.0], absolute_target_ess=5000)
-    assert any("absolute_target_ess" in str(x.message) for x in w)
+    assert any("ESS" in str(x.message) for x in w)
+
+
+# ---------------------------------------------------------------------------
+# B2b: BlackJAXSMCConfig ESS XOR validator
+# ---------------------------------------------------------------------------
+
+
+def test_smc_default_ess_fraction():
+    cfg = BlackJAXSMCConfig()
+    assert cfg.target_ess_fraction == 0.9
+    assert cfg.absolute_target_ess is None
+
+
+def test_smc_ess_fraction_set():
+    cfg = BlackJAXSMCConfig(target_ess_fraction=0.3)
+    assert cfg.target_ess_fraction == 0.3
+    assert cfg.absolute_target_ess is None
+
+
+def test_smc_absolute_ess_set():
+    cfg = BlackJAXSMCConfig(absolute_target_ess=1000)
+    assert cfg.absolute_target_ess == 1000
+    assert cfg.target_ess_fraction is None
+
+
+def test_smc_both_ess_raises():
+    with pytest.raises(ValidationError, match="exactly one"):
+        BlackJAXSMCConfig(target_ess_fraction=0.9, absolute_target_ess=1000)
+
+
+def test_smc_fraction_zero_raises():
+    with pytest.raises(ValidationError):
+        BlackJAXSMCConfig(target_ess_fraction=0.0)
+
+
+def test_smc_fraction_above_one_in_persistent_ok():
+    cfg = BlackJAXSMCConfig(target_ess_fraction=1.5, persistent_sampling=True)
+    assert cfg.target_ess_fraction == 1.5
+
+
+def test_smc_fraction_above_one_in_tempered_raises():
+    with pytest.raises(ValidationError, match="1.0"):
+        BlackJAXSMCConfig(target_ess_fraction=1.5, persistent_sampling=False)
+
+
+def test_smc_absolute_ess_above_n_particles_in_tempered_raises():
+    with pytest.raises(ValidationError):
+        BlackJAXSMCConfig(
+            absolute_target_ess=5000, n_particles=2000, persistent_sampling=False
+        )
+
+
+def test_smc_absolute_ess_above_n_particles_in_persistent_ok():
+    cfg = BlackJAXSMCConfig(
+        absolute_target_ess=5000, n_particles=2000, persistent_sampling=True
+    )
+    assert cfg.absolute_target_ess == 5000
+
+
+def test_smc_fraction_warns_with_fixed_ladder():
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        BlackJAXSMCConfig(temperature_ladder=[0.0, 0.5, 1.0], target_ess_fraction=0.3)
+    assert any(
+        "target_ess_fraction" in str(x.message) or "ESS" in str(x.message) for x in w
+    )
+
+
+def test_smc_resolve_target_ess_fraction():
+    cfg = BlackJAXSMCConfig(target_ess_fraction=0.4)
+    assert cfg._resolve_target_ess_fraction() == pytest.approx(0.4)
+
+    cfg2 = BlackJAXSMCConfig(absolute_target_ess=1000, n_particles=2000)
+    assert cfg2._resolve_target_ess_fraction() == pytest.approx(0.5)

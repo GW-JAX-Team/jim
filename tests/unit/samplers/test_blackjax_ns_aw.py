@@ -1,15 +1,12 @@
-"""Smoke test: BlackJAXNSAWSampler on a 2-D Gaussian (analytic logZ = 0)."""
+"""Smoke test: BlackJAXNSAWSampler on a 2-D Gaussian."""
 
 from __future__ import annotations
-
-import math
 
 import jax
 import numpy as np
 import pytest
 
 blackjax = pytest.importorskip("blackjax")
-anesthetic = pytest.importorskip("anesthetic")
 
 from jimgw.core.prior import CombinePrior, UniformPrior  # noqa: E402
 from jimgw.samplers.base import SamplerDiagnostics, SamplerOutput  # noqa: E402
@@ -113,17 +110,12 @@ def test_ns_aw_output_fields():
     assert out.samples.ndim == 2
     assert out.samples.shape[1] == 2
 
-    # log_likelihood present, log_posterior absent
+    # log_likelihood and log_likelihood_birth present; weights computed by Jim
     assert out.log_likelihood is not None
+    assert out.log_likelihood_birth is not None
+    assert out.log_likelihood_birth.shape == (out.samples.shape[0],)
     assert out.log_posterior is None
-
-    # Evidence estimates present
-    assert out.log_evidence is not None
-    assert out.log_evidence_err is not None
-
-    # Posterior weights provided by anesthetic
-    assert out.weights is not None
-    assert out.weights.shape == (out.samples.shape[0],)
+    assert out.weights is None
 
 
 def test_ns_aw_samples_in_prior_support():
@@ -134,19 +126,6 @@ def test_ns_aw_samples_in_prior_support():
     # Sampling space = prior space (no sample_transforms), so [0,1]^2.
     assert np.all(out.samples[:, 0] >= 0.0) and np.all(out.samples[:, 0] <= 1.0)
     assert np.all(out.samples[:, 1] >= 0.0) and np.all(out.samples[:, 1] <= 1.0)
-
-
-def test_ns_aw_log_evidence_reasonable():
-    """log Z for a normalised Gaussian should be close to log(2π σ²)."""
-    sampler = _make_sampler(n_live=150)
-    sampler.sample(jax.random.key(3), _init_pos(150))
-    out = sampler.get_output()
-
-    logZ_analytic = math.log(2 * math.pi * _SIGMA**2)
-    assert out.log_evidence is not None
-    assert abs(out.log_evidence - logZ_analytic) < 2.0, (
-        f"log Z = {out.log_evidence:.3f}, expected ≈ {logZ_analytic:.3f}"
-    )
 
 
 def test_ns_aw_diagnostics_before_sample_raises():
@@ -161,7 +140,6 @@ def test_ns_aw_diagnostics():
     diag = sampler.get_diagnostics()
 
     assert isinstance(diag, SamplerDiagnostics)
-    assert diag.backend == "blackjax_ns_aw"
     assert diag.sampling_time_seconds > 0
     assert diag.n_likelihood_evaluations > 0
     assert diag.ns_n_iterations is not None and diag.ns_n_iterations > 0

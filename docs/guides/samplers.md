@@ -11,20 +11,18 @@ samples = jim.get_samples()  # dict[str, np.ndarray] keyed by parameter name
 
 ## Sampler overview
 
-| Sampler | Algorithm | Evidence (log Z) | Extra install | Prior constraint |
+| Sampler | Algorithm | Evidence | Extra install | Prior constraint |
 | --- | --- | --- | --- | --- |
-| [flowMC](#flowmc-default) | MCMC + normalizing flow | No | No | None |
-| [NS-AW](#blackjax-ns-aw) | Nested sampling (Bilby/Dynesty-like acceptance-walk) | Yes | Yes | Uniform prior; unit-cube sampling space |
-| [NSS](#blackjax-nss) | Nested slice sampling | Yes | Yes | None |
-| [SMC](#blackjax-smc) | Sequential Monte Carlo | Persistent modes only | Yes | None |
+| [flowMC](#flowmc) | normalizing-flow-enhanced MCMC | No | No | None |
+| [NS-AW](#blackjax-ns-aw) | Nested sampling (bilby/dynesty-style acceptance-walk) | Yes | Yes (`nested-sampling`) | Uniform prior; unit-cube sampling space |
+| [NSS](#blackjax-nss) | Nested slice sampling | Yes | Yes (`nested-sampling`) | Normalised prior |
+| [SMC](#blackjax-smc) | Sequential Monte Carlo | Yes | No | Normalised prior |
 
 ---
 
-## flowMC (default)
+## flowMC
 
-flowMC is Jim's default backend. It runs parallel MCMC chains enhanced by a
-normalizing flow that learns the posterior shape during training, then uses that
-learned geometry to make global proposals during production.
+flowMC runs parallel MCMC chains enhanced by a normalizing flow that learns the posterior shape during training, then uses that learned geometry to make global proposals during production.
 
 ```python
 from jimgw.core.jim import Jim
@@ -39,10 +37,7 @@ jim = Jim(
         n_global_steps=1000,
         n_training_loops=20,
         n_production_loops=10,
-        n_epochs=20,
     ),
-    sample_transforms=sample_transforms,
-    likelihood_transforms=likelihood_transforms,
 )
 
 jim.sample()
@@ -59,15 +54,8 @@ Key parameters:
 - `local_kernel` — MCMC kernel for local steps; one of `"MALA"` (default),
   `"HMC"`, or `"GRW"`.
 - `parallel_tempering` — parallel tempering settings; disabled by default.
-  Enable with `parallel_tempering={"enabled": True, "n_temperatures": 5}`.
-
-Less commonly tuned:
-
-- `mala` / `hmc` / `grw` — step-size sub-config for the active kernel.
-- `rq_spline_hidden_units`, `rq_spline_n_bins`, `rq_spline_n_layers` — NF
-  architecture; defaults work for most problems.
-- `learning_rate`, `batch_size`, `n_max_examples` — NF training settings.
-- `local_thinning`, `global_thinning` — thinning factors for chain storage.
+  Enable with `parallel_tempering=True` (uses defaults), a plain dict of settings
+  such as `{"n_temperatures": 8}`, or a `ParallelTemperingConfig` instance.
 
 **Repository:** [GW-JAX-Team/flowMC](https://github.com/GW-JAX-Team/flowMC)
 
@@ -80,26 +68,61 @@ JOSS 8 (83) 5021 (2023). Wong, K. W. K., Isi, M., Edwards, T. D. P.,
 
 ---
 
-## BlackJAX samplers
+## BlackJAX SMC
 
-The three BlackJAX backends require additional dependencies not yet on upstream
-PyPI.  Install them with:
+Sequential Monte Carlo (SMC) maintains a population of particles and gradually shifts them from the prior toward the posterior through a sequence of intermediate temperature steps.
+
+> **Normalised-prior requirement** — SMC computes a Bayesian evidence estimate and therefore requires a normalised prior.
+> All built-in Jim priors are normalised.
+> If you add custom constraints, check whether the resulting distribution is still normalised; if so, override `is_normalized` to return `True`.
+> Jim raises a `ValueError` at construction if this condition is not met.
+
+```python
+from jimgw.samplers.config import BlackJAXSMCConfig
+
+jim = Jim(
+    likelihood,
+    prior,
+    sampler_config=BlackJAXSMCConfig(
+        n_particles=2000,
+        n_mcmc_steps_per_dim=100,
+    ),
+)
+jim.sample()
+samples = jim.get_samples()
+```
+
+Key parameters:
+
+- `n_particles` — particle ensemble size.
+- `n_mcmc_steps_per_dim` — MCMC steps per dimension at each temperature step.
+- `target_ess_fraction` — target ESS as a fraction of `n_particles` (default `0.9`). The algorithm advances the temperature when the fraction of effectively contributing particles hits this threshold.  Values in `(0, 1]` are valid when `persistent_sampling=False`; persistent sampling may exceed `1.0` because particles are recycled across steps.  Only used with adaptive temperature selection (no effect with a fixed `temperature_ladder`).
+- `absolute_target_ess` — target ESS as an absolute particle count. `target_ess_fraction` and `absolute_target_ess` are mutually exclusive; set one or the other, not both. When `persistent_sampling=False`, must be `<= n_particles`.
+- `persistent_sampling` — whether to retain particles from all temperature steps (default `True`).
+- `temperature_ladder` — explicit temperature schedule. If given, the sampler advances through this fixed ladder and ignores `target_ess_fraction` and `absolute_target_ess`.
+
+**Repository:** [blackjax-devs/blackjax](https://github.com/blackjax-devs/blackjax)
+
+---
+
+## BlackJAX nested samplers
+
+The two BlackJAX nested-sampling backends require additional dependencies.
+They need a maintained fork of BlackJAX; install it with:
 
 ```bash
-uv sync --group blackjax
+uv sync --group nested-sampling
 ```
 
 This pulls in:
 
-- **anesthetic** ≥ 2 — for nested-sampling post-processing (log Z, weights).
-- **blackjax** — pinned to the `GW-JAX-Team/blackjax@jim` branch, which
-  carries the nested-sampling and persistent-sampling SMC extensions Jim needs.
+- **blackjax** — pinned to the `GW-JAX-Team/blackjax@jim` branch, which carries the BlackJAX nested-sampling module.
 
 ---
 
 ### BlackJAX NS-AW
 
-Nested sampling with a Dynesty-style adaptive differential-evolution
+Nested sampling with a bilby/dynesty-style adaptive differential-evolution
 acceptance-walk inner kernel.
 
 > **Unit-cube + uniform-prior requirement** — this sampler works in the unit
@@ -128,9 +151,11 @@ jim = Jim(
 jim.sample()
 samples = jim.get_samples()
 
-# Evidence estimate is available via the raw output:
+# Evidence estimate via anesthetic:
 out = jim.sampler.get_output()
-print(f"log Z = {out.log_evidence:.2f} ± {out.log_evidence_err:.2f}")
+from anesthetic.samples import NestedSamples
+ns = NestedSamples(out.samples, logL=out.log_likelihood, logL_birth=out.log_likelihood_birth)
+print(f"log Z = {ns.logZ().mean():.2f} ± {ns.logZ().std():.2f}")
 ```
 
 Key parameters:
@@ -151,8 +176,13 @@ sampling kernel within blackjax-ns"*, arXiv:2509.04336 (Sep 2025).
 
 ### BlackJAX NSS
 
-Nested sampling with a slice-sampling inner kernel.  Unlike NS-AW, it does not
-require a unit-cube prior and works in any bounded sampling space.
+Nested sampling with a slice-sampling inner kernel.
+Unlike NS-AW, it does not require a unit-cube prior and works in any bounded sampling space.
+
+> **Normalised-prior requirement** — NSS computes a Bayesian evidence estimate and therefore requires a normalised prior.
+> All built-in Jim priors are normalised.
+> If you add custom constraints, check whether the resulting distribution is still normalised; if so, override `is_normalized` to return `True`.
+> Jim raises a `ValueError` at construction if this condition is not met.
 
 ```python
 from jimgw.samplers.config import BlackJAXNSSConfig
@@ -172,8 +202,11 @@ jim = Jim(
 jim.sample()
 samples = jim.get_samples()
 
+# Evidence estimate via anesthetic:
 out = jim.sampler.get_output()
-print(f"log Z = {out.log_evidence:.2f} ± {out.log_evidence_err:.2f}")
+from anesthetic.samples import NestedSamples
+ns = NestedSamples(out.samples, logL=out.log_likelihood, logL_birth=out.log_likelihood_birth)
+print(f"log Z = {ns.logZ().mean():.2f} ± {ns.logZ().std():.2f}")
 ```
 
 Key parameters:
@@ -192,87 +225,6 @@ Key parameters:
 [arXiv:2509.24949](https://arxiv.org/abs/2509.24949) (Sep 2025).
 Yallup, D., Kroupa, N., Handley, W., *"Nested Slice Sampling"*,
 [OpenReview](https://openreview.net/forum?id=ekbkMSuPo4) (2025).
-
----
-
-### BlackJAX SMC
-
-Sequential Monte Carlo (SMC) maintains a population of particles and gradually
-shifts them from the prior toward the posterior through a sequence of
-intermediate temperature steps.
-
-**Four modes** are available, controlled by two settings:
-
-| `persistent_sampling` | `temperature_ladder` | Mode |
-| --- | --- | --- |
-| `True` (default) | `None` (default) | Adaptive persistent — temperature steps chosen automatically; particles from all temperatures retained for evidence estimation |
-| `True` | provided | Fixed persistent — you specify the temperature schedule; particles from all temperatures retained |
-| `False` | `None` | Adaptive tempered — temperature steps chosen automatically; only final-temperature particles kept |
-| `False` | provided | Fixed tempered — you specify the temperature schedule; only final-temperature particles kept |
-
-Persistent modes compute a Bayesian evidence estimate (`log_evidence`) and
-return weighted samples spanning all temperature steps (see
-[SamplerOutput fields](#sampleroutput-fields)).  Tempered modes return only the
-final-temperature particles with equal weights.
-
-The default mode is **adaptive persistent**.
-
-```python
-from jimgw.samplers.config import BlackJAXSMCConfig
-
-jim = Jim(
-    likelihood,
-    prior,
-    sampler_config=BlackJAXSMCConfig(
-        n_particles=2000,
-        n_mcmc_steps_per_dim=100,
-        absolute_target_ess=1000,   # target 50 % efficiency (1000 / 2000)
-        initial_cov_scale=0.5,
-        target_acceptance_rate=0.234,
-        scale_adaptation_gain=3.0,
-    ),
-    sample_transforms=sample_transforms,
-    likelihood_transforms=likelihood_transforms,
-)
-jim.sample()
-samples = jim.get_samples()
-
-out = jim.sampler.get_output()
-print(f"log Z ≈ {out.log_evidence:.2f}")
-```
-
-To use a fixed temperature ladder instead:
-
-```python
-sampler_config=BlackJAXSMCConfig(
-    n_particles=2000,
-    n_mcmc_steps_per_dim=100,
-    persistent_sampling=True,
-    temperature_ladder=[0.0, 0.1, 0.3, 0.6, 1.0],
-)
-```
-
-Key parameters:
-
-- `n_particles` — particle ensemble size; more particles → more accurate but
-  slower.
-- `n_mcmc_steps_per_dim` — MCMC steps per dimension at each temperature step.
-- `absolute_target_ess` — target effective sample size (absolute particle
-  count).  The algorithm advances the temperature when the effective number of
-  contributing particles reaches this value.  A reasonable starting point is
-  25–50 % of `n_particles` (e.g. `1000` for `n_particles=2000`).  Only used in
-  adaptive modes.
-- `persistent_sampling` — whether to retain particles from all temperature
-  steps (default `True`).
-- `temperature_ladder` — explicit temperature schedule (`None` = adaptive).
-- `initial_cov_scale` — initial scaling of the particle covariance for
-  random-walk proposals.
-- `target_acceptance_rate` — random-walk acceptance rate to aim for; `0.234`
-  is the standard optimal rate for Gaussian proposals.
-- `scale_adaptation_gain` — how aggressively the proposal scale is adjusted to
-  hit `target_acceptance_rate`; increase if adaptation is slow.
-
-**Repository:** [blackjax-devs/blackjax](https://github.com/blackjax-devs/blackjax)
 
 ---
 
@@ -306,39 +258,51 @@ config = BlackJAXNSAWConfig(
 handles the reverse transform from sampling space back to prior space and
 returns a `dict[str, np.ndarray]` keyed by parameter name.
 
-For lower-level access (raw sampling-space arrays, evidence estimates, per-sample
-weights), use `jim.sampler.get_output()`:
+For backends that return weights (SMC), `get_samples()` performs weighted resampling to produce an equally-weighted posterior.
+For NS-AW and NSS, `get_samples()` passes the nested sampling data to anesthetic to compute posterior weights, then resamples.
+With the default `n_samples=0` it returns approximately `floor(1 / max(weights))` samples, matching anesthetic's `posterior_points()` convention; pass an explicit `n_samples` to override.
+For flowMC, `n_samples=0` returns all samples collected across all chains.
+
+For lower-level access (raw sampling-space arrays, per-sample log-densities), use `jim.sampler.get_output()`:
 
 ```python
 out = jim.sampler.get_output()
 
-out.samples          # np.ndarray shape (N, n_dims) — raw sampling-space values
-out.log_prior        # np.ndarray | None — per-sample log-prior
-out.log_likelihood   # np.ndarray | None — per-sample log-likelihood
-out.log_posterior    # np.ndarray | None — per-sample log-posterior
-out.log_evidence     # float | None — log Z
-out.log_evidence_err # float | None — bootstrap uncertainty on log Z (NS only)
-out.weights          # np.ndarray | None — posterior weights
+out.samples                # np.ndarray shape (N, n_dims) — raw sampling-space values
+out.log_prior              # np.ndarray | None — per-sample log-prior
+out.log_likelihood         # np.ndarray | None — per-sample log-likelihood
+out.log_posterior          # np.ndarray | None — per-sample log-posterior
+out.log_likelihood_birth   # np.ndarray | None — birth log-likelihoods (NS only)
+out.weights                # np.ndarray | None — posterior weights (SMC only)
 ```
 
 Which fields are populated depends on the backend:
 
-| Backend | `log_posterior` | `log_likelihood` | `log_evidence` | `weights` |
+| Backend | `log_posterior` | `log_likelihood` | `log_likelihood_birth` | `weights` |
 | --- | --- | --- | --- | --- |
 | flowMC | ✓ | | | |
-| NS-AW / NSS | | ✓ | ✓ | ✓ |
-| SMC adaptive/fixed tempered | ✓ | | | |
-| SMC adaptive/fixed persistent | | ✓ | ✓ | ✓ |
+| NS-AW / NSS | | ✓ | ✓ | |
+| SMC | | ✓ | | ✓ |
 
-For NS-AW, NSS, and persistent SMC, `weights` contains the posterior weights
-needed for correct analysis.  When `weights` is not `None`, pass it to any
-weighted-average or corner-plot function you use, e.g.:
+For NS-AW and NSS, `jim.get_samples()` uses anesthetic to compute posterior weights from
+`log_likelihood` and `log_likelihood_birth`.  To compute the evidence estimate directly:
+
+```python
+out = jim.sampler.get_output()
+from anesthetic.samples import NestedSamples
+ns = NestedSamples(out.samples, logL=out.log_likelihood, logL_birth=out.log_likelihood_birth)
+log_z_mean = ns.logZ().mean()
+log_z_err = ns.logZ().std()
+```
+
+For SMC, `weights` contains the posterior weights computed by the sampler.
+Pass them to any weighted-average or corner-plot function you use, e.g.:
 
 ```python
 posterior_mean = np.average(out.samples, weights=out.weights, axis=0)
 ```
 
-For persistent SMC, `out.samples` stacks particles from all temperature steps
+When `persistent_sampling=True`, `out.samples` stacks particles from all temperature steps
 (shape `(n_steps * n_particles, n_dims)`).  Earlier temperature steps explore
 more broadly; later steps concentrate near the posterior peak.  The `weights`
 account for this automatically.
@@ -354,7 +318,6 @@ how many likelihood evaluations were made, and per-step convergence histories.
 ```python
 diag = jim.get_diagnostics()
 
-diag.backend                   # str   — which backend ran
 diag.sampling_time_seconds     # float — wall-clock sampling time in seconds
 diag.n_likelihood_evaluations  # int   — total number of likelihood calls
 ```
@@ -369,11 +332,11 @@ diag.training_loss_history     # np.ndarray — normalizing-flow loss per epoch
 # NS-AW and NSS
 diag.ns_n_iterations           # int        — number of nested-sampling steps
 
-# SMC (adaptive modes only — for fixed modes these are user-specified)
+# SMC (adaptive temperature only — for fixed ladder these are user-specified)
 diag.smc_n_iterations          # int        — number of temperature steps taken
 diag.smc_tempering_schedule    # np.ndarray — temperature value at each step
 diag.smc_acceptance_history    # np.ndarray — mean acceptance rate at each step
-diag.smc_persistent_log_Z      # np.ndarray — log Z trajectory (persistent modes)
+diag.smc_persistent_log_Z      # np.ndarray — log Z trajectory (when persistent_sampling=True)
 ```
 
 ---

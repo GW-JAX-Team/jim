@@ -49,7 +49,7 @@ def test_build_sampler_returns_flowmc():
         n_training_loops=1,
         n_production_loops=1,
         n_epochs=1,
-        parallel_tempering={"enabled": False},
+        parallel_tempering=None,
     )
     sampler = build_sampler(
         cfg,

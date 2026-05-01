@@ -1,4 +1,4 @@
-"""Dynesty adaptive DE acceptance-walk kernel for unit-hypercube nested sampling.
+"""bilby/dynesty-style adaptive DE acceptance-walk kernel for unit-hypercube nested sampling.
 
 Ported and modified from:
   https://github.com/mrosep/blackjax_ns_gw/blob/main/src/custom_kernels/acceptance_walk.py
@@ -295,7 +295,7 @@ def bilby_adaptive_de_sampler(
     stepper_fn=None,
     max_proposals: int = 1000,
 ) -> SamplingAlgorithm:
-    """Dynesty adaptive DE sampler for unit-hypercube nested sampling."""
+    """bilby/dynesty-style adaptive DE sampler for unit-hypercube nested sampling."""
     if stepper_fn is None:
         raise ValueError("stepper_fn must be provided")
 

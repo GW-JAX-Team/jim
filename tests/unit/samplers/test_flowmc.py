@@ -37,7 +37,7 @@ def _make_tiny_config() -> FlowMCConfig:
         n_training_loops=2,
         n_production_loops=2,
         n_epochs=2,
-        parallel_tempering={"enabled": False},
+        parallel_tempering=None,
     )
 
 
@@ -100,7 +100,6 @@ def test_flowmc_sampler_sample_and_get_output():
     assert output.log_posterior.shape == (n,)
     assert output.log_likelihood is None
     assert output.weights is None
-    assert output.log_evidence is None
 
 
 @pytest.mark.slow
@@ -128,7 +127,6 @@ def test_flowmc_diagnostics():
     diag = s.get_diagnostics()
 
     assert isinstance(diag, SamplerDiagnostics)
-    assert diag.backend == "flowmc"
     assert diag.sampling_time_seconds > 0
     assert diag.n_likelihood_evaluations > 0
     assert diag.n_training_loops_actual is not None

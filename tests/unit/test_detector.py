@@ -175,7 +175,7 @@ class TestET:
         equal the arm length (10 km) to within 50 m.
 
         This checks both the propagation formula and that the triangle closes,
-        following the approach used in Bilby's TriangularInterferometerTest.
+        following the approach used in bilby's TriangularInterferometerTest.
         """
         # Use the same WGS-84 radius get_ET uses: computed at ET1's latitude
         # (the initial latitude, before any vertex propagation).

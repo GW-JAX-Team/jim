@@ -3,9 +3,9 @@
 This module defines :class:`Sampler`, an abstract base class that encapsulates
 everything Jim needs from a JAX sampler backend, and two frozen dataclasses:
 
-- :class:`SamplerOutput` — the slim, user-analysis-facing result returned by
+- :class:`SamplerOutput` — the raw result returned by
   :meth:`Sampler.get_output`.  Carries samples, per-sample log-densities,
-  evidence, and posterior weights.
+  posterior weights, and (for nested samplers) birth log-likelihoods.
 - :class:`SamplerDiagnostics` — run-level metadata and per-backend
   instrumentation returned by :meth:`Sampler.get_diagnostics`.  Contains only
   information the user *cannot* derive from their sampler config: wall-clock
@@ -43,12 +43,17 @@ class SamplerOutput:
     parameter values only — per-sample log-densities live in their own
     aligned arrays (``log_prior``, ``log_likelihood``, ``log_posterior``).
 
-    Each backend populates only the fields it computes naturally:
+    Each backend populates only the fields it computes directly:
 
     * **flowMC** — ``log_posterior``.
-    * **NS-AW / NSS** — ``log_likelihood``, ``log_evidence``,
-      ``log_evidence_err``, ``weights``.
-    * **SMC** — ``log_posterior`` (and ``log_evidence`` in persistent modes).
+    * **NS-AW / NSS** — ``log_likelihood``, ``log_likelihood_birth``.
+      ``weights`` is ``None``; :meth:`~jimgw.core.jim.Jim.get_samples` uses
+      anesthetic to compute posterior weights from ``log_likelihood`` and
+      ``log_likelihood_birth``.
+    * **SMC** — ``log_likelihood``, ``weights``.
+      When ``persistent_sampling=True``, ``samples`` stacks particles from all
+      temperature steps; when ``False``, only final-temperature particles with
+      equal weights are returned.
 
     At least one of ``log_prior``/``log_likelihood``/``log_posterior`` must be
     set; this is enforced by :meth:`__post_init__`.
@@ -58,8 +63,7 @@ class SamplerOutput:
     log_prior: Optional[np.ndarray] = None
     log_likelihood: Optional[np.ndarray] = None
     log_posterior: Optional[np.ndarray] = None
-    log_evidence: Optional[float] = None
-    log_evidence_err: Optional[float] = None
+    log_likelihood_birth: Optional[np.ndarray] = None
     weights: Optional[np.ndarray] = None
 
     def __post_init__(self) -> None:
@@ -86,7 +90,7 @@ class SamplerDiagnostics:
     included here.  Config fields (n_chains, n_live, step sizes, user-specified
     temperature ladders …) are omitted — the user already knows them.
 
-    The three mandatory fields (``backend``, ``sampling_time_seconds``,
+    The two mandatory fields (``sampling_time_seconds``,
     ``n_likelihood_evaluations``) are populated by every backend.
     All other fields are ``Optional``; check whether they are ``None`` before
     use — the docstring for each group specifies which backends populate them.
@@ -102,14 +106,13 @@ class SamplerDiagnostics:
 
     **SMC fields** (prefix: ``smc_``):
     populated only when ``backend == "blackjax_smc"``.
-    ``smc_n_iterations`` and ``smc_tempering_schedule`` are populated only for
-    adaptive modes (AP/AT) whose convergence count and schedule are unknown at
-    call time.  ``smc_persistent_log_Z`` is populated only for persistent modes
-    (AP/FP).
+    ``smc_n_iterations`` and ``smc_tempering_schedule`` are populated only when
+    ``temperature_ladder=None`` (adaptive schedule), since the count and values
+    are unknown at call time.  ``smc_persistent_log_Z`` is populated only when
+    ``persistent_sampling=True``.
     """
 
     # ---- Universal (all backends) ----
-    backend: str
     sampling_time_seconds: float
     n_likelihood_evaluations: int
 
@@ -137,10 +140,10 @@ class SamplerDiagnostics:
     nss_is_accepted_history: Optional[np.ndarray] = None
 
     # ---- SMC ----
-    # smc_n_iterations / smc_tempering_schedule: adaptive modes only (AP/AT).
-    # smc_ess_history / smc_cov_scale_history: adaptive modes only (AP/AT).
-    # smc_acceptance_history: all modes.
-    # smc_persistent_log_Z: persistent modes only (AP/FP).
+    # smc_n_iterations / smc_tempering_schedule: adaptive temperature only (temperature_ladder=None).
+    # smc_ess_history / smc_cov_scale_history: adaptive temperature only.
+    # smc_acceptance_history: always.
+    # smc_persistent_log_Z: persistent sampling only (persistent_sampling=True).
     smc_n_iterations: Optional[int] = None
     smc_tempering_schedule: Optional[np.ndarray] = None
     smc_ess_history: Optional[np.ndarray] = None

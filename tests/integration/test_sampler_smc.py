@@ -6,8 +6,6 @@ The fixed-ladder modes are exercised by the unit tests.
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 import pytest
 
@@ -52,11 +50,7 @@ def test_smc_posterior_mean_near_half(smc_jim):
     assert abs(float(np.mean(samples["y"])) - 0.5) < 0.2
 
 
-def test_smc_log_evidence(smc_jim):
-    """Persistent-sampling SMC reports log_evidence; tempered SMC does not."""
+def test_smc_output_has_weights(smc_jim):
     output = smc_jim.sampler.get_output()
-    if smc_jim._sampler_config.persistent_sampling:
-        assert output.log_evidence is not None
-        assert math.isfinite(float(output.log_evidence))
-    else:
-        assert output.log_evidence is None
+    assert output.log_likelihood is not None
+    assert output.weights is not None

@@ -105,7 +105,7 @@ from jimgw.samplers.flowmc import FlowMCSampler  # noqa: E402
 
 register_sampler("flowmc", lambda: FlowMCSampler)
 
-# --- BlackJAX samplers (lazy; installed via `uv sync --group blackjax`) ---
+# --- BlackJAX samplers (NS-AW/NSS need `uv sync --group nested-sampling`; SMC is in core deps) ---
 
 
 def _load_ns_aw() -> SamplerBuilder:

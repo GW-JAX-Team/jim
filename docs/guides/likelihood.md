@@ -55,9 +55,9 @@ likelihood = TransientLikelihoodFD(
     trigger_time=gps_time,
     f_min=20.0,
     f_max=1024.0,
-    time_marginalization={"tc_range": (-0.1, 0.1)},   # or time_marginalization={} for defaults
-    phase_marginalization=True,                         # shorthand for PhaseMargConfig()
-    distance_marginalization={"dist_prior": distance_prior},  # required: dist_prior
+    time_marginalization={"tc_range": (-0.1, 0.1)},               # or time_marginalization=True for default range
+    phase_marginalization=True,                                   # shorthand for PhaseMargConfig()
+    distance_marginalization={"distance_prior": distance_prior},  # required: distance_prior
 )
 ```
 
@@ -65,7 +65,7 @@ Marginalising over these parameters reduces the effective dimensionality of the 
 
 - `time_marginalization` — marginalises over `t_c` within the range set by `tc_range` (default `(-0.1, 0.1)`). Pass `{}` to use the default range, or `{"tc_range": (lo, hi)}` for a custom range.
 - `phase_marginalization` — marginalises over `phase_c`. Pass `True`, `{}`, or a `PhaseMargConfig()` instance.
-- `distance_marginalization` — marginalises over `d_L`. Pass a dict with `dist_prior` (a 1-D prior over luminosity distance) and optionally `n_dist_points` and `ref_dist`.
+- `distance_marginalization` — marginalises over `d_L`. Pass a dict with `distance_prior` (a 1-D prior over luminosity distance) and optionally `n_dist_points` and `ref_dist`.
 
 ### Fixing Parameters
 

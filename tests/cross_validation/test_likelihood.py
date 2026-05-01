@@ -2,7 +2,7 @@
 
 All seven likelihood classes are tested:
 
-    Jim class                                              Bilby equivalent
+    Jim class                                              bilby equivalent
     ─────────────────────────────────────────────────────  ────────────────────────────────────────────────────────────
     TransientLikelihoodFD                                  GravitationalWaveTransient (no marginalization)
     TransientLikelihoodFD(phase_marginalization=True)      GravitationalWaveTransient (phase_marginalization=True)
@@ -162,7 +162,7 @@ def build_bilby_ifo_from_jim(jim_ifo, f_min: float, f_max: float):
     sampling_frequency = float(jim_ifo.data.sampling_frequency)
     start_time = float(jim_ifo.data.start_time)
 
-    # Zero out contributions outside [f_min, f_max].  Bilby's time-marginalization
+    # Zero out contributions outside [f_min, f_max].  bilby's time-marginalization
     # FFT runs over the *full* one-sided frequency array without a frequency mask,
     # so keeping out-of-band data would add spurious contributions absent in jim
     # (which pads those bins with zeros).  Zeroing here makes both FFTs identical.
@@ -207,7 +207,7 @@ def ripple_pv2_bilby_source(
     phase,
     **kwargs,
 ):
-    """Bilby-compatible frequency-domain source model that calls RippleIMRPhenomPv2.
+    """bilby-compatible frequency-domain source model that calls RippleIMRPhenomPv2.
 
     Accepts bilby-convention (mass_1/2, spin angles) and converts to Cartesian
     spins via bilby's own ``bilby_to_lalsimulation_spins``, so the parameter
@@ -232,7 +232,7 @@ def ripple_pv2_bilby_source(
     from ripplegw.waveforms.IMRPhenomPv2 import gen_IMRPhenomPv2_hphc
     from bilby.gw.conversion import bilby_to_lalsimulation_spins as b2lal
 
-    # Bilby's relative-binning likelihood sets waveform_arguments['fiducial']:
+    # bilby's relative-binning likelihood sets waveform_arguments['fiducial']:
     #   1 → computing the fiducial waveform  → return full frequency grid array
     #   0 → likelihood evaluation            → return bin-edge array
     # For non-relative-binning calls (fiducial key absent) we always use the
@@ -291,7 +291,7 @@ def build_bilby_waveform_generator(duration: float, sampling_frequency: float):
         sampling_frequency=sampling_frequency,
         frequency_domain_source_model=ripple_pv2_bilby_source,
         # Must be None: ripple_pv2_bilby_source handles the spin conversion
-        # internally.  Bilby's default convert_to_lal_binary_black_hole_parameters
+        # internally.  bilby's default convert_to_lal_binary_black_hole_parameters
         # mangles the parameter dict in a way that makes the source function
         # return NaN (e.g. when called without a reference_frequency key).
         parameter_conversion=None,
@@ -373,7 +373,7 @@ class TestPhaseMarginalizedLikelihood:
     pair is inconsistent and gives a different waveform than bilby evaluates.
 
     Fix: compute jim_params with phase=0 so that the spins and the phase that
-    evaluate() uses (phase_c=0) are consistent.  Bilby ignores the input 'phase'
+    evaluate() uses (phase_c=0) are consistent.  bilby ignores the input 'phase'
     when phase_marginalization=True (it evaluates at phase=0 internally), so
     both sides produce the same waveform.
     """
@@ -422,7 +422,7 @@ class TestTimeMarginalizedLikelihood:
 
     * Jim uses ``tc_range = (-duration/2 - margin, duration/2 + margin)`` so
       that every FFT bin is in range and the denominator is ``-log(N_fft)``.
-    * Bilby gets a ``Uniform(start_time, start_time+duration)`` prior, which gives the
+    * bilby gets a ``Uniform(start_time, start_time+duration)`` prior, which gives the
       same weight ``log(dt / duration) = -log(N_fft)`` per bin.
 
     Out-of-band FD strain is zeroed in ``build_bilby_ifo_from_jim`` so that
@@ -483,7 +483,7 @@ class TestDistanceMarginalizedLikelihood:
 
         dist_min, dist_max = 100.0, 2000.0
 
-        jim_dist_prior = PowerLawPrior(
+        jim_distance_prior = PowerLawPrior(
             xmin=dist_min,
             xmax=dist_max,
             alpha=2.0,
@@ -497,7 +497,7 @@ class TestDistanceMarginalizedLikelihood:
             f_max=F_MAX,
             trigger_time=GPS,
             distance_marginalization={
-                "dist_prior": jim_dist_prior,
+                "distance_prior": jim_distance_prior,
                 "n_dist_points": 10000,
             },
         ).evaluate(setup["jim_params"].copy(), {})
@@ -547,7 +547,7 @@ class TestPhaseDistanceMarginalizedLikelihood:
         bilby_params_ph0 = {**setup["bilby_params"], "phase": 0.0}
         jim_params_ph0 = bilby_to_jim_params(bilby_params_ph0)
 
-        jim_dist_prior = PowerLawPrior(
+        jim_distance_prior = PowerLawPrior(
             xmin=dist_min,
             xmax=dist_max,
             alpha=2.0,
@@ -562,7 +562,7 @@ class TestPhaseDistanceMarginalizedLikelihood:
             trigger_time=GPS,
             phase_marginalization=True,
             distance_marginalization={
-                "dist_prior": jim_dist_prior,
+                "distance_prior": jim_distance_prior,
                 "n_dist_points": 10000,
             },
         ).evaluate(jim_params_ph0.copy(), {})

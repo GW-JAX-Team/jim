@@ -5,6 +5,7 @@ from typing import Optional
 import jax
 import jax.numpy as jnp
 import numpy as np
+from anesthetic.samples import NestedSamples  # type: ignore[import]
 from jaxtyping import Array, Float, Key
 
 from jimgw.core.base import LikelihoodBase
@@ -317,36 +318,94 @@ class Jim:
         self,
         n_samples: int = 0,
     ) -> dict[str, np.ndarray]:
-        """Retrieve posterior samples, optionally downsampled.
+        """Retrieve posterior samples, optionally resampled.
+
+        For NS-AW and NSS backends, anesthetic computes posterior weights from
+        the nested sampling data (``log_likelihood`` + ``log_likelihood_birth``).
+
+        For SMC, posterior weights are pre-computed by the sampler.
+
+        For both cases, samples are drawn with replacement proportional to
+        those weights.  When ``n_samples == 0``, the target count is the
+        equal-weight effective sample size ``floor(1 / max(weights))``,
+        matching the behaviour of anesthetic's ``posterior_points()``.
+
+        For flowMC (no weights), samples are drawn uniformly without
+        replacement.  When ``n_samples == 0``, all available samples are
+        returned.
 
         Args:
-            n_samples: If > 0, uniformly downsample to this many samples
-                without replacement. If 0 (default), return all available
-                samples. Downsampling always uses a fixed internal key, so
-                results are deterministic.
+            n_samples: Target number of samples.  If 0 (default) the backend
+                chooses a sensible count (see above).  Downsampling always uses
+                a fixed internal key so results are deterministic.
 
         Returns:
             Dict mapping prior parameter names to 1-D numpy arrays in prior space.
         """
         output = self.sampler.get_output()
         sample_array = np.asarray(output.samples)
-
         n_available = sample_array.shape[0]
 
-        if n_samples > 0:
-            if n_samples > n_available:
+        # Determine posterior weights.
+        if output.log_likelihood_birth is not None:
+            # NS-AW / NSS: use anesthetic to compute weights from nested sampling data.
+            logL_birth = np.asarray(output.log_likelihood_birth)
+            df = NestedSamples(
+                sample_array,
+                logL=np.asarray(output.log_likelihood),
+                logL_birth=logL_birth,
+                logzero=np.nan,
+                dtype=np.float64,
+            )
+            weights: np.ndarray | None = np.asarray(df.get_weights())
+        elif output.weights is not None:
+            # SMC: weights already computed by sampler.
+            weights = np.asarray(output.weights)
+        else:
+            weights = None
+
+        if weights is not None:
+            if n_samples > 0:
+                n_target = n_samples
+            else:
+                # Equal-weight ESS: 1/max(w), matching anesthetic's posterior_points().
+                n_target = max(1, int(1.0 / float(np.max(weights))))
+            if n_target > n_available:
+                logger.warning(
+                    "Requested %d samples but only %d available. Returning all available samples.",
+                    n_target,
+                    n_available,
+                )
+                n_target = n_available
+            indices = np.array(
+                jax.random.choice(
+                    _DOWNSAMPLE_KEY,
+                    n_available,
+                    shape=(n_target,),
+                    replace=True,
+                    p=weights,
+                )
+            )
+        else:
+            n_target = n_samples if n_samples > 0 else n_available
+            if n_samples > 0 and n_samples > n_available:
                 logger.warning(
                     "Requested %d samples but only %d available. Returning all available samples.",
                     n_samples,
                     n_available,
                 )
-            else:
+                n_target = n_available
+            # Uniform downsampling without replacement (flowMC MCMC samples).
+            if n_target < n_available:
                 indices = np.array(
                     jax.random.choice(
-                        _DOWNSAMPLE_KEY, n_available, shape=(n_samples,), replace=False
+                        _DOWNSAMPLE_KEY, n_available, shape=(n_target,), replace=False
                     )
                 )
-                sample_array = sample_array[indices]
+            else:
+                indices = np.arange(n_available)
+
+        sample_array = sample_array[indices]
 
         # Backward-transform from sampling space to prior space and add names.
         named = jax.vmap(self.add_name)(jnp.array(sample_array))

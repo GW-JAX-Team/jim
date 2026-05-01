@@ -19,25 +19,37 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float, Key
 
+from blackjax import (
+    adaptive_persistent_sampling_smc,
+    adaptive_tempered_smc,
+    inner_kernel_tuning,
+    persistent_sampling_smc,
+    rmh,
+    tempered_smc,
+)
+from blackjax.mcmc import random_walk
+from blackjax.smc import extend_params
+from blackjax.smc.inner_kernel_tuning import StateWithParameterOverride
+from blackjax.smc.persistent_sampling import (
+    compute_log_persistent_weights,
+)
+from blackjax.smc.resampling import systematic
+
 from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
-from jimgw.samplers.blackjax._imports import import_blackjax, require_persistent_smc
 from jimgw.samplers.config import BlackJAXSMCConfig
 from jimgw.samplers.periodic import to_displacement_wrapper
-
-_blackjax = import_blackjax()
-require_persistent_smc(_blackjax)
 
 
 class BlackJAXSMCSampler(Sampler):
     """BlackJAX SMC sampler.
 
-    Four modes are available, selected by ``config.persistent_sampling``
-    and ``config.temperature_ladder``.  See
-    :class:`~jimgw.samplers.config.BlackJAXSMCConfig` for details.
+    Behaviour is controlled by two orthogonal settings in
+    :class:`~jimgw.samplers.config.BlackJAXSMCConfig`:
+    ``persistent_sampling`` and ``temperature_ladder``.
 
-    All modes use a Gaussian random-walk MCMC inner kernel with initial
-    covariance estimated from the starting particles.  In adaptive modes
-    the covariance is re-estimated at each temperature step.
+    Uses a Gaussian random-walk MCMC inner kernel with initial covariance
+    estimated from the starting particles.  With adaptive temperature
+    selection the covariance is re-estimated at each step.
 
     Operates on flat ``(n_dims,)`` arrays.
     """
@@ -50,10 +62,14 @@ class BlackJAXSMCSampler(Sampler):
     _mode: str  # "ap" | "fp" | "at" | "ft"
     _n_iterations: int
     # Per-mode diagnostics stashes (set in the corresponding _run_* method).
-    _acceptance_history: np.ndarray  # AP/AT: per-step mean acceptance rate
-    _cov_scale_history: np.ndarray  # AP only: per-step covariance scale factor
-    _tempering_schedule: np.ndarray  # AT only: per-step tempering parameter
-    _scan_infos: Any  # FP/FT: stacked SMCInfo from jax.lax.scan
+    _acceptance_history: (
+        np.ndarray
+    )  # adaptive/persistent: per-step mean acceptance rate
+    _cov_scale_history: (
+        np.ndarray
+    )  # persistent adaptive only: per-step covariance scale
+    _tempering_schedule: np.ndarray  # adaptive tempered only: per-step temperature
+    _scan_infos: Any  # fixed ladder: stacked SMCInfo from jax.lax.scan
 
     def __init__(
         self,
@@ -84,8 +100,6 @@ class BlackJAXSMCSampler(Sampler):
 
     def _build_mcmc_step(self):
         """Return a GRW step callable ``(key, state, logdensity, cov) -> (state, info)``."""
-        from blackjax.mcmc import random_walk  # type: ignore[import]
-
         displacement_wrapper = self._displacement_wrapper
         kernel = random_walk.build_additive_step()
 
@@ -106,18 +120,9 @@ class BlackJAXSMCSampler(Sampler):
 
     def _run_adaptive_persistent(self, rng_key: Key, initial_particles) -> None:
         """Mode AP: adaptive_persistent_sampling_smc + inner_kernel_tuning + while_loop."""
-        from blackjax import (  # type: ignore[import]
-            adaptive_persistent_sampling_smc,
-            inner_kernel_tuning,
-            rmh,
-        )
-        from blackjax.smc import extend_params  # type: ignore[import]
-        from blackjax.smc.inner_kernel_tuning import StateWithParameterOverride  # type: ignore[import]
-        from blackjax.smc.resampling import systematic  # type: ignore[import]
-
         config = self._config
         n_mcmc_steps = config.n_mcmc_steps_per_dim * self.n_dims
-        target_ess = config.absolute_target_ess / config.n_particles
+        target_ess = config._resolve_target_ess_fraction()
         max_iterations = 1000
 
         mcmc_step = self._build_mcmc_step()
@@ -194,10 +199,7 @@ class BlackJAXSMCSampler(Sampler):
     def _run_fixed_persistent(
         self, rng_key: Key, initial_particles, ladder: list[float]
     ) -> None:
-        """Mode FP: persistent_sampling_smc + scan over explicit temperature ladder."""
-        from blackjax import persistent_sampling_smc, rmh  # type: ignore[import]
-        from blackjax.smc.resampling import systematic  # type: ignore[import]
-
+        """persistent_sampling=True, fixed temperature ladder."""
         config = self._config
         n_mcmc_steps = config.n_mcmc_steps_per_dim * self.n_dims
         lambdas = jnp.array(ladder[1:])  # skip 0.0 (already in init state)
@@ -233,14 +235,10 @@ class BlackJAXSMCSampler(Sampler):
         self._scan_infos = scan_infos
 
     def _run_adaptive_tempered(self, rng_key: Key, initial_particles) -> None:
-        """Mode AT: adaptive_tempered_smc + inner_kernel_tuning + while_loop."""
-        from blackjax import adaptive_tempered_smc, inner_kernel_tuning, rmh  # type: ignore[import]
-        from blackjax.smc import extend_params  # type: ignore[import]
-        from blackjax.smc.resampling import systematic  # type: ignore[import]
-
+        """persistent_sampling=False, adaptive temperature selection."""
         config = self._config
         n_mcmc_steps = config.n_mcmc_steps_per_dim * self.n_dims
-        target_ess = config.absolute_target_ess / config.n_particles
+        target_ess = config._resolve_target_ess_fraction()
         max_iterations = 1000
 
         mcmc_step = self._build_mcmc_step()
@@ -301,9 +299,6 @@ class BlackJAXSMCSampler(Sampler):
         self, rng_key: Key, initial_particles, ladder: list[float]
     ) -> None:
         """Mode FT: tempered_smc + scan over explicit temperature ladder."""
-        from blackjax import rmh, tempered_smc  # type: ignore[import]
-        from blackjax.smc.resampling import systematic  # type: ignore[import]
-
         config = self._config
         n_mcmc_steps = config.n_mcmc_steps_per_dim * self.n_dims
         lambdas = jnp.array(ladder[1:])  # skip 0.0
@@ -373,20 +368,17 @@ class BlackJAXSMCSampler(Sampler):
     def get_output(self) -> SamplerOutput:
         """Return posterior samples.
 
-        For AP/FP modes: returns all-temperature particles stacked into a single
-        ``(n_steps * n_particles, n_dims)`` array with posterior weights computed
-        via the persistent-sampling weight formula.  This mirrors how NS-AW/NSS
-        use anesthetic weights over dead points.
+        All configurations populate ``log_likelihood`` and ``weights``.
 
-        For AT/FT modes: returns only the final-temperature particles with equal
-        (implicit) weights.
+        When ``persistent_sampling=True``: all-temperature particles stacked
+        into a single ``(n_steps * n_particles, n_dims)`` array with posterior
+        weights computed via the persistent-sampling weight formula.
+
+        When ``persistent_sampling=False``: final-temperature particles with
+        equal weights ``1 / n_particles``.
         """
         if not self._sampled:
             raise RuntimeError("get_output() called before sample()")
-
-        from blackjax.smc.persistent_sampling import (  # type: ignore[import]
-            compute_log_persistent_weights,
-        )
 
         mode = self._mode
         state = self._final_state
@@ -410,47 +402,51 @@ class BlackJAXSMCSampler(Sampler):
                 include_current=True,
             )
             weights = np.asarray(jax.nn.softmax(log_w[: n_iter + 1].reshape(-1)))
-            log_evidence = float(ps.persistent_log_Z[n_iter])  # type: ignore[attr-defined]
 
             return SamplerOutput(
                 samples=all_particles,
                 log_likelihood=all_log_likelihoods,
-                log_evidence=log_evidence,
                 weights=weights,
             )
 
         elif mode == "at":
             ps = state.sampler_state  # type: ignore[attr-defined]
             final_particles = np.array(ps.particles)
-            log_posterior_arr = np.array(jax.vmap(self._log_posterior_fn)(ps.particles))
+            n = final_particles.shape[0]
+            log_likelihoods = np.array(jax.vmap(self._log_likelihood_fn)(ps.particles))
             return SamplerOutput(
                 samples=final_particles,
-                log_posterior=log_posterior_arr,
+                log_likelihood=log_likelihoods,
+                weights=np.full(n, 1.0 / n),
             )
 
         else:  # mode == "ft"
             final_particles = np.array(state.particles)  # type: ignore[attr-defined]
-            log_posterior_arr = np.array(
-                jax.vmap(self._log_posterior_fn)(state.particles)  # type: ignore[attr-defined]
+            n = final_particles.shape[0]
+            log_likelihoods = np.array(
+                jax.vmap(self._log_likelihood_fn)(state.particles)  # type: ignore[attr-defined]
             )
             return SamplerOutput(
                 samples=final_particles,
-                log_posterior=log_posterior_arr,
+                log_likelihood=log_likelihoods,
+                weights=np.full(n, 1.0 / n),
             )
 
     def get_diagnostics(self) -> SamplerDiagnostics:
         """Return SMC run diagnostics.
 
-        Universal fields populated: ``backend``, ``sampling_time_seconds``,
+        Universal fields populated: ``sampling_time_seconds``,
         ``n_likelihood_evaluations``.
 
-        ``smc_acceptance_history`` is populated for all modes.
+        ``smc_acceptance_history`` is always populated.
 
         ``smc_n_iterations``, ``smc_tempering_schedule``, and
-        ``smc_cov_scale_history`` are populated only for adaptive modes
-        (AP/AT) because for fixed-ladder modes these are user-specified.
+        ``smc_cov_scale_history`` are populated only when
+        ``temperature_ladder=None`` (adaptive) because for fixed ladders
+        these are user-specified.
 
-        ``smc_persistent_log_Z`` is populated only for persistent modes (AP/FP).
+        ``smc_persistent_log_Z`` is populated only when
+        ``persistent_sampling=True``.
         """
         if not self._sampled:
             raise RuntimeError("get_diagnostics() called before sample()")
@@ -461,7 +457,6 @@ class BlackJAXSMCSampler(Sampler):
         n_iter = self._n_iterations
 
         kwargs: dict = dict(
-            backend="blackjax_smc",
             sampling_time_seconds=self._sampling_time_seconds,
             n_likelihood_evaluations=n_mcmc * n_iter * cfg.n_particles,
         )

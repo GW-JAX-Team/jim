@@ -21,8 +21,10 @@ classifiers = [
 ]
 
 dependencies = [
+    "anesthetic>=2",
     "astropy>=7.0.1",
     "beartype>=0.19.0",
+    "blackjax>=1.4",
     "evosax>=0.2.0",
     "flowmc>=0.5.0",
     "gwpy>=3.0.12",
@@ -63,8 +65,7 @@ doc = [
     "pymdown-extensions",
     "zensical",
 ]
-blackjax = [
-    "anesthetic>=2",
+nested-sampling = [
     "blackjax",
 ]
 
@@ -80,11 +81,7 @@ jimgw = { workspace = true }
 # Pinned to a maintained fork on a dedicated `jim` branch that carries:
 #   - blackjax.ns.{base,adaptive,utils}                                     (NS-AW, NSS)
 #   - blackjax.nss                                                          (NSS)
-#   - blackjax.adaptive_persistent_sampling_smc,
-#     blackjax.smc.persistent_sampling, blackjax.smc.inner_kernel_tuning
-#     with StateWithParameterOverride                                       (SMC)
-# When upstream blackjax-devs ships all three feature sets, switch this
-# pin to a tagged PyPI release and drop the [tool.uv.sources] entry.
+# When the NS module land upstream, drop this pin and the nested-sampling group.
 blackjax = { git = "https://github.com/GW-JAX-Team/blackjax.git", branch = "jim" }
 
 [build-system]

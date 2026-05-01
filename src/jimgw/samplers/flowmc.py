@@ -80,7 +80,7 @@ class FlowMCSampler(Sampler):
 
         # Pre-compute strategy order for use before sampling.
         order = ["local_sampler", "normalizing_flow"]
-        if config.parallel_tempering.enabled:
+        if config.parallel_tempering is not None:
             order.append("parallel_tempering")
         self._strategy_order_from_config: list[str] = order
 
@@ -121,7 +121,9 @@ class FlowMCSampler(Sampler):
         config = self._config
         rng_key, bundle_key, sampler_key = jax.random.split(rng_key, 3)
 
-        bundle_cls = _BUNDLE[(config.local_kernel, config.parallel_tempering.enabled)]
+        bundle_cls = _BUNDLE[
+            (config.local_kernel, config.parallel_tempering is not None)
+        ]
 
         # Common kwargs for every bundle.
         common_kwargs: dict = dict(
@@ -163,12 +165,11 @@ class FlowMCSampler(Sampler):
             common_kwargs["grw_step_size"] = config.grw.step_size
 
         # PT-specific kwargs (only for PT bundles).
-        if config.parallel_tempering.enabled:
-            common_kwargs["n_temperatures"] = config.parallel_tempering.n_temperatures
-            common_kwargs["max_temperature"] = config.parallel_tempering.max_temperature
-            common_kwargs["n_tempered_steps"] = (
-                config.parallel_tempering.n_tempered_steps
-            )
+        if config.parallel_tempering is not None:
+            pt = config.parallel_tempering
+            common_kwargs["n_temperatures"] = pt.n_temperatures
+            common_kwargs["max_temperature"] = pt.max_temperature
+            common_kwargs["n_tempered_steps"] = pt.n_tempered_steps
             common_kwargs["logprior"] = self._logprior_flowmc
 
         resource_strategy_bundle = bundle_cls(**common_kwargs)
@@ -259,7 +260,6 @@ class FlowMCSampler(Sampler):
         )
 
         return SamplerDiagnostics(
-            backend="flowmc",
             sampling_time_seconds=self._sampling_time_seconds,  # type: ignore[arg-type]
             n_likelihood_evaluations=n_evals,
             n_training_loops_actual=actual_training_loops,

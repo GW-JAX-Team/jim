@@ -2,8 +2,8 @@
 
 Jim priors are built by composing individual prior components with `CombinePrior`, which joins them into a joint prior. Each component can cover one or more parameters.
 
-!!! note "BlackJAX NS-AW sampler requirement"
-    If you plan to use the BlackJAX NS-AW backend, every parameter must have a **uniform prior** and your `sample_transforms` must map each parameter into `[0, 1]`. See the [Samplers guide](samplers.md#blackjax-ns-aw) for details.
+!!! note "Sampler prior requirements"
+    Some samplers impose extra constraints on the prior. BlackJAX NS-AW requires a uniform prior on the unit hypercube; BlackJAX NSS and SMC require a normalised prior. See the [Samplers guide](samplers.md) before choosing a backend.
 
 ## CombinePrior
 
@@ -55,7 +55,7 @@ PowerLawPrior(xmin, xmax, alpha, ["parameter_name"])
 
 ### SinePrior
 
-$p(\theta) \propto \sin(\theta)$ over $[0, \pi]$. Commonly used for inclination:
+$p(\theta) \propto \sin(\theta)$ over $\lbrack 0, \pi \rbrack$. Commonly used for inclination:
 
 ```python
 SinePrior(["iota"])
@@ -63,7 +63,7 @@ SinePrior(["iota"])
 
 ### CosinePrior
 
-$p(\delta) \propto \cos(\delta)$ over $[-\pi/2, \pi/2]$. Commonly used for declination:
+$p(\delta) \propto \cos(\delta)$ over $\lbrack -\pi/2, \pi/2 \rbrack$. Commonly used for declination:
 
 ```python
 CosinePrior(["dec"])
@@ -102,7 +102,7 @@ RayleighPrior(sigma, ["parameter_name"])
 ## Constraints
 
 !!! warning
-    When custom constraints are applied, the resulting prior is generally **not normalised**. Jim uses the prior only as an unnormalised log-probability (it never needs the normalisation constant for sampling), so this is fine in practice. However, you should be aware that `log_prob` values are not comparable across different constrained priors, and any downstream use that assumes a normalised density will be incorrect.
+    When custom constraints are applied, the resulting prior is generally **not normalised**. flowMC tolerates this because it never needs the normalisation constant. However, BlackJAX NS-AW, NSS, and SMC compute Bayesian evidence and therefore require a normalised prior. If you know your constrained prior is normalised, override `is_normalized` to return `True`. Jim enforces this at construction time and will raise a `ValueError` if `is_normalized` is `False` for those backends.
 
 ### Single-parameter bounds with BoundedMixin
 

@@ -8,21 +8,10 @@ A Jim analysis is assembled from the following building blocks:
 
 ```text
 Waveform Model ─┐
-                ├── Likelihood ──────────────────────────────┐
-Data ───────────┘                                            │
-                                  Likelihood Transforms ─────┤
-                                                             ├─→ Jim
-                    Prior ───────────────────────────────────┤
-                      │                                      │
-                      └──────────── Sample Transforms ───────┘
-```
-
-```text
-Waveform Model ─┐
                 ├── Likelihood ────────────────────────── 1 ──┐
 Data ───────────┘                           │                 │
                                  Likelihood Transforms ── 2 ──│
-                                            │                 ├─→ Jim 
+                                            │                 ├─→ Jim ←─ 5 ── Sampler
                       Prior ────────────────┴──────────── 3 ──│
                         │                                     │
                         └───────── Sample Transforms ──── 4 ──┘
@@ -103,6 +92,23 @@ Prior Space
 - **Likelihood transforms** — map from the prior parameter space to the likelihood parameter space. The likelihood space is fixed by your waveform model (e.g. ripple expects `eta`, Cartesian spins), so the likelihood transforms you need depend on how you define your prior. For example, if your prior is on mass ratio `q` but the waveform expects symmetric mass ratio `eta`, a likelihood transform handles that conversion.
 
 - **Sample transforms** — map from the prior space to the sampling space. This lets the sampler explore a different parameterisation than the one your prior is defined in, typically one where correlations between parameters are reduced (e.g. sampling in detector-frame sky coordinates instead of equatorial coordinates).
+
+### Sampler
+
+Jim's sampler is selected by passing a typed config object.  Four backends are available:
+
+| Backend | Config class | Evidence | Extra install |
+| --- | --- | --- | --- |
+| **flowMC** | `FlowMCConfig` | No | No |
+| **BlackJAX NS-AW** | `BlackJAXNSAWConfig` | Yes | Yes — `uv sync --group nested-sampling` |
+| **BlackJAX NSS** | `BlackJAXNSSConfig` | Yes | Yes — `uv sync --group nested-sampling` |
+| **BlackJAX SMC** | `BlackJAXSMCConfig` | Yes | No |
+
+flowMC is a normalizing-flow-enhanced MCMC sampler.
+BlackJAX NS-AW and NSS are nested samplers with different sampling algorithms.
+BlackJAX SMC uses a particle population tempered from the prior to the posterior.
+
+See the [Samplers guide](guides/samplers.md) for configuration details and per-backend requirements.
 
 ### Putting It Together
 

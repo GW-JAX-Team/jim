@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 import jax
 import numpy as np
 import pytest
@@ -106,8 +104,6 @@ def test_smc_output_fields():
     assert out.log_posterior is None
     assert out.weights is not None
     assert abs(float(np.sum(out.weights)) - 1.0) < 1e-5
-    # Adaptive persistent SMC populates log_evidence.
-    assert out.log_evidence is not None
 
 
 def test_smc_samples_in_prior_support():
@@ -117,19 +113,6 @@ def test_smc_samples_in_prior_support():
 
     assert np.all(out.samples[:, 0] >= 0.0) and np.all(out.samples[:, 0] <= 1.0)
     assert np.all(out.samples[:, 1] >= 0.0) and np.all(out.samples[:, 1] <= 1.0)
-
-
-def test_smc_log_evidence_reasonable():
-    """log Z for the normalised Gaussian should be within ~3 nats of analytic."""
-    sampler = _make_sampler(n_particles=300)
-    sampler.sample(jax.random.key(3), _init_pos(300))
-    out = sampler.get_output()
-
-    logZ_analytic = math.log(2 * math.pi * _SIGMA**2)
-    assert out.log_evidence is not None
-    assert abs(out.log_evidence - logZ_analytic) < 3.0, (
-        f"log Z = {out.log_evidence:.3f}, expected ≈ {logZ_analytic:.3f}"
-    )
 
 
 def test_smc_diagnostics_before_sample_raises():
@@ -145,7 +128,6 @@ def test_smc_ap_diagnostics():
     diag = sampler.get_diagnostics()
 
     assert isinstance(diag, SamplerDiagnostics)
-    assert diag.backend == "blackjax_smc"
     assert diag.sampling_time_seconds > 0
     assert diag.n_likelihood_evaluations > 0
 

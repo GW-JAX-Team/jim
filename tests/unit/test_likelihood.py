@@ -1023,8 +1023,8 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
     # Validation tests (no waveform evaluation needed)
     # ------------------------------------------------------------------
 
-    def test_init_no_dist_prior_raises(self):
-        """Constructing DistanceMargConfig() without dist_prior must raise ValidationError."""
+    def test_init_no_distance_prior_raises(self):
+        """Constructing DistanceMargConfig() without distance_prior must raise ValidationError."""
         from pydantic import ValidationError
         from jimgw.core.single_event.likelihood import DistanceMargConfig
 
@@ -1041,7 +1041,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
                 f_min=fmin,
                 f_max=fmax,
                 trigger_time=gps,
-                distance_marginalization={"dist_prior": self.make_d_L_prior()},
+                distance_marginalization={"distance_prior": self.make_d_L_prior()},
                 fixed_parameters={"d_L": 400.0},
             )
 
@@ -1058,7 +1058,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
                 f_min=fmin,
                 f_max=fmax,
                 trigger_time=gps,
-                distance_marginalization={"dist_prior": prior_no_d_L},
+                distance_marginalization={"distance_prior": prior_no_d_L},
             )
 
     def test_init_n_dist_points_too_small_raises(self, detectors_and_waveform):
@@ -1072,7 +1072,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
                 f_max=fmax,
                 trigger_time=gps,
                 distance_marginalization={
-                    "dist_prior": self.make_d_L_prior(),
+                    "distance_prior": self.make_d_L_prior(),
                     "n_dist_points": 1,
                 },
             )
@@ -1088,7 +1088,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
                 f_max=fmax,
                 trigger_time=gps,
                 distance_marginalization={
-                    "dist_prior": self.make_d_L_prior(),
+                    "distance_prior": self.make_d_L_prior(),
                     "ref_dist": -100.0,
                 },
             )
@@ -1106,7 +1106,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             f_min=fmin,
             f_max=fmax,
             trigger_time=gps,
-            distance_marginalization={"dist_prior": self.make_d_L_prior()},
+            distance_marginalization={"distance_prior": self.make_d_L_prior()},
         )
         assert isinstance(likelihood, TransientLikelihoodFD)
 
@@ -1120,7 +1120,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             f_min=fmin,
             f_max=fmax,
             trigger_time=gps,
-            distance_marginalization={"dist_prior": uniform_d_L},
+            distance_marginalization={"distance_prior": uniform_d_L},
         )
         assert isinstance(likelihood, TransientLikelihoodFD)
 
@@ -1134,7 +1134,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             f_min=fmin,
             f_max=fmax,
             trigger_time=gps,
-            distance_marginalization={"dist_prior": d_L_prior},
+            distance_marginalization={"distance_prior": d_L_prior},
         )
         assert jnp.isclose(likelihood.ref_dist, (200.0 + 1000.0) / 2.0)
 
@@ -1148,7 +1148,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             f_max=fmax,
             trigger_time=gps,
             distance_marginalization={
-                "dist_prior": self.make_d_L_prior(),
+                "distance_prior": self.make_d_L_prior(),
                 "ref_dist": 500.0,
             },
         )
@@ -1165,7 +1165,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             f_min=fmin,
             f_max=fmax,
             trigger_time=gps,
-            distance_marginalization={"dist_prior": self.make_d_L_prior()},
+            distance_marginalization={"distance_prior": self.make_d_L_prior()},
         )
         assert jnp.isclose(logsumexp(likelihood.log_weights), 0.0, atol=1e-5)
 
@@ -1182,7 +1182,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             f_min=fmin,
             f_max=fmax,
             trigger_time=gps,
-            distance_marginalization={"dist_prior": self.make_d_L_prior()},
+            distance_marginalization={"distance_prior": self.make_d_L_prior()},
         )
         params = self.params_without_d_L()
         result = likelihood.evaluate(params, {})
@@ -1197,7 +1197,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             f_min=fmin,
             f_max=fmax,
             trigger_time=gps,
-            distance_marginalization={"dist_prior": self.make_d_L_prior()},
+            distance_marginalization={"distance_prior": self.make_d_L_prior()},
         )
         params = self.params_without_d_L()
         result = likelihood.evaluate(params, {})
@@ -1224,7 +1224,10 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             f_min=fmin,
             f_max=fmax,
             trigger_time=gps,
-            distance_marginalization={"dist_prior": narrow_prior, "ref_dist": true_d_L},
+            distance_marginalization={
+                "distance_prior": narrow_prior,
+                "ref_dist": true_d_L,
+            },
         )
 
         base_likelihood = TransientLikelihoodFD(
@@ -1261,7 +1264,7 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             f_min={"H1": fmin, "L1": fmin + 1.0},
             f_max=fmax,
             trigger_time=gps,
-            distance_marginalization={"dist_prior": self.make_d_L_prior()},
+            distance_marginalization={"distance_prior": self.make_d_L_prior()},
         )
         params = self.params_without_d_L()
         result = likelihood.evaluate(params, {})
@@ -1307,7 +1310,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
                 f_max=fmax,
                 trigger_time=gps,
                 phase_marginalization=True,
-                distance_marginalization={"dist_prior": self.make_d_L_prior()},
+                distance_marginalization={"distance_prior": self.make_d_L_prior()},
                 fixed_parameters={"phase_c": 0.0},
             )
 
@@ -1321,7 +1324,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
                 f_max=fmax,
                 trigger_time=gps,
                 phase_marginalization=True,
-                distance_marginalization={"dist_prior": self.make_d_L_prior()},
+                distance_marginalization={"distance_prior": self.make_d_L_prior()},
                 fixed_parameters={"d_L": 400.0},
             )
 
@@ -1338,7 +1341,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
             f_max=fmax,
             trigger_time=gps,
             phase_marginalization=True,
-            distance_marginalization={"dist_prior": self.make_d_L_prior()},
+            distance_marginalization={"distance_prior": self.make_d_L_prior()},
         )
         params = self.params_without_d_L_phase()
         result = likelihood.evaluate(params, {})
@@ -1355,7 +1358,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
             f_max=fmax,
             trigger_time=gps,
             phase_marginalization=True,
-            distance_marginalization={"dist_prior": self.make_d_L_prior()},
+            distance_marginalization={"distance_prior": self.make_d_L_prior()},
         )
         params = self.params_without_d_L_phase()
         result = likelihood.evaluate(params, {})
@@ -1381,7 +1384,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
             f_max=fmax,
             trigger_time=gps,
             phase_marginalization=True,
-            distance_marginalization={"dist_prior": d_prior},
+            distance_marginalization={"distance_prior": d_prior},
         )
         distance_likelihood = TransientLikelihoodFD(
             detectors=ifos,
@@ -1390,7 +1393,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
             f_max=fmax,
             trigger_time=gps,
             distance_marginalization={
-                "dist_prior": d_prior,
+                "distance_prior": d_prior,
                 "ref_dist": phase_distance_likelihood.ref_dist,
             },
         )
@@ -1414,7 +1417,7 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
             f_max=fmax,
             trigger_time=gps,
             phase_marginalization=True,
-            distance_marginalization={"dist_prior": self.make_d_L_prior()},
+            distance_marginalization={"distance_prior": self.make_d_L_prior()},
         )
         params = self.params_without_d_L_phase()
         result = likelihood.evaluate(params, {})

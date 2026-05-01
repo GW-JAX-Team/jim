@@ -11,7 +11,6 @@ from jaxtyping import Array, Float, Key
 
 from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
 from jimgw.samplers.blackjax._imports import (
-    import_anesthetic,
     import_blackjax,
     require_nested_sampling,
     require_nss,
@@ -22,7 +21,6 @@ from jimgw.samplers.periodic import to_prior_space_stepper
 _blackjax = import_blackjax()
 require_nested_sampling(_blackjax)
 require_nss(_blackjax)
-_NestedSamples = import_anesthetic()
 
 
 class BlackJAXNSSSampler(Sampler):
@@ -116,32 +114,16 @@ class BlackJAXNSSSampler(Sampler):
 
         final_state = self._final_state
 
-        # Particles are flat arrays of shape (N, n_dims) in sampling space.
         particles_sample = np.array(final_state.particles.position)
         log_likelihood = np.array(final_state.particles.loglikelihood)
 
         logL_birth = jnp.array(final_state.particles.loglikelihood_birth)
         logL_birth = jnp.where(jnp.isnan(logL_birth), -jnp.inf, logL_birth)
 
-        # anesthetic gives us both logZ and posterior weights from the same frame.
-        df = _NestedSamples(
-            particles_sample,
-            logL=final_state.particles.loglikelihood,
-            logL_birth=logL_birth,
-            logzero=jnp.nan,
-            dtype=jnp.float64,
-        )
-        logZ_bootstrap = df.logZ(nsamples=1000)  # type: ignore[misc]
-        log_evidence = float(logZ_bootstrap.mean())  # type: ignore[union-attr]
-        log_evidence_err = float(logZ_bootstrap.std())  # type: ignore[union-attr]
-        weights = np.asarray(df.get_weights())  # type: ignore[attr-defined]
-
         return SamplerOutput(
             samples=particles_sample,
             log_likelihood=log_likelihood,
-            log_evidence=log_evidence,
-            log_evidence_err=log_evidence_err,
-            weights=weights,
+            log_likelihood_birth=np.asarray(logL_birth),
         )
 
     def get_diagnostics(self) -> SamplerDiagnostics:
@@ -159,7 +141,6 @@ class BlackJAXNSSSampler(Sampler):
         total_steps = int(jnp.sum(ui.num_steps))
         total_shrink = int(jnp.sum(ui.num_shrink))
         return SamplerDiagnostics(
-            backend="blackjax_nss",
             sampling_time_seconds=self._sampling_time_seconds,  # type: ignore[arg-type]
             n_likelihood_evaluations=total_steps + total_shrink,
             ns_n_iterations=self._n_iterations,

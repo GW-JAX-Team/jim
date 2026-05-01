@@ -52,30 +52,22 @@ class _TrivialSampler(Sampler):
 
 def test_diagnostics_rejects_negative_time():
     with pytest.raises(ValueError, match="non-negative"):
-        SamplerDiagnostics(
-            backend="x", sampling_time_seconds=-1.0, n_likelihood_evaluations=0
-        )
+        SamplerDiagnostics(sampling_time_seconds=-1.0, n_likelihood_evaluations=0)
 
 
 def test_diagnostics_rejects_negative_evals():
     with pytest.raises(ValueError, match="non-negative"):
-        SamplerDiagnostics(
-            backend="x", sampling_time_seconds=0.0, n_likelihood_evaluations=-1
-        )
+        SamplerDiagnostics(sampling_time_seconds=0.0, n_likelihood_evaluations=-1)
 
 
 def test_diagnostics_is_frozen():
-    diag = SamplerDiagnostics(
-        backend="x", sampling_time_seconds=1.0, n_likelihood_evaluations=10
-    )
+    diag = SamplerDiagnostics(sampling_time_seconds=1.0, n_likelihood_evaluations=10)
     with pytest.raises(Exception):
-        diag.backend = "y"  # type: ignore[misc]
+        diag.sampling_time_seconds = 2.0  # type: ignore[misc]
 
 
 def test_diagnostics_optional_fields_default_none():
-    diag = SamplerDiagnostics(
-        backend="x", sampling_time_seconds=0.5, n_likelihood_evaluations=5
-    )
+    diag = SamplerDiagnostics(sampling_time_seconds=0.5, n_likelihood_evaluations=5)
     assert diag.n_training_loops_actual is None
     assert diag.ns_n_iterations is None
     assert diag.smc_n_iterations is None
@@ -105,9 +97,8 @@ def test_sampler_output_optional_fields_default_none():
     out = SamplerOutput(samples=np.zeros((2, 1)), log_posterior=np.zeros(2))
     assert out.log_prior is None
     assert out.log_likelihood is None
+    assert out.log_likelihood_birth is None
     assert out.weights is None
-    assert out.log_evidence is None
-    assert out.log_evidence_err is None
 
 
 # --- ABC instantiation ---

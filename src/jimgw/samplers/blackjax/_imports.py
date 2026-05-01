@@ -1,17 +1,20 @@
 """Lazy import of BlackJAX with feature validation.
 
-Jim pins a specific branch in the ``blackjax`` dependency group in
-``pyproject.toml``.  If a user has a different BlackJAX installed, the
-feature-check helpers below raise a clear, actionable error.
+NS-AW and NSS rely on nested-sampling submodules not yet in upstream PyPI.
+Install them via the ``nested-sampling`` dependency group:
+
+    uv sync --group nested-sampling
+
+SMC uses only features available in ``blackjax>=1.4`` (a core dependency).
 """
 
 from __future__ import annotations
 
 _INSTALL_MSG = (
-    "BlackJAX is required for this sampler.  Jim pins a specific branch "
-    "in the `blackjax` dependency group.  Install it with:\n"
-    "    uv sync --group blackjax\n"
-    "See docs/tutorials/samplers.md for the exact branch Jim currently supports."
+    "BlackJAX is required for this sampler but the installed version is "
+    "missing nested-sampling submodules.  Install the fork with:\n"
+    "    uv sync --group nested-sampling\n"
+    "See docs/installation.md for details."
 )
 
 
@@ -39,31 +42,3 @@ def require_nss(bjx) -> None:
         raise ImportError(
             "Installed BlackJAX is missing top-level `blackjax.nss`.  " + _INSTALL_MSG
         )
-
-
-def require_persistent_smc(bjx) -> None:
-    """Check that the installed BlackJAX has the persistent-sampling SMC additions."""
-    if not hasattr(bjx, "adaptive_persistent_sampling_smc"):
-        raise ImportError(
-            "Installed BlackJAX is missing `adaptive_persistent_sampling_smc`.  "
-            + _INSTALL_MSG
-        )
-    try:
-        import blackjax.smc.persistent_sampling  # type: ignore[import]  # noqa: F401
-    except ImportError as exc:
-        raise ImportError(
-            "Installed BlackJAX is missing `blackjax.smc.persistent_sampling`.  "
-            + _INSTALL_MSG
-        ) from exc
-
-
-def import_anesthetic():
-    """Import ``anesthetic.samples.NestedSamples``, raising a helpful error if missing."""
-    try:
-        from anesthetic.samples import NestedSamples  # type: ignore[import]
-    except ImportError as exc:
-        raise ImportError(
-            "anesthetic is required for nested-sampling post-processing.  "
-            "Install with:  uv sync --group blackjax"
-        ) from exc
-    return NestedSamples

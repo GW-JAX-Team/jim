@@ -28,11 +28,14 @@ class BaseSamplerConfig(BaseModel):
 
 
 class ParallelTemperingConfig(BaseModel):
-    """Parallel-tempering settings for the flowMC backend."""
+    """Parallel-tempering settings for the flowMC backend.
+
+    Construct directly or pass a plain ``dict`` to ``FlowMCConfig.parallel_tempering``.
+    Use ``True`` to enable with all defaults, ``False`` / ``None`` to disable.
+    """
 
     model_config = {"extra": "forbid"}
 
-    enabled: bool = False
     n_temperatures: int = 5
     max_temperature: float = 10.0
     n_tempered_steps: int = 5
@@ -72,14 +75,13 @@ class FlowMCConfig(BaseSamplerConfig):
     * ``"HMC"`` — Hamiltonian Monte Carlo.
     * ``"GRW"`` — Gaussian random walk.
 
-    Parallel tempering is **off by default**.  Enable it via
-    ``parallel_tempering={"enabled": True, ...}``.
+    Parallel tempering is **off by default**.  To enable, pass a
+    :class:`ParallelTemperingConfig`, a ``dict`` of its fields, or simply
+    ``True`` (uses all defaults).  ``False`` disables it.
 
     .. note::
         Only the sub-config matching the active ``local_kernel`` is used.
         Non-default values in inactive sub-configs emit a :class:`UserWarning`.
-        Likewise, non-default ``parallel_tempering`` settings when
-        ``parallel_tempering.enabled=False`` warn.
     """
 
     type: Literal["flowmc"] = "flowmc"
@@ -94,9 +96,7 @@ class FlowMCConfig(BaseSamplerConfig):
     n_epochs: int = 20
 
     local_kernel: Literal["MALA", "HMC", "GRW"] = "MALA"
-    parallel_tempering: ParallelTemperingConfig = Field(
-        default_factory=ParallelTemperingConfig
-    )
+    parallel_tempering: Optional[ParallelTemperingConfig] = None
     mala: MALAConfig = Field(default_factory=MALAConfig)
     hmc: HMCConfig = Field(default_factory=HMCConfig)
     grw: GRWConfig = Field(default_factory=GRWConfig)
@@ -113,12 +113,28 @@ class FlowMCConfig(BaseSamplerConfig):
 
     chain_batch_size: int = 0
     local_thinning: int = 1
-    global_thinning: int = 100
+    global_thinning: int = 1
 
     early_stopping: bool = True
     early_stopping_tolerance: float = 0.1
     early_stopping_patience: int = 3
     early_stopping_min_acceptance: float = 0.1
+
+    @field_validator("parallel_tempering", mode="before")
+    @classmethod
+    def _coerce_parallel_tempering(cls, v: object) -> Optional[ParallelTemperingConfig]:
+        if v is None or v is False:
+            return None
+        if v is True:
+            return ParallelTemperingConfig()
+        if isinstance(v, dict):
+            return ParallelTemperingConfig(**v)
+        if isinstance(v, ParallelTemperingConfig):
+            return v
+        raise ValueError(
+            "parallel_tempering must be None, False, True, a dict of ParallelTemperingConfig "
+            f"fields, or a ParallelTemperingConfig instance; got {type(v).__name__}."
+        )
 
     @model_validator(mode="after")
     def _warn_if_irrelevant_kernel_set(self) -> FlowMCConfig:
@@ -140,16 +156,6 @@ class FlowMCConfig(BaseSamplerConfig):
                     UserWarning,
                     stacklevel=2,
                 )
-        if (
-            not self.parallel_tempering.enabled
-            and self.parallel_tempering != ParallelTemperingConfig()
-        ):
-            warnings.warn(
-                "FlowMCConfig: `parallel_tempering` sub-config has non-default values but "
-                "`parallel_tempering.enabled=False` — the parallel tempering settings will be ignored.",
-                UserWarning,
-                stacklevel=2,
-            )
         return self
 
 
@@ -231,21 +237,6 @@ class BlackJAXNSSConfig(BaseSamplerConfig):
 
 class BlackJAXSMCConfig(BaseSamplerConfig):
     """Configuration for the BlackJAX SMC sampler.
-
-    The ``(persistent_sampling, temperature_ladder)`` pair selects the
-    underlying BlackJAX algorithm:
-
-    | ``persistent_sampling`` | ``temperature_ladder`` | Algorithm                            |
-    | ----------------------- | ---------------------- | ------------------------------------ |
-    | ``True``                | ``None``               | ``adaptive_persistent_sampling_smc`` |
-    | ``True``                | given                  | ``persistent_sampling_smc``          |
-    | ``False``               | ``None``               | ``adaptive_tempered_smc``            |
-    | ``False``               | given                  | ``tempered_smc``                     |
-
-    For adaptive modes, the temperature schedule is determined automatically
-    using ``absolute_target_ess``.  For fixed-ladder modes, set
-    ``temperature_ladder`` to a 1-D sequence strictly increasing from ``0.0``
-    to ``1.0`` and ``absolute_target_ess`` has no effect.
     """
 
     type: Literal["blackjax-smc"] = "blackjax-smc"
@@ -254,7 +245,8 @@ class BlackJAXSMCConfig(BaseSamplerConfig):
 
     n_particles: int = 2000
     n_mcmc_steps_per_dim: int = 100
-    absolute_target_ess: int = 10000
+    absolute_target_ess: Optional[int] = None
+    target_ess_fraction: Optional[float] = None
     initial_cov_scale: float = 0.5
     target_acceptance_rate: float = 0.234
     scale_adaptation_gain: float = 3.0
@@ -281,18 +273,70 @@ class BlackJAXSMCConfig(BaseSamplerConfig):
         return v
 
     @model_validator(mode="after")
-    def _warn_irrelevant_ess(self) -> BlackJAXSMCConfig:
-        if (
-            self.temperature_ladder is not None
-            and "absolute_target_ess" in self.model_fields_set
+    def _validate_ess_args(self) -> BlackJAXSMCConfig:
+        both_set = (
+            "absolute_target_ess" in self.model_fields_set
+            and "target_ess_fraction" in self.model_fields_set
+        )
+        if both_set:
+            raise ValueError(
+                "BlackJAXSMCConfig: set exactly one of `absolute_target_ess` or "
+                "`target_ess_fraction`, not both."
+            )
+
+        # Apply default if neither was set.
+        if self.absolute_target_ess is None and self.target_ess_fraction is None:
+            object.__setattr__(self, "target_ess_fraction", 0.9)
+
+        # Validate absolute_target_ess.
+        if self.absolute_target_ess is not None:
+            if self.absolute_target_ess <= 0:
+                raise ValueError(
+                    f"absolute_target_ess must be > 0, got {self.absolute_target_ess}."
+                )
+            if (
+                not self.persistent_sampling
+                and self.absolute_target_ess > self.n_particles
+            ):
+                raise ValueError(
+                    f"absolute_target_ess ({self.absolute_target_ess}) > n_particles "
+                    f"({self.n_particles}) is not valid when persistent_sampling=False; "
+                    "the ESS cannot exceed the number of particles. "
+                    "Set persistent_sampling=True or lower absolute_target_ess."
+                )
+
+        # Validate target_ess_fraction.
+        if self.target_ess_fraction is not None:
+            if self.target_ess_fraction <= 0:
+                raise ValueError(
+                    f"target_ess_fraction must be > 0, got {self.target_ess_fraction}."
+                )
+            if not self.persistent_sampling and self.target_ess_fraction > 1.0:
+                raise ValueError(
+                    f"target_ess_fraction ({self.target_ess_fraction}) > 1.0 is not valid "
+                    "when persistent_sampling=False; the ESS fraction cannot exceed 1. "
+                    "Set persistent_sampling=True or use a fraction in (0, 1]."
+                )
+
+        # Warn if a fixed temperature ladder is given alongside an ESS target.
+        if self.temperature_ladder is not None and (
+            "absolute_target_ess" in self.model_fields_set
+            or "target_ess_fraction" in self.model_fields_set
         ):
             warnings.warn(
-                "BlackJAXSMCConfig: `absolute_target_ess` has no effect when "
+                "BlackJAXSMCConfig: ESS target has no effect when "
                 "`temperature_ladder` is provided (fixed-ladder mode).",
                 UserWarning,
                 stacklevel=2,
             )
         return self
+
+    def _resolve_target_ess_fraction(self) -> float:
+        """Return the ESS target as a fraction of n_particles."""
+        if self.target_ess_fraction is not None:
+            return self.target_ess_fraction
+        assert self.absolute_target_ess is not None
+        return self.absolute_target_ess / self.n_particles
 
 
 SamplerConfig = Annotated[

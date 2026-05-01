@@ -16,7 +16,7 @@ from jimgw.core.single_event.utils import (
     complex_inner_product,
     apply_fixed_parameters,
 )
-from jimgw.core.single_event.marg_config import (
+from jimgw.core.single_event.marginalization_config import (
     PhaseMargConfig,
     TimeMargConfig,
     DistanceMargConfig,
@@ -154,17 +154,20 @@ class TransientLikelihoodFD(SingleEventLikelihood):
             Can be a single float or a per-detector dictionary.
         trigger_time: GPS time of the event trigger.
         time_marginalization: If provided, marginalize over coalescence time
-            ``t_c``.  Pass a :class:`TimeMargConfig` object or a plain dict
-            (e.g. ``{"tc_range": (-0.1, 0.1)}``).  ``None`` (default) disables
+            ``t_c``.  Pass a :class:`TimeMargConfig` object, a plain dict
+            (e.g. ``{"tc_range": (-0.1, 0.1)}``), or ``True`` (shorthand for
+            ``TimeMargConfig()``).  ``False`` or the default ``None`` disables
             time marginalization.
         phase_marginalization: If provided, marginalize over coalescence phase
             ``phase_c``.  Pass a :class:`PhaseMargConfig` object, a plain dict
-            ``{}``, or ``True`` (shorthand for ``PhaseMargConfig()``).  ``None``
-            or ``False`` (default) disables phase marginalization.
+            ``{}``, or ``True`` (shorthand for ``PhaseMargConfig()``).  ``False``
+            or the default ``None`` disables phase marginalization.
         distance_marginalization: If provided, marginalize over luminosity
             distance ``d_L``.  Pass a :class:`DistanceMargConfig` object or a
-            plain dict (e.g. ``{"dist_prior": prior, "n_dist_points": 10000}``).
-            ``None`` (default) disables distance marginalization.
+            plain dict (e.g. ``{"distance_prior": prior, "n_dist_points": 10000}``).
+            ``False`` or the default ``None`` disables distance marginalization.
+            ``True`` is not supported — ``distance_prior`` has no default; pass a
+            dict or :class:`DistanceMargConfig` instead.
 
     Example:
         >>> likelihood = TransientLikelihoodFD(
@@ -189,21 +192,48 @@ class TransientLikelihoodFD(SingleEventLikelihood):
         f_min: float | dict[str, float] = 0.0,
         f_max: float | dict[str, float] = jnp.inf,
         trigger_time: Float = 0,
-        time_marginalization: Optional[Union[TimeMargConfig, dict]] = None,
+        time_marginalization: Union[TimeMargConfig, dict, bool, None] = None,
         phase_marginalization: Union[PhaseMargConfig, dict, bool, None] = None,
-        distance_marginalization: Optional[Union[DistanceMargConfig, dict]] = None,
+        distance_marginalization: Union[DistanceMargConfig, dict, bool, None] = None,
     ) -> None:
         super().__init__(detectors, waveform, fixed_parameters)
 
         # --- coerce marginalization inputs ---
-        if isinstance(time_marginalization, dict):
-            time_marginalization = TimeMargConfig(**time_marginalization)
-        if isinstance(phase_marginalization, bool):
-            phase_marginalization = PhaseMargConfig() if phase_marginalization else None
-        elif isinstance(phase_marginalization, dict):
-            phase_marginalization = PhaseMargConfig(**phase_marginalization)
-        if isinstance(distance_marginalization, dict):
-            distance_marginalization = DistanceMargConfig(**distance_marginalization)
+        if isinstance(time_marginalization, (bool, dict)):
+            if time_marginalization is False:
+                time_marginalization = None
+            else:
+                time_marginalization = TimeMargConfig(
+                    **(
+                        time_marginalization
+                        if isinstance(time_marginalization, dict)
+                        else {}
+                    )
+                )
+        if isinstance(phase_marginalization, (bool, dict)):
+            if phase_marginalization is False:
+                phase_marginalization = None
+            else:
+                phase_marginalization = PhaseMargConfig(
+                    **(
+                        phase_marginalization
+                        if isinstance(phase_marginalization, dict)
+                        else {}
+                    )
+                )
+        if isinstance(distance_marginalization, (bool, dict)):
+            if distance_marginalization is True:
+                raise ValueError(
+                    "distance_marginalization=True is not supported because "
+                    "`distance_prior` has no default.  Pass a dict with `distance_prior` "
+                    "or a DistanceMargConfig instance instead."
+                )
+            elif isinstance(distance_marginalization, dict):
+                distance_marginalization = DistanceMargConfig(
+                    **distance_marginalization
+                )
+            else:  # False
+                distance_marginalization = None
 
         # --- frequency setup (from former BaseTransientLikelihoodFD) ---
         _frequencies = []
@@ -247,7 +277,7 @@ class TransientLikelihoodFD(SingleEventLikelihood):
             self._init_phase_marginalization()
         if distance_marginalization is not None:
             self._init_distance_marginalization(
-                distance_marginalization.dist_prior,
+                distance_marginalization.distance_prior,
                 distance_marginalization.n_dist_points,
                 distance_marginalization.ref_dist,
             )
@@ -395,27 +425,27 @@ class TransientLikelihoodFD(SingleEventLikelihood):
 
     def _init_distance_marginalization(
         self,
-        dist_prior: Prior,
+        distance_prior: Prior,
         n_dist_points: int,
         ref_dist: Optional[float],
     ) -> None:
         if "d_L" in self.fixed_parameters:
             raise ValueError("Cannot have d_L fixed while marginalising over d_L")
 
-        if list(dist_prior.parameter_names) != ["d_L"]:
+        if list(distance_prior.parameter_names) != ["d_L"]:
             raise ValueError(
-                f"dist_prior must be a 1D prior with parameter_names=['d_L'], "
-                f"got parameter_names={list(dist_prior.parameter_names)}."
+                f"distance_prior must be a 1D prior with parameter_names=['d_L'], "
+                f"got parameter_names={list(distance_prior.parameter_names)}."
             )
 
-        if not hasattr(dist_prior, "xmin") or not hasattr(dist_prior, "xmax"):
+        if not hasattr(distance_prior, "xmin") or not hasattr(distance_prior, "xmax"):
             raise ValueError(
                 "The d_L sub-prior must have xmin and xmax attributes. "
                 "Use a bounded prior such as PowerLawPrior or UniformPrior."
             )
 
-        dist_min = float(getattr(dist_prior, "xmin"))
-        dist_max = float(getattr(dist_prior, "xmax"))
+        dist_min = float(getattr(distance_prior, "xmin"))
+        dist_max = float(getattr(distance_prior, "xmax"))
 
         if dist_min <= 0:
             raise ValueError(
@@ -438,7 +468,7 @@ class TransientLikelihoodFD(SingleEventLikelihood):
         delta_d = (dist_max - dist_min) / (n_dist_points - 1)
         self.scaling = self.ref_dist / distance_grid
 
-        log_prob_fn = jax.vmap(lambda d: dist_prior.log_prob({"d_L": d}))
+        log_prob_fn = jax.vmap(lambda d: distance_prior.log_prob({"d_L": d}))
         log_w = log_prob_fn(distance_grid) + jnp.log(delta_d)
         self.log_weights = log_w - logsumexp(log_w)
 
