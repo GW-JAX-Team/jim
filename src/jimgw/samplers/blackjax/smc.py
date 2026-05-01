@@ -1,7 +1,7 @@
 """BlackJAX SMC samplers for Jim.
 
 Supports four mode combinations selected by
-:class:`~jimgw.samplers.config.BlackJAXSMCConfig`:
+[`BlackJAXSMCConfig`][jimgw.samplers.config.BlackJAXSMCConfig]:
 
 * ``persistent_sampling=True,  temperature_ladder=None``  → adaptive persistent SMC
 * ``persistent_sampling=True,  temperature_ladder=given`` → fixed-ladder persistent SMC
@@ -35,17 +35,16 @@ from blackjax.smc.persistent_sampling import (
 )
 from blackjax.smc.resampling import systematic
 
-from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
+from jimgw.samplers.base import Sampler
 from jimgw.samplers.config import BlackJAXSMCConfig
 from jimgw.samplers.periodic import to_displacement_wrapper
+
+# Fixed key used for post-sampling resampling in get_samples().
+_RESAMPLE_KEY = jax.random.key(123)
 
 
 class BlackJAXSMCSampler(Sampler):
     """BlackJAX SMC sampler.
-
-    Behaviour is controlled by two orthogonal settings in
-    :class:`~jimgw.samplers.config.BlackJAXSMCConfig`:
-    ``persistent_sampling`` and ``temperature_ladder``.
 
     Uses a Gaussian random-walk MCMC inner kernel with initial covariance
     estimated from the starting particles.  With adaptive temperature
@@ -58,7 +57,7 @@ class BlackJAXSMCSampler(Sampler):
     _displacement_wrapper: Callable
     _sampled: bool
     _final_state: Any
-    # Mode tag set in _sample_impl() so get_output() / get_diagnostics() know which path was taken.
+    # Mode tag set in sample() so get_samples() / get_diagnostics() know which path was taken.
     _mode: str  # "ap" | "fp" | "at" | "ft"
     _n_iterations: int
     # Per-mode diagnostics stashes (set in the corresponding _run_* method).
@@ -335,11 +334,22 @@ class BlackJAXSMCSampler(Sampler):
     # Public API
     # ------------------------------------------------------------------
 
-    def _sample_impl(
+    def sample(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n_particles n_dims"],
     ) -> None:
+        """Run the BlackJAX SMC sampler.
+
+        Args:
+            rng_key: JAX PRNG key.
+            initial_position: Starting particles in the sampling space,
+                shape ``(n_particles, n_dims)``.  Must match ``config.n_particles``.
+
+        Raises:
+            ValueError: If ``initial_position`` shape does not match
+                ``(n_particles, n_dims)``.
+        """
         config = self._config
         n_particles = config.n_particles
         arr = jnp.asarray(initial_position)
@@ -365,20 +375,23 @@ class BlackJAXSMCSampler(Sampler):
 
         self._sampled = True
 
-    def get_output(self) -> SamplerOutput:
+    def get_samples(self) -> dict[str, np.ndarray]:
         """Return posterior samples.
 
-        All configurations populate ``log_likelihood`` and ``weights``.
+        When ``persistent_sampling=True``: samples are drawn with replacement
+        from all-temperature particles weighted by the persistent-sampling
+        weight formula.  The number of returned samples approximately equals
+        the effective sample size ``1 / max(weights)``.
 
-        When ``persistent_sampling=True``: all-temperature particles stacked
-        into a single ``(n_steps * n_particles, n_dims)`` array with posterior
-        weights computed via the persistent-sampling weight formula.
+        When ``persistent_sampling=False``: returns all final-temperature
+        particles with equal weight.
 
-        When ``persistent_sampling=False``: final-temperature particles with
-        equal weights ``1 / n_particles``.
+        Returns:
+            Dict with keys ``"samples"`` (shape ``(n, n_dims)``) and
+            ``"log_likelihood"`` (shape ``(n,)``).
         """
         if not self._sampled:
-            raise RuntimeError("get_output() called before sample()")
+            raise RuntimeError("get_samples() called before sample()")
 
         mode = self._mode
         state = self._final_state
@@ -403,50 +416,48 @@ class BlackJAXSMCSampler(Sampler):
             )
             weights = np.asarray(jax.nn.softmax(log_w[: n_iter + 1].reshape(-1)))
 
-            return SamplerOutput(
-                samples=all_particles,
-                log_likelihood=all_log_likelihoods,
-                weights=weights,
+            n_available = all_particles.shape[0]
+            n_target = max(1, int(1.0 / float(np.max(weights))))
+            n_target = min(n_target, n_available)
+            indices = np.array(
+                jax.random.choice(
+                    _RESAMPLE_KEY,
+                    n_available,
+                    shape=(n_target,),
+                    replace=True,
+                    p=weights,
+                )
             )
+            return {
+                "samples": all_particles[indices],
+                "log_likelihood": all_log_likelihoods[indices],
+            }
 
         elif mode == "at":
             ps = state.sampler_state  # type: ignore[attr-defined]
             final_particles = np.array(ps.particles)
-            n = final_particles.shape[0]
             log_likelihoods = np.array(jax.vmap(self._log_likelihood_fn)(ps.particles))
-            return SamplerOutput(
-                samples=final_particles,
-                log_likelihood=log_likelihoods,
-                weights=np.full(n, 1.0 / n),
-            )
+            return {"samples": final_particles, "log_likelihood": log_likelihoods}
 
         else:  # mode == "ft"
             final_particles = np.array(state.particles)  # type: ignore[attr-defined]
-            n = final_particles.shape[0]
             log_likelihoods = np.array(
                 jax.vmap(self._log_likelihood_fn)(state.particles)  # type: ignore[attr-defined]
             )
-            return SamplerOutput(
-                samples=final_particles,
-                log_likelihood=log_likelihoods,
-                weights=np.full(n, 1.0 / n),
-            )
+            return {"samples": final_particles, "log_likelihood": log_likelihoods}
 
-    def get_diagnostics(self) -> SamplerDiagnostics:
+    def get_diagnostics(self) -> dict[str, Any]:
         """Return SMC run diagnostics.
 
-        Universal fields populated: ``sampling_time_seconds``,
-        ``n_likelihood_evaluations``.
+        Returns a dict with the following keys (not all present for all modes):
 
-        ``smc_acceptance_history`` is always populated.
-
-        ``smc_n_iterations``, ``smc_tempering_schedule``, and
-        ``smc_cov_scale_history`` are populated only when
-        ``temperature_ladder=None`` (adaptive) because for fixed ladders
-        these are user-specified.
-
-        ``smc_persistent_log_Z`` is populated only when
-        ``persistent_sampling=True``.
+        * ``"n_likelihood_evaluations"`` — total likelihood calls.
+        * ``"acceptance_history"`` — per-iteration mean acceptance rate.
+        * ``"n_iterations"`` — total SMC iterations (adaptive modes only).
+        * ``"tempering_schedule"`` — tempering schedule (adaptive modes only).
+        * ``"cov_scale_history"`` — covariance scale per iteration (adaptive-persistent only).
+        * ``"persistent_log_Z"`` — log-Z trajectory (persistent modes only).
+        * ``"log_Z"`` — final log Bayesian evidence (persistent modes only).
         """
         if not self._sampled:
             raise RuntimeError("get_diagnostics() called before sample()")
@@ -456,40 +467,34 @@ class BlackJAXSMCSampler(Sampler):
         n_mcmc = cfg.n_mcmc_steps_per_dim * self.n_dims
         n_iter = self._n_iterations
 
-        kwargs: dict = dict(
-            sampling_time_seconds=self._sampling_time_seconds,
-            n_likelihood_evaluations=n_mcmc * n_iter * cfg.n_particles,
-        )
+        result: dict[str, Any] = {
+            "n_likelihood_evaluations": n_mcmc * n_iter * cfg.n_particles,
+        }
 
         if mode in ("ap", "at"):
-            kwargs["smc_n_iterations"] = n_iter
-            kwargs["smc_acceptance_history"] = self._acceptance_history
-
-        if mode == "ap":
-            kwargs["smc_cov_scale_history"] = self._cov_scale_history
-            # Extract tempering schedule and log-Z trajectory from persistent state.
-            ps = self._final_state.sampler_state  # type: ignore[attr-defined]
-            n = int(ps.iteration)  # type: ignore[attr-defined]
-            kwargs["smc_tempering_schedule"] = np.asarray(
-                ps.tempering_schedule[: n + 1]  # type: ignore[attr-defined]
-            )
-            kwargs["smc_persistent_log_Z"] = np.asarray(
-                ps.persistent_log_Z[: n + 1]  # type: ignore[attr-defined]
-            )
-
-        elif mode == "at":
-            kwargs["smc_tempering_schedule"] = self._tempering_schedule
-
+            result["n_iterations"] = n_iter
+            result["acceptance_history"] = self._acceptance_history
+            if mode == "ap":
+                result["cov_scale_history"] = self._cov_scale_history
+                ps = self._final_state.sampler_state
+                n = int(ps.iteration)
+                result["tempering_schedule"] = np.asarray(
+                    ps.tempering_schedule[: n + 1]
+                )
+                log_Z_traj = np.asarray(ps.persistent_log_Z[: n + 1])
+                result["persistent_log_Z"] = log_Z_traj
+                result["log_Z"] = float(log_Z_traj[-1])
+            else:  # mode == "at"
+                result["tempering_schedule"] = self._tempering_schedule
         elif mode in ("fp", "ft"):
-            kwargs["smc_acceptance_history"] = np.asarray(
+            result["acceptance_history"] = np.asarray(
                 self._scan_infos.update_info.acceptance_rate.mean(axis=-1)
             )
+            if mode == "fp":
+                ps = self._final_state
+                n = int(ps.iteration)
+                log_Z_traj = np.asarray(ps.persistent_log_Z[: n + 1])
+                result["persistent_log_Z"] = log_Z_traj
+                result["log_Z"] = float(log_Z_traj[-1])
 
-        if mode == "fp":
-            ps = self._final_state
-            n = int(ps.iteration)  # type: ignore[attr-defined]
-            kwargs["smc_persistent_log_Z"] = np.asarray(
-                ps.persistent_log_Z[: n + 1]  # type: ignore[attr-defined]
-            )
-
-        return SamplerDiagnostics(**kwargs)
+        return result

@@ -11,8 +11,6 @@ pytestmark = pytest.mark.integration
 
 blackjax = pytest.importorskip("blackjax")
 
-from anesthetic.samples import NestedSamples  # noqa: E402
-
 from jimgw.samplers.config import BlackJAXNSSConfig  # noqa: E402
 
 from tests.integration._helpers import make_gaussian_jim  # noqa: E402
@@ -28,7 +26,7 @@ def nss_jim():
 
 def test_nss_get_samples_shape(nss_jim):
     samples = nss_jim.get_samples()
-    assert set(samples.keys()) == {"x", "y"}
+    assert set(samples.keys()) == {"x", "y", "log_likelihood"}
     n = samples["x"].shape[0]
     assert n > 0
     assert samples["y"].shape == (n,)
@@ -41,12 +39,6 @@ def test_nss_posterior_mean_near_half(nss_jim):
 
 
 def test_nss_log_evidence_finite(nss_jim):
-    output = nss_jim.sampler.get_output()
-    ns = NestedSamples(
-        output.samples,
-        logL=output.log_likelihood,
-        logL_birth=output.log_likelihood_birth,
-        logzero=float("nan"),
-    )
-    log_z = float(ns.logZ().mean())
+    diag = nss_jim.sampler.get_diagnostics()
+    log_z = diag["log_Z"]
     assert math.isfinite(log_z)

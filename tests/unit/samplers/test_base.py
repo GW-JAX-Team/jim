@@ -1,11 +1,13 @@
-"""Unit tests for the Sampler ABC and SamplerOutput dataclass."""
+"""Unit tests for the Sampler ABC."""
+
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
+from jimgw.samplers.base import Sampler
 from jimgw.samplers.config import BaseSamplerConfig
 
 jax.config.update("jax_enable_x64", True)
@@ -30,75 +32,17 @@ def _make_callables(n_dims: int = 1):
 class _TrivialSampler(Sampler):
     """Minimal concrete Sampler for ABC contract tests."""
 
-    def _sample_impl(self, rng_key, initial_position) -> None:  # noqa: ARG002
+    def sample(self, rng_key, initial_position) -> None:  # noqa: ARG002
         self._ran = True
 
-    def get_output(self) -> SamplerOutput:
-        return SamplerOutput(
-            samples=np.zeros((3, self.n_dims)),
-            log_posterior=np.zeros(3),
-        )
+    def get_samples(self) -> dict[str, np.ndarray]:
+        return {
+            "samples": np.zeros((3, self.n_dims)),
+            "log_likelihood": np.zeros(3),
+        }
 
-    def get_diagnostics(self) -> SamplerDiagnostics:
-        return SamplerDiagnostics(
-            backend="trivial",
-            sampling_time_seconds=0.0,
-            n_likelihood_evaluations=0,
-        )
-
-
-# --- SamplerDiagnostics invariants ---
-
-
-def test_diagnostics_rejects_negative_time():
-    with pytest.raises(ValueError, match="non-negative"):
-        SamplerDiagnostics(sampling_time_seconds=-1.0, n_likelihood_evaluations=0)
-
-
-def test_diagnostics_rejects_negative_evals():
-    with pytest.raises(ValueError, match="non-negative"):
-        SamplerDiagnostics(sampling_time_seconds=0.0, n_likelihood_evaluations=-1)
-
-
-def test_diagnostics_is_frozen():
-    diag = SamplerDiagnostics(sampling_time_seconds=1.0, n_likelihood_evaluations=10)
-    with pytest.raises(Exception):
-        diag.sampling_time_seconds = 2.0  # type: ignore[misc]
-
-
-def test_diagnostics_optional_fields_default_none():
-    diag = SamplerDiagnostics(sampling_time_seconds=0.5, n_likelihood_evaluations=5)
-    assert diag.n_training_loops_actual is None
-    assert diag.ns_n_iterations is None
-    assert diag.smc_n_iterations is None
-    assert diag.smc_acceptance_history is None
-
-
-# --- SamplerOutput invariants ---
-
-
-def test_sampler_output_requires_at_least_one_log_density():
-    with pytest.raises(ValueError, match="at least one"):
-        SamplerOutput(samples=np.zeros((2, 1)))
-
-
-def test_sampler_output_accepts_any_log_density_field():
-    SamplerOutput(samples=np.zeros((2, 1)), log_prior=np.zeros(2))
-    SamplerOutput(samples=np.zeros((2, 1)), log_likelihood=np.zeros(2))
-    SamplerOutput(samples=np.zeros((2, 1)), log_posterior=np.zeros(2))
-
-
-def test_sampler_output_n_samples():
-    out = SamplerOutput(samples=np.zeros((7, 2)), log_posterior=np.zeros(7))
-    assert out.n_samples() == 7
-
-
-def test_sampler_output_optional_fields_default_none():
-    out = SamplerOutput(samples=np.zeros((2, 1)), log_posterior=np.zeros(2))
-    assert out.log_prior is None
-    assert out.log_likelihood is None
-    assert out.log_likelihood_birth is None
-    assert out.weights is None
+    def get_diagnostics(self) -> dict[str, Any]:
+        return {"n_likelihood_evaluations": 0}
 
 
 # --- ABC instantiation ---
@@ -126,9 +70,23 @@ def test_trivial_sampler_works():
         config=BaseSamplerConfig(),
     )
     s.sample(jax.random.key(0), jnp.zeros((3, 2)))
-    out = s.get_output()
-    assert out.samples.shape == (3, 2)
-    assert out.n_samples() == 3
+    result = s.get_samples()
+    assert result["samples"].shape == (3, 2)
+    assert result["log_likelihood"].shape == (3,)
+
+
+def test_trivial_sampler_get_diagnostics_returns_dict():
+    lp, ll, lpost = _make_callables(n_dims=1)
+    s = _TrivialSampler(
+        n_dims=1,
+        log_prior_fn=lp,
+        log_likelihood_fn=ll,
+        log_posterior_fn=lpost,
+        config=BaseSamplerConfig(),
+    )
+    diag = s.get_diagnostics()
+    assert isinstance(diag, dict)
+    assert "n_likelihood_evaluations" in diag
 
 
 # --- Callable injection ---

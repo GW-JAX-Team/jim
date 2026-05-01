@@ -21,16 +21,17 @@ from jimgw.core.transforms import (
 
 
 class Prior(eqx.Module):
-    """
-    Base class for prior distributions.
+    """Base class for prior distributions.
 
-    This class should not be used directly. It provides a common interface and bookkeeping for parameter names and transforms.
+    This class should not be used directly. It provides a common interface and
+    bookkeeping for parameter names and transforms.
     """
 
     parameter_names: tuple[str, ...]
 
     @property
     def n_dims(self) -> int:
+        """Number of parameters in this prior."""
         return len(self.parameter_names)
 
     @property
@@ -49,43 +50,63 @@ class Prior(eqx.Module):
     def __init__(self, parameter_names: list[str]):
         """
         Args:
-            parameter_names (list[str]): A list of names for the parameters of the prior.
+            parameter_names: List of parameter names for this prior.
         """
         self.parameter_names = tuple(parameter_names)
 
     def add_name(self, x: Float[Array, "n_dims"]) -> dict[str, Float]:
-        """
-        Turn an array into a dictionary.
+        """Convert a flat parameter array to a named dict.
 
         Args:
-            x (Array): An array of parameters. Shape (n_dims,).
-        """
+            x: Array of parameter values, shape ``(n_dims,)``.
 
+        Returns:
+            Dict mapping parameter names to scalar values.
+        """
         return dict(zip(self.parameter_names, x))
 
     def __call__(self, x: dict[str, Float]) -> Float:
+        """Alias for `log_prob`."""
         return self.log_prob(x)
 
     @abstractmethod
     def log_prob(self, z: dict[str, Float]) -> Float:
+        """Evaluate the log-probability of a sample.
+
+        Args:
+            z: Dict of parameter values.
+
+        Returns:
+            Log-probability scalar.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def sample(
         self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
+        """Draw samples from the prior.
+
+        Args:
+            rng_key: JAX PRNG key.
+            n_samples: Number of samples to draw.
+
+        Returns:
+            Dict mapping parameter names to arrays of shape ``(n_samples,)``.
+        """
         raise NotImplementedError
 
 
 @jaxtyped(typechecker=typechecker)
 class CompositePrior(Prior):
-    """
-    Composite prior consisting of multiple priors, including SequentialTransformPrior and CombinePrior.
-    This class is used to create complex prior distributions from simpler ones.
+    """Composite prior consisting of multiple component priors.
+
+    Base class for [`SequentialTransformPrior`][jimgw.core.prior.SequentialTransformPrior] and [`CombinePrior`][jimgw.core.prior.CombinePrior].
+    Used to build complex prior distributions from simpler ones.
 
     Attributes:
-        base_prior (tuple[Prior, ...]): Tuple of prior objects.
-        parameter_names (tuple[str, ...]): Names of all parameters in the composite prior.
+        base_prior: Component prior objects.
+        parameter_names: Names of all parameters in this composite prior.
     """
 
     base_prior: tuple[Prior, ...]
@@ -97,6 +118,10 @@ class CompositePrior(Prior):
         self,
         priors: list[Prior],
     ):
+        """
+        Args:
+            priors: List of component prior objects.
+        """
         self.base_prior = tuple(priors)
         self.parameter_names = tuple(
             [name for prior in priors for name in prior.parameter_names]
@@ -106,11 +131,10 @@ class CompositePrior(Prior):
         """Recursively collect all leaf (non-composite) priors.
 
         Args:
-            output (Optional[list[Prior]]): Accumulator list. If None, a new list
-                is created. Defaults to None.
+            output: Accumulator list. If ``None``, a new list is created.
 
         Returns:
-            list[Prior]: List of all leaf prior objects in this composite.
+            List of all leaf prior objects in this composite.
         """
         if output is None:
             output = []
@@ -124,12 +148,7 @@ class CompositePrior(Prior):
 
 @jaxtyped(typechecker=typechecker)
 class LogisticDistribution(Prior):
-    """
-    One-dimensional logistic distribution prior.
-
-    Attributes:
-        parameter_names (list[str]): Name of the parameter.
-    """
+    """One-dimensional logistic distribution prior."""
 
     @property
     def is_normalized(self) -> bool:
@@ -145,15 +164,14 @@ class LogisticDistribution(Prior):
     def sample(
         self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
-        """
-        Sample from a logistic distribution.
+        """Sample from a logistic distribution.
 
         Args:
-            rng_key (Key): A random key to use for sampling.
-            n_samples (int): The number of samples to draw.
+            rng_key: JAX PRNG key.
+            n_samples: Number of samples to draw.
 
         Returns:
-            dict: Samples from the distribution. The keys are the names of the parameters.
+            Dict mapping parameter name to samples of shape ``(n_samples,)``.
         """
         samples = jax.random.uniform(rng_key, (n_samples,), minval=0.0, maxval=1.0)
         samples = logit(samples)
@@ -166,12 +184,7 @@ class LogisticDistribution(Prior):
 
 @jaxtyped(typechecker=typechecker)
 class StandardNormalDistribution(Prior):
-    """
-    One-dimensional standard normal (Gaussian) distribution prior.
-
-    Attributes:
-        parameter_names (list[str]): Name of the parameter.
-    """
+    """One-dimensional standard normal (Gaussian) distribution prior."""
 
     @property
     def is_normalized(self) -> bool:
@@ -189,15 +202,14 @@ class StandardNormalDistribution(Prior):
     def sample(
         self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
-        """
-        Sample from a standard normal distribution.
+        """Sample from a standard normal distribution.
 
         Args:
-            rng_key (Key): A random key to use for sampling.
-            n_samples (int): The number of samples to draw.
+            rng_key: JAX PRNG key.
+            n_samples: Number of samples to draw.
 
         Returns:
-            dict: Samples from the distribution. The keys are the names of the parameters.
+            Dict mapping parameter name to samples of shape ``(n_samples,)``.
         """
         samples = jax.random.normal(rng_key, (n_samples,))
         return self.add_name(samples[None])
@@ -209,12 +221,7 @@ class StandardNormalDistribution(Prior):
 
 @jaxtyped(typechecker=typechecker)
 class UniformDistribution(Prior):
-    """
-    One-dimensional uniform distribution prior over [0, 1].
-
-    Attributes:
-        parameter_names (list[str]): Name of the parameter.
-    """
+    """One-dimensional uniform distribution prior over [0, 1]."""
 
     xmin: float = 0.0
     xmax: float = 1.0
@@ -233,15 +240,14 @@ class UniformDistribution(Prior):
     def sample(
         self, rng_key: Key, n_samples: int
     ) -> dict[str, Float[Array, " n_samples"]]:
-        """
-        Sample from a uniform distribution.
+        """Sample from a uniform distribution.
 
         Args:
-            rng_key (Key): A random key to use for sampling.
-            n_samples (int): The number of samples to draw.
+            rng_key: JAX PRNG key.
+            n_samples: Number of samples to draw.
 
         Returns:
-            dict: Samples from the distribution. The keys are the names of the parameters.
+            Dict mapping parameter name to samples of shape ``(n_samples,)``.
         """
         samples = jax.random.uniform(rng_key, (n_samples,), minval=0.0, maxval=1.0)
         return self.add_name(samples[None])
@@ -279,9 +285,9 @@ class SequentialTransformPrior(CompositePrior):
     ):
         """
         Args:
-            base_prior (list[Prior]): A single-element list containing the base prior.
-            transforms (list[BijectiveTransform]): Ordered list of bijective transforms
-                to apply to samples from the base prior.
+            base_prior: A single-element list containing the base prior.
+            transforms: Ordered list of bijective transforms to apply to
+                samples from the base prior.
         """
         assert len(base_prior) == 1, (
             "SequentialTransformPrior only takes one base prior"
@@ -297,12 +303,11 @@ class SequentialTransformPrior(CompositePrior):
         """Sample by drawing from the base prior and applying all transforms.
 
         Args:
-            rng_key (Key): JAX PRNG key.
-            n_samples (int): Number of samples to draw.
+            rng_key: JAX PRNG key.
+            n_samples: Number of samples to draw.
 
         Returns:
-            dict[str, Float[Array, " n_samples"]]: Transformed samples keyed by
-                parameter name.
+            Transformed samples keyed by parameter name.
         """
         output = self.base_prior[0].sample(rng_key, n_samples)
         return jax.vmap(self.transform)(output)
@@ -314,10 +319,10 @@ class SequentialTransformPrior(CompositePrior):
         log-Jacobian determinants, then evaluates the base prior.
 
         Args:
-            z (dict[str, Float]): Sample in the transformed (output) space.
+            z: Sample in the transformed (output) space.
 
         Returns:
-            Float: Log-probability of z under the induced distribution.
+            Log-probability of z under the induced distribution.
         """
         output = 0
         for transform in reversed(self.transforms):
@@ -330,10 +335,10 @@ class SequentialTransformPrior(CompositePrior):
         """Apply all transforms sequentially (forward direction).
 
         Args:
-            x (dict[str, Float]): Sample in the base prior space.
+            x: Sample in the base prior space.
 
         Returns:
-            dict[str, Float]: Transformed sample.
+            Transformed sample.
         """
         for transform in self.transforms:
             x = transform.forward(x)
@@ -382,8 +387,8 @@ class CombinePrior(CompositePrior):
     which is valid when all component priors are independent.
 
     Attributes:
-        base_prior (tuple[Prior, ...]): Tuple of independent priors.
-        parameter_names (tuple[str, ...]): Names of all parameters in the combined prior.
+        base_prior: Independent component priors.
+        parameter_names: Names of all parameters in the combined prior.
     """
 
     base_prior: tuple[Prior, ...] = field(default_factory=tuple)
@@ -403,7 +408,7 @@ class CombinePrior(CompositePrior):
     ):
         """
         Args:
-            priors (list[Prior]): List of independent prior objects to combine.
+            priors: List of independent prior objects to combine.
         """
         super().__init__(priors)
 
@@ -413,12 +418,11 @@ class CombinePrior(CompositePrior):
         """Sample from all component priors independently.
 
         Args:
-            rng_key (Key): JAX PRNG key (split internally for each component).
-            n_samples (int): Number of samples to draw.
+            rng_key: JAX PRNG key (split internally for each component).
+            n_samples: Number of samples to draw.
 
         Returns:
-            dict[str, Float[Array, " n_samples"]]: Combined samples from all
-                component priors, keyed by parameter name.
+            Combined samples from all component priors, keyed by parameter name.
         """
         output = {}
         for prior in self.base_prior:
@@ -430,10 +434,10 @@ class CombinePrior(CompositePrior):
         """Evaluate the joint log-probability as the sum of component log-probabilities.
 
         Args:
-            z (dict[str, Float]): Dictionary of parameter values.
+            z: Dictionary of parameter values.
 
         Returns:
-            Float: Sum of log-probabilities from all component priors.
+            Sum of log-probabilities from all component priors.
         """
         output = 0.0
         for prior in self.base_prior:
@@ -443,13 +447,11 @@ class CombinePrior(CompositePrior):
 
 @jaxtyped(typechecker=typechecker)
 class UniformPrior(SequentialTransformPrior):
-    """
-    Uniform prior over a finite interval [xmin, xmax].
+    """Uniform prior over a finite interval ``[xmin, xmax]``.
 
     Attributes:
-        xmin (float): Lower bound of the interval.
-        xmax (float): Upper bound of the interval.
-        parameter_names (list[str]): Name of the parameter.
+        xmin: Lower bound of the interval.
+        xmax: Upper bound of the interval.
     """
 
     xmin: float
@@ -487,13 +489,11 @@ class UniformPrior(SequentialTransformPrior):
 
 @jaxtyped(typechecker=typechecker)
 class GaussianPrior(SequentialTransformPrior):
-    """
-    Gaussian (normal) prior with specified mean and standard deviation.
+    """Gaussian (normal) prior with specified mean and standard deviation.
 
     Attributes:
-        mu (float): Mean of the distribution.
-        sigma (float): Standard deviation of the distribution.
-        parameter_names (list[str]): Name of the parameter.
+        mu: Mean of the distribution.
+        sigma: Standard deviation of the distribution.
     """
 
     mu: float
@@ -509,13 +509,10 @@ class GaussianPrior(SequentialTransformPrior):
         parameter_names: list[str],
     ):
         """
-        A convenient wrapper distribution on top of the StandardNormalDistribution class
-        which scale and translate the distribution according to the mean and standard deviation.
-
-        Args
-            mu: The mean of the distribution.
-            sigma: The standard deviation of the distribution.
-            parameter_names: A list of names for the parameters of the prior.
+        Args:
+            mu: Mean of the distribution.
+            sigma: Standard deviation of the distribution.
+            parameter_names: List with a single parameter name.
         """
         assert len(parameter_names) == 1, "GaussianPrior needs to be 1D distributions"
         self.mu = mu
@@ -540,12 +537,7 @@ class GaussianPrior(SequentialTransformPrior):
 
 @jaxtyped(typechecker=typechecker)
 class SinePrior(BoundedMixin, SequentialTransformPrior):
-    """
-    Prior with PDF proportional to sin(x) over [0, pi].
-
-    Attributes:
-        parameter_names (list[str]): Name of the parameter.
-    """
+    """Prior with PDF proportional to ``sin(x)`` over ``[0, π]``."""
 
     xmin: float = 0.0
     xmax: float = jnp.pi
@@ -576,12 +568,7 @@ class SinePrior(BoundedMixin, SequentialTransformPrior):
 
 @jaxtyped(typechecker=typechecker)
 class CosinePrior(BoundedMixin, SequentialTransformPrior):
-    """
-    Prior with PDF proportional to cos(x) over [-pi/2, pi/2].
-
-    Attributes:
-        parameter_names (list[str]): Name of the parameter.
-    """
+    """Prior with PDF proportional to ``cos(x)`` over ``[-π/2, π/2]``."""
 
     xmin: float = -jnp.pi / 2
     xmax: float = jnp.pi / 2
@@ -613,17 +600,18 @@ class CosinePrior(BoundedMixin, SequentialTransformPrior):
 
 @jaxtyped(typechecker=typechecker)
 class UniformSpherePrior(CombinePrior):
-    """
-    Uniform prior over a sphere, parameterized by magnitude, theta, and phi.
-
-    Attributes:
-        parameter_names (list[str]): Names of the vector, theta, and phi parameters.
-    """
+    """Uniform prior over a sphere, parameterized by magnitude, polar angle, and azimuth."""
 
     def __repr__(self):
         return f"UniformSpherePrior(parameter_names={self.parameter_names})"
 
     def __init__(self, parameter_names: list[str], max_mag: float = 1.0):
+        """
+        Args:
+            parameter_names: Single-element list with the base parameter name.
+                Expands to ``<name>_mag``, ``<name>_theta``, ``<name>_phi``.
+            max_mag: Maximum magnitude of the vector.
+        """
         assert len(parameter_names) == 1, (
             "UniformSpherePrior only takes the name of the vector"
         )
@@ -641,12 +629,10 @@ class UniformSpherePrior(CombinePrior):
 
 @jaxtyped(typechecker=typechecker)
 class RayleighPrior(BoundedMixin, SequentialTransformPrior):
-    """
-    Rayleigh distribution prior with scale parameter sigma.
+    """Rayleigh distribution prior with scale parameter sigma.
 
     Attributes:
-        sigma (float): Scale parameter of the Rayleigh distribution.
-        parameter_names (list[str]): Name of the parameter.
+        sigma: Scale parameter of the Rayleigh distribution.
     """
 
     sigma: float
@@ -667,6 +653,11 @@ class RayleighPrior(BoundedMixin, SequentialTransformPrior):
         sigma: float,
         parameter_names: list[str],
     ):
+        """
+        Args:
+            sigma: Scale parameter of the Rayleigh distribution.
+            parameter_names: List with a single parameter name.
+        """
         assert len(parameter_names) == 1, "RayleighPrior needs to be 1D distributions"
         self.sigma = sigma
         super().__init__(
@@ -682,14 +673,12 @@ class RayleighPrior(BoundedMixin, SequentialTransformPrior):
 
 @jaxtyped(typechecker=typechecker)
 class PowerLawPrior(SequentialTransformPrior):
-    """
-    Power-law prior over [xmin, xmax] with exponent alpha.
+    """Power-law prior over ``[xmin, xmax]`` with exponent alpha.
 
     Attributes:
-        xmin (float): Lower bound of the interval.
-        xmax (float): Upper bound of the interval.
-        alpha (float): Power-law exponent.
-        parameter_names (list[str]): Name of the parameter.
+        xmin: Lower bound of the interval (must be positive).
+        xmax: Upper bound of the interval.
+        alpha: Power-law exponent.
     """
 
     xmin: float
@@ -706,6 +695,13 @@ class PowerLawPrior(SequentialTransformPrior):
         alpha: float,
         parameter_names: list[str],
     ):
+        """
+        Args:
+            xmin: Lower bound (must be positive).
+            xmax: Upper bound.
+            alpha: Power-law exponent.
+            parameter_names: List with a single parameter name.
+        """
         assert len(parameter_names) == 1, "Power law needs to be 1D distributions"
         self.xmax = xmax
         self.xmin = xmin

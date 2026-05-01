@@ -150,12 +150,6 @@ jim = Jim(
 )
 jim.sample()
 samples = jim.get_samples()
-
-# Evidence estimate via anesthetic:
-out = jim.sampler.get_output()
-from anesthetic.samples import NestedSamples
-ns = NestedSamples(out.samples, logL=out.log_likelihood, logL_birth=out.log_likelihood_birth)
-print(f"log Z = {ns.logZ().mean():.2f} ± {ns.logZ().std():.2f}")
 ```
 
 Key parameters:
@@ -165,8 +159,6 @@ Key parameters:
   (e.g. `0.5` replaces half the live points each step).
 - `n_target` — target number of accepted proposals per walk.
 - `max_mcmc` — maximum number of proposals before giving up on a dead point.
-- `termination_dlogz` — stop when the estimated remaining log-evidence
-  contribution falls below this value.
 
 **Reference:** Prathaban, M., Yallup, D., Alvey, J., Yang, M., Templeton, W.,
 Handley, W., *"Gravitational-wave inference at GPU speed: A bilby-like nested
@@ -201,12 +193,6 @@ jim = Jim(
 )
 jim.sample()
 samples = jim.get_samples()
-
-# Evidence estimate via anesthetic:
-out = jim.sampler.get_output()
-from anesthetic.samples import NestedSamples
-ns = NestedSamples(out.samples, logL=out.log_likelihood, logL_birth=out.log_likelihood_birth)
-print(f"log Z = {ns.logZ().mean():.2f} ± {ns.logZ().std():.2f}")
 ```
 
 Key parameters:
@@ -215,8 +201,6 @@ Key parameters:
 - `n_delete_frac` — fraction of live points replaced per iteration.
 - `num_inner_steps_per_dim` — slice-sampler steps per dimension per dead point;
   increase for strongly correlated posteriors.
-- `termination_dlogz` — stop when the estimated remaining log-evidence
-  contribution falls below this value.
 
 **Repository:** [handley-lab/blackjax](https://github.com/handley-lab/blackjax)
 
@@ -252,91 +236,66 @@ config = BlackJAXNSAWConfig(
 
 ---
 
-## `SamplerOutput` fields
+## Posterior samples
 
-`jim.get_samples()` is the primary way to retrieve posterior samples — it
-handles the reverse transform from sampling space back to prior space and
-returns a `dict[str, np.ndarray]` keyed by parameter name.
-
-For backends that return weights (SMC), `get_samples()` performs weighted resampling to produce an equally-weighted posterior.
-For NS-AW and NSS, `get_samples()` passes the nested sampling data to anesthetic to compute posterior weights, then resamples.
-With the default `n_samples=0` it returns approximately `floor(1 / max(weights))` samples, matching anesthetic's `posterior_points()` convention; pass an explicit `n_samples` to override.
-For flowMC, `n_samples=0` returns all samples collected across all chains.
-
-For lower-level access (raw sampling-space arrays, per-sample log-densities), use `jim.sampler.get_output()`:
+`jim.get_samples()` is the primary way to retrieve posterior samples.
 
 ```python
-out = jim.sampler.get_output()
-
-out.samples                # np.ndarray shape (N, n_dims) — raw sampling-space values
-out.log_prior              # np.ndarray | None — per-sample log-prior
-out.log_likelihood         # np.ndarray | None — per-sample log-likelihood
-out.log_posterior          # np.ndarray | None — per-sample log-posterior
-out.log_likelihood_birth   # np.ndarray | None — birth log-likelihoods (NS only)
-out.weights                # np.ndarray | None — posterior weights (SMC only)
+samples = jim.get_samples()
+# keys: prior parameter names + "log_likelihood"
+samples["M_c"]             # np.ndarray — chirp mass in prior space
+samples["log_likelihood"]  # np.ndarray — per-sample log-likelihood
 ```
 
-Which fields are populated depends on the backend:
+Each backend's `get_samples()` returns equally-weighted posterior samples:
 
-| Backend | `log_posterior` | `log_likelihood` | `log_likelihood_birth` | `weights` |
-| --- | --- | --- | --- | --- |
-| flowMC | ✓ | | | |
-| NS-AW / NSS | | ✓ | ✓ | |
-| SMC | | ✓ | | ✓ |
+- **NS-AW / NSS**: uses anesthetic's `posterior_points()` to resample the dead-point collection to equal-weight samples.
+- **SMC (persistent)**: resamples all-temperature particles weighted by the persistent-sampling weights.
+- **SMC (non-persistent)**: returns all final-temperature particles.
+- **flowMC**: returns all production samples across all chains.
 
-For NS-AW and NSS, `jim.get_samples()` uses anesthetic to compute posterior weights from
-`log_likelihood` and `log_likelihood_birth`.  To compute the evidence estimate directly:
+Pass `n_samples` to `jim.get_samples()` to further downsample uniformly without replacement:
 
 ```python
-out = jim.sampler.get_output()
-from anesthetic.samples import NestedSamples
-ns = NestedSamples(out.samples, logL=out.log_likelihood, logL_birth=out.log_likelihood_birth)
-log_z_mean = ns.logZ().mean()
-log_z_err = ns.logZ().std()
+samples = jim.get_samples(n_samples=2000)
 ```
-
-For SMC, `weights` contains the posterior weights computed by the sampler.
-Pass them to any weighted-average or corner-plot function you use, e.g.:
-
-```python
-posterior_mean = np.average(out.samples, weights=out.weights, axis=0)
-```
-
-When `persistent_sampling=True`, `out.samples` stacks particles from all temperature steps
-(shape `(n_steps * n_particles, n_dims)`).  Earlier temperature steps explore
-more broadly; later steps concentrate near the posterior peak.  The `weights`
-account for this automatically.
 
 ---
 
 ## Run diagnostics
 
-`jim.get_diagnostics()` returns a `SamplerDiagnostics` dataclass with
-information that is not known in advance — things like how long sampling took,
-how many likelihood evaluations were made, and per-step convergence histories.
+`jim.get_diagnostics()` is a thin wrapper around the sampler's own `get_diagnostics()`, which returns a plain `dict[str, Any]`.
 
 ```python
 diag = jim.get_diagnostics()
 
-diag.sampling_time_seconds     # float — wall-clock sampling time in seconds
-diag.n_likelihood_evaluations  # int   — total number of likelihood calls
+diag["n_likelihood_evaluations"]  # int — total number of likelihood calls
 ```
 
-Backend-specific extras (all `None` if not applicable):
+Backend-specific keys:
 
 ```python
 # flowMC
-diag.n_training_loops_actual   # int        — actual training loops run (may be less than configured if early stopping triggered)
-diag.training_loss_history     # np.ndarray — normalizing-flow loss per epoch
+diag["n_training_loops_actual"]         # int        — training loops run (may be less than configured)
+diag["training_loss_history"]           # np.ndarray — normalizing-flow loss per epoch
+diag["acceptance_training_local"]       # np.ndarray — local acceptance rate per training loop
+diag["acceptance_training_global"]      # np.ndarray — global acceptance rate per training loop
+diag["acceptance_production_local"]     # np.ndarray — local acceptance rate per production loop
+diag["acceptance_production_global"]    # np.ndarray — global acceptance rate per production loop
 
-# NS-AW and NSS
-diag.ns_n_iterations           # int        — number of nested-sampling steps
+# NS-AW and NSS — also include evidence estimate
+diag["n_iterations"]              # int   — number of nested-sampling steps
+diag["log_Z"]                     # float — log Bayesian evidence
+diag["log_Z_error"]               # float — standard deviation from 100 bootstrap samples
 
-# SMC (adaptive temperature only — for fixed ladder these are user-specified)
-diag.smc_n_iterations          # int        — number of temperature steps taken
-diag.smc_tempering_schedule    # np.ndarray — temperature value at each step
-diag.smc_acceptance_history    # np.ndarray — mean acceptance rate at each step
-diag.smc_persistent_log_Z      # np.ndarray — log Z trajectory (when persistent_sampling=True)
+# SMC
+diag["acceptance_history"]        # np.ndarray — mean acceptance rate at each step
+# Adaptive temperature only:
+diag["n_iterations"]              # int        — number of temperature steps
+diag["tempering_schedule"]        # np.ndarray — temperature value at each step
+# Persistent sampling only:
+diag["persistent_log_Z"]          # np.ndarray — log Z trajectory
+diag["log_Z"]                     # float      — final log Bayesian evidence
 ```
 
 ---
@@ -349,17 +308,15 @@ diag.smc_persistent_log_Z      # np.ndarray — log Z trajectory (when persisten
 
 Subclass `Sampler`, implement three methods, and register it:
 
-- `_sample_impl(rng_key, initial_position)` — run the sampler.  The
-  base-class `sample()` wraps this with timing, so wall-clock time is captured
-  automatically.
-- `get_output()` — return a `SamplerOutput`.
-- `get_diagnostics()` — return a `SamplerDiagnostics`.
+- `sample(rng_key, initial_position)` — run the sampler and store results.
+- `get_samples()` — return a dict with `"samples"` and `"log_likelihood"` keys.
+- `get_diagnostics()` — return a plain dict with diagnostic information.
 
 ```python
-from typing import Literal
+from typing import Any, Literal
 import numpy as np
 from jimgw.samplers import register_sampler
-from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
+from jimgw.samplers.base import Sampler
 from jimgw.samplers.config import BaseSamplerConfig
 
 
@@ -377,27 +334,25 @@ class MySampler(Sampler):
         self._config = config
         self._result = None
 
-    def _sample_impl(self, rng_key, initial_position):
+    def sample(self, rng_key, initial_position) -> None:
         # initial_position: shape (n_chains, n_dims), drawn from the prior by Jim.
         # ... run your sampler for self._config.n_steps steps ...
         self._result = np.asarray(initial_position)
 
-    def get_output(self):
+    def get_samples(self) -> dict[str, np.ndarray]:
         if self._result is None:
             raise RuntimeError("call sample() first")
-        return SamplerOutput(
-            samples=self._result,
-            log_posterior=np.zeros(self._result.shape[0]),
-        )
+        return {
+            "samples": self._result,
+            "log_likelihood": np.zeros(self._result.shape[0]),
+        }
 
-    def get_diagnostics(self):
+    def get_diagnostics(self) -> dict[str, Any]:
         if self._result is None:
             raise RuntimeError("call sample() first")
-        return SamplerDiagnostics(
-            backend="my-sampler",
-            sampling_time_seconds=self._sampling_time_seconds,
-            n_likelihood_evaluations=self._config.n_steps,
-        )
+        return {
+            "n_likelihood_evaluations": self._config.n_steps,
+        }
 
 
 register_sampler("my-sampler", lambda: MySampler)

@@ -8,18 +8,16 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float, Key
+from anesthetic.samples import NestedSamples
+import blackjax
 
-from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
+from jimgw.samplers.base import Sampler
 from jimgw.samplers.blackjax._acceptance_walk_kernel import bilby_adaptive_de_sampler
-from jimgw.samplers.blackjax._imports import (
-    import_blackjax,
-    require_nested_sampling,
-)
+from jimgw.samplers.blackjax._imports import require_nested_sampling
 from jimgw.samplers.config import BlackJAXNSAWConfig
 from jimgw.samplers.periodic import to_unit_cube_stepper
 
-_blackjax = import_blackjax()
-require_nested_sampling(_blackjax)
+require_nested_sampling(blackjax)
 
 
 class BlackJAXNSAWSampler(Sampler):
@@ -30,26 +28,26 @@ class BlackJAXNSAWSampler(Sampler):
     of shape ``(n_dims,)``; the acceptance-walk kernel is pytree-generic and
     works identically with flat arrays.
 
-    .. note::
+    !!! note
         This sampler requires the sampling space to be the unit hypercube
         ``[0, 1]^n_dims``.  All ``sample_transforms`` in Jim must map the
         prior support onto ``[0, 1]`` per dimension before sampling.  A
-        :class:`ValueError` is raised at construction if the supplied
+        `ValueError` is raised at construction if the supplied
         ``log_prior_fn`` violates this constraint.
 
-    Reference
-    ---------
-    Prathaban, M., Yallup, D., Alvey, J., Yang, M., Templeton, W., Handley, W.,
-    "Gravitational-wave inference at GPU speed: A bilby-like nested sampling
-    kernel within blackjax-ns", arXiv:2509.04336 (Sep 2025).
+    **Reference:** Prathaban, M., Yallup, D., Alvey, J., Yang, M., Templeton, W.,
+    Handley, W., *"Gravitational-wave inference at GPU speed: A bilby-like nested
+    sampling kernel within blackjax-ns"*, arXiv:2509.04336 (Sep 2025).
 
-    Configure via :class:`~jimgw.samplers.config.BlackJAXNSAWConfig`.
+    Configure via [`BlackJAXNSAWConfig`][jimgw.samplers.config.BlackJAXNSAWConfig].
     """
 
     _config: BlackJAXNSAWConfig
     _stepper_fn: Callable
     _sampled: bool
     _final_state: Any
+    _nested_samples: NestedSamples
+    _n_iterations: int
 
     def __init__(
         self,
@@ -95,11 +93,22 @@ class BlackJAXNSAWSampler(Sampler):
                 "log_prior_fn must return -inf for all points outside [0, 1]^n_dims. "
             )
 
-    def _sample_impl(
+    def sample(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n_live n_dims"],
     ) -> None:
+        """Run the BlackJAX NS-AW sampler.
+
+        Args:
+            rng_key: JAX PRNG key.
+            initial_position: Starting live points in the unit-cube sampling
+                space, shape ``(n_live, n_dims)``.  Must match ``config.n_live``.
+
+        Raises:
+            ValueError: If ``initial_position`` shape does not match
+                ``(n_live, n_dims)``.
+        """
         config = self._config
         n_live = config.n_live
         n_delete = int(n_live * config.n_delete_frac)
@@ -143,43 +152,66 @@ class BlackJAXNSAWSampler(Sampler):
 
         self._final_state = finalise(state, dead)
         self._n_iterations = n_iter
+
+        # Build anesthetic NestedSamples for use in get_samples() and get_diagnostics().
+        particles_sample = np.array(self._final_state.particles.position)
+        log_likelihood = np.array(self._final_state.particles.loglikelihood)
+        logL_birth = jnp.array(self._final_state.particles.loglikelihood_birth)
+        logL_birth = jnp.where(jnp.isnan(logL_birth), -jnp.inf, logL_birth)
+        self._nested_samples = NestedSamples(  # type: ignore[call-arg]
+            particles_sample,
+            logL=log_likelihood,
+            logL_birth=np.asarray(logL_birth),
+            logzero=np.nan,
+            dtype=np.float64,
+        )
         self._sampled = True
 
-    def get_output(self) -> SamplerOutput:
+    def get_samples(self) -> dict[str, np.ndarray]:
+        """Return equally-weighted posterior samples.
+
+        Uses `NestedSamples.posterior_points` to
+        resample the nested dead-point collection to a set of equal-weight
+        samples.
+
+        Returns:
+            Dict with keys ``"samples"`` (shape ``(n, n_dims)``) and
+            ``"log_likelihood"`` (shape ``(n,)``).
+        """
         if not self._sampled:
-            raise RuntimeError("get_output() called before sample()")
+            raise RuntimeError("get_samples() called before sample()")
+        posterior = self._nested_samples.posterior_points()
+        samples = np.asarray(posterior.iloc[:, : self.n_dims])
+        log_L = np.asarray(posterior["logL"])
+        return {"samples": samples, "log_likelihood": log_L}
 
-        final_state = self._final_state
-
-        particles_sample = np.array(final_state.particles.position)
-        log_likelihood = np.array(final_state.particles.loglikelihood)
-
-        logL_birth = jnp.array(final_state.particles.loglikelihood_birth)
-        logL_birth = jnp.where(jnp.isnan(logL_birth), -jnp.inf, logL_birth)
-
-        return SamplerOutput(
-            samples=particles_sample,
-            log_likelihood=log_likelihood,
-            log_likelihood_birth=np.asarray(logL_birth),
-        )
-
-    def get_diagnostics(self) -> SamplerDiagnostics:
+    def get_diagnostics(self) -> dict[str, Any]:
         """Return NS-AW run diagnostics.
 
-        Populates: ``ns_n_iterations``, ``ns_aw_n_accept``,
-        ``ns_aw_walks_completed``, ``ns_aw_total_proposals``.
-        ``n_likelihood_evaluations`` is derived from the concatenated
-        :class:`DEWalkInfo`.
+        Returns a dict with the following keys:
+
+        * ``"n_likelihood_evaluations"`` — total likelihood calls.
+        * ``"n_iterations"`` — total nested-sampling iterations.
+        * ``"n_accept_history"`` — accepted proposal count per NS iteration.
+        * ``"n_walks_history"`` — completed walk count per NS iteration.
+        * ``"n_proposals_history"`` — total proposal count per NS iteration.
+        * ``"log_Z"`` — log Bayesian evidence (anesthetic mean estimate).
+        * ``"log_Z_error"`` — standard deviation of log Z from 100 bootstrap samples.
         """
         if not self._sampled:
             raise RuntimeError("get_diagnostics() called before sample()")
         ui = self._final_state.update_info  # DEWalkInfo concatenated across all steps
         n_evals = int(jnp.sum(ui.n_likelihood_evals))
-        return SamplerDiagnostics(
-            sampling_time_seconds=self._sampling_time_seconds,  # type: ignore[arg-type]
-            n_likelihood_evaluations=n_evals,
-            ns_n_iterations=self._n_iterations,
-            ns_aw_n_accept=np.asarray(ui.n_accept),
-            ns_aw_walks_completed=np.asarray(ui.walks_completed),
-            ns_aw_total_proposals=np.asarray(ui.total_proposals),
-        )
+
+        log_Z = np.asarray(self._nested_samples.logZ()).item()
+        log_Z_error = np.std(np.asarray(self._nested_samples.logZ(nsamples=100))).item()
+
+        return {
+            "n_likelihood_evaluations": n_evals,
+            "n_iterations": self._n_iterations,
+            "n_accept_history": np.asarray(ui.n_accept),
+            "n_walks_history": np.asarray(ui.walks_completed),
+            "n_proposals_history": np.asarray(ui.total_proposals),
+            "log_Z": log_Z,
+            "log_Z_error": log_Z_error,
+        }

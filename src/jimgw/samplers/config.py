@@ -1,7 +1,7 @@
 """Pydantic configuration models for Jim's samplers.
 
 Each sampler has its own ``*Config`` class discriminated by a ``type`` literal;
-:data:`SamplerConfig` is the discriminated-union annotation a caller passes to
+`SamplerConfig` is the discriminated-union annotation a caller passes to
 ``Jim(..., sampler_config=...)``.
 """
 
@@ -67,7 +67,7 @@ class GRWConfig(BaseModel):
 
 
 class FlowMCConfig(BaseSamplerConfig):
-    """Configuration for :class:`~jimgw.samplers.flowmc.FlowMCSampler`.
+    """Configuration for [`FlowMCSampler`][jimgw.samplers.flowmc.FlowMCSampler].
 
     The ``local_kernel`` field selects the MCMC kernel used for local proposals:
 
@@ -76,12 +76,13 @@ class FlowMCConfig(BaseSamplerConfig):
     * ``"GRW"`` — Gaussian random walk.
 
     Parallel tempering is **off by default**.  To enable, pass a
-    :class:`ParallelTemperingConfig`, a ``dict`` of its fields, or simply
-    ``True`` (uses all defaults).  ``False`` disables it.
+    [`ParallelTemperingConfig`][jimgw.samplers.config.ParallelTemperingConfig],
+    a ``dict`` of its fields, or simply ``True`` (uses all defaults).
+    ``False`` disables it.
 
-    .. note::
+    !!! note
         Only the sub-config matching the active ``local_kernel`` is used.
-        Non-default values in inactive sub-configs emit a :class:`UserWarning`.
+        Non-default values in inactive sub-configs emit a `UserWarning`.
     """
 
     type: Literal["flowmc"] = "flowmc"
@@ -162,7 +163,7 @@ class FlowMCConfig(BaseSamplerConfig):
 class BlackJAXNSAWConfig(BaseSamplerConfig):
     """Configuration for the BlackJAX acceptance-walk nested sampler.
 
-    .. note::
+    !!! note
         This sampler requires the sampling space to be the unit hypercube
         ``[0, 1]^n_dims``.  When using Jim, this means all
         ``sample_transforms`` must map the prior support onto the unit cube.

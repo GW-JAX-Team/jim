@@ -1,37 +1,15 @@
-"""Tests for the BlackJAX lazy-import guards in _imports.py."""
+"""Tests for the BlackJAX import guards in _imports.py."""
 
 from __future__ import annotations
 
-import sys
 import types
 
 import pytest
 
 from jimgw.samplers.blackjax._imports import (
-    import_blackjax,
     require_nested_sampling,
     require_nss,
 )
-
-
-# ---------------------------------------------------------------------------
-# import_blackjax
-# ---------------------------------------------------------------------------
-
-
-def test_import_blackjax_missing(monkeypatch):
-    monkeypatch.setitem(sys.modules, "blackjax", None)
-    with pytest.raises(ImportError, match="uv sync --group nested-sampling"):
-        import_blackjax()
-
-
-def test_import_blackjax_present():
-    bjx = import_blackjax()
-    assert bjx is not None
-    import blackjax
-
-    assert bjx is blackjax
-
 
 # ---------------------------------------------------------------------------
 # require_nested_sampling

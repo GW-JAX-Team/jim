@@ -1,6 +1,6 @@
 """FlowMC-backed sampler for Jim.
 
-Wraps :class:`flowMC.Sampler.Sampler` configured with a rational-quadratic
+Wraps the flowMC `Sampler` configured with a rational-quadratic
 spline normalizing flow and a choice of local MCMC kernel, with optional
 parallel tempering.
 """
@@ -8,7 +8,7 @@ parallel tempering.
 from __future__ import annotations
 
 import logging
-from typing import Callable, Optional, Sequence, Type
+from typing import Any, Callable, Optional, Sequence, Type
 
 import jax
 import jax.numpy as jnp
@@ -22,7 +22,7 @@ from flowMC.resource_strategy_bundle.RQSpline_MALA_PT import RQSpline_MALA_PT_Bu
 from flowMC.Sampler import Sampler as FlowMCSamplerBackend
 from jaxtyping import Array, Float, Key
 
-from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
+from jimgw.samplers.base import Sampler
 from jimgw.samplers.config import FlowMCConfig
 from jimgw.samplers.periodic import to_index_dict
 
@@ -42,13 +42,13 @@ _BUNDLE: dict[tuple[str, bool], Type] = {
 class FlowMCSampler(Sampler):
     """flowMC sampler backend.
 
-    Wraps :class:`flowMC.Sampler.Sampler` with a rational-quadratic spline NF
+    Wraps the flowMC `Sampler` with a rational-quadratic spline NF
     and a configurable local MCMC kernel (MALA, HMC, or GRW) with optional
     parallel tempering.  The flowMC bundle is built lazily inside
-    :meth:`sample` so the PRNG key from Jim is used correctly (no duplication
+    `sample` so the PRNG key from Jim is used correctly (no duplication
     of the seed).
 
-    Configured via :class:`~jimgw.samplers.config.FlowMCConfig`.
+    Configured via [`FlowMCConfig`][jimgw.samplers.config.FlowMCConfig].
     """
 
     _config: FlowMCConfig
@@ -100,7 +100,7 @@ class FlowMCSampler(Sampler):
                 return order
         return self._strategy_order_from_config
 
-    def _sample_impl(
+    def sample(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n_chains n_dims"],
@@ -208,50 +208,61 @@ class FlowMCSampler(Sampler):
         self._flowmc_sampler.sample(initial_position, {})
         self._sampled = True
 
-    def get_output(self) -> SamplerOutput:
-        """Return the production samples and per-sample log-posterior.
+    def get_samples(self) -> dict[str, np.ndarray]:
+        """Return all production samples with their log-likelihoods.
 
         Production samples are flat arrays in sampling space, shape
-        ``(N, n_dims)``; :meth:`~jimgw.core.jim.Jim.get_samples` is
-        responsible for the backward-transform and naming step.
+        ``(N, n_dims)`` where ``N = n_chains * n_production_loops * n_total_steps``.
+        Log-likelihoods are recovered from the stored log-posterior values as
+        ``log_likelihood = log_posterior - log_prior``, avoiding a second
+        evaluation of the likelihood function.
 
-        Diagnostic buffers (training samples, loss history, acceptance
-        rates) are not surfaced here.  Power users can reach them via
-        ``self._flowmc_sampler.resources``; that is an internal escape
-        hatch, not a documented API.
+        Returns:
+            Dict with keys ``"samples"`` (shape ``(N, n_dims)``) and
+            ``"log_likelihood"`` (shape ``(N,)``).
         """
         if not self._sampled or self._flowmc_sampler is None:
             raise RuntimeError(
-                "get_output() called before sample(). Run sample() first."
+                "get_samples() called before sample(). Run sample() first."
             )
         resources = self._flowmc_sampler.resources
 
         prod_positions = resources["positions_production"].data  # type: ignore[union-attr]
         prod_positions = np.array(prod_positions.reshape(-1, self.n_dims))
+        pos_jnp = jnp.array(prod_positions)
+
         log_posterior = np.array(
-            resources["log_prob_production"].data.reshape(-1)  # type: ignore[union-attr]
-        )
+            resources["log_prob_production"].data  # type: ignore[union-attr]
+        ).reshape(-1)
+        log_prior = np.array(jax.vmap(self._log_prior_fn)(pos_jnp))
+        log_likelihood = log_posterior - log_prior
 
-        return SamplerOutput(
-            samples=prod_positions,
-            log_posterior=log_posterior,
-        )
+        return {"samples": prod_positions, "log_likelihood": log_likelihood}
 
-    def get_diagnostics(self) -> SamplerDiagnostics:
+    def get_diagnostics(self) -> dict[str, Any]:
         """Return flowMC run diagnostics.
 
-        Populates: ``n_training_loops_actual``, ``training_loss_history``,
-        ``local_acceptance_training``, ``global_acceptance_training``,
-        ``local_acceptance_production``, ``global_acceptance_production``.
+        Returns a dict with the following keys:
+
+        * ``"n_likelihood_evaluations"`` — total likelihood calls.
+        * ``"n_training_loops_actual"`` — training loops actually run
+          (may be fewer than configured if early stopping triggered).
+        * ``"training_loss_history"`` — normalizing-flow loss per epoch.
+        * ``"acceptance_training_local"`` — per-loop local acceptance (training).
+        * ``"acceptance_training_global"`` — per-loop global acceptance (training).
+        * ``"acceptance_production_local"`` — per-loop local acceptance (production).
+        * ``"acceptance_production_global"`` — per-loop global acceptance (production).
         """
         if not self._sampled or self._flowmc_sampler is None:
             raise RuntimeError("get_diagnostics() called before sample()")
         cfg = self._config
         res = self._flowmc_sampler.resources
 
-        loss_data = np.asarray(res["loss_buffer"].data)  # type: ignore[union-attr]
-        epochs_run = int(np.sum(~np.isinf(loss_data)))
-        actual_training_loops = epochs_run // max(cfg.n_epochs, 1)
+        actual_training_loops = (
+            self._flowmc_sampler.strategies["check_early_stop"]._call_count  # type: ignore[reportAttributeAccessIssue]
+            if "check_early_stop" in self._flowmc_sampler.strategies
+            else cfg.n_training_loops
+        )
 
         n_evals = int(
             cfg.n_chains
@@ -259,15 +270,16 @@ class FlowMCSampler(Sampler):
             * (actual_training_loops + cfg.n_production_loops)
         )
 
-        return SamplerDiagnostics(
-            sampling_time_seconds=self._sampling_time_seconds,  # type: ignore[arg-type]
-            n_likelihood_evaluations=n_evals,
-            n_training_loops_actual=actual_training_loops,
-            training_loss_history=loss_data[:epochs_run]
-            if epochs_run > 0
-            else loss_data,
-            local_acceptance_training=np.asarray(res["local_accs_training"].data),  # type: ignore[union-attr]
-            global_acceptance_training=np.asarray(res["global_accs_training"].data),  # type: ignore[union-attr]
-            local_acceptance_production=np.asarray(res["local_accs_production"].data),  # type: ignore[union-attr]
-            global_acceptance_production=np.asarray(res["global_accs_production"].data),  # type: ignore[union-attr]
-        )
+        return {
+            "n_likelihood_evaluations": n_evals,
+            "n_training_loops_actual": actual_training_loops,
+            "training_loss_history": np.asarray(res["loss_buffer"].data),  # type: ignore[reportAttributeAccessIssue]
+            "acceptance_training_local": np.asarray(res["local_accs_training"].data),  # type: ignore[reportAttributeAccessIssue]
+            "acceptance_training_global": np.asarray(res["global_accs_training"].data),  # type: ignore[reportAttributeAccessIssue]
+            "acceptance_production_local": np.asarray(
+                res["local_accs_production"].data  # type: ignore[reportAttributeAccessIssue]
+            ),
+            "acceptance_production_global": np.asarray(
+                res["global_accs_production"].data  # type: ignore[reportAttributeAccessIssue]
+            ),
+        }

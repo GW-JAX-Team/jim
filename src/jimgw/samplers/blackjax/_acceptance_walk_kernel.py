@@ -218,7 +218,6 @@ def _update_bilby_walks(
     default_walks_float = jnp.array(100.0, dtype=jnp.float32)
     default_n_accept_total = jnp.array(0, dtype=jnp.int32)
     default_current_walks = jnp.array(100, dtype=jnp.int32)
-    # default_n_likelihood_evals_total = jnp.array(0, dtype=jnp.int32)
 
     walks_float = cast(
         jax.Array,
@@ -244,11 +243,6 @@ def _update_bilby_walks(
             prev_params.num_walks.astype(jnp.int32),
         ),
     )
-    # n_likelihood_evals_total = cast(jax.Array, jnp.where(
-    #     is_uninitialized,
-    #     default_n_likelihood_evals_total,
-    #     prev_params.n_likelihood_evals_total.astype(jnp.int32),
-    # ))
 
     leaves = cast(list[jax.Array], jax.tree_util.tree_leaves(ns_state.particles))
     nlive = leaves[0].shape[0]

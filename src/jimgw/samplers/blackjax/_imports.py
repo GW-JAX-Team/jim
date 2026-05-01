@@ -4,27 +4,16 @@ NS-AW and NSS rely on nested-sampling submodules not yet in upstream PyPI.
 Install them via the ``nested-sampling`` dependency group:
 
     uv sync --group nested-sampling
-
-SMC uses only features available in ``blackjax>=1.4`` (a core dependency).
 """
 
 from __future__ import annotations
 
 _INSTALL_MSG = (
-    "BlackJAX is required for this sampler but the installed version is "
-    "missing nested-sampling submodules.  Install the fork with:\n"
+    "The BlackJAX nested-sampling submodules are required for this sampler "
+    "but are not available in the installed version.  Install them with:\n"
     "    uv sync --group nested-sampling\n"
     "See docs/installation.md for details."
 )
-
-
-def import_blackjax():
-    """Import blackjax and return the module, raising a helpful error if missing."""
-    try:
-        import blackjax  # type: ignore[import]
-    except ImportError as exc:
-        raise ImportError(_INSTALL_MSG) from exc
-    return blackjax
 
 
 def require_nested_sampling(bjx) -> None:

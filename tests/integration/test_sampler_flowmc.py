@@ -30,7 +30,7 @@ def flowmc_jim():
 
 def test_flowmc_get_samples_shape(flowmc_jim):
     samples = flowmc_jim.get_samples()
-    assert set(samples.keys()) == {"x", "y"}
+    assert set(samples.keys()) == {"x", "y", "log_likelihood"}
     n = samples["x"].shape[0]
     assert n > 0
     assert samples["y"].shape == (n,)
@@ -42,7 +42,7 @@ def test_flowmc_posterior_mean_near_half(flowmc_jim):
     assert abs(float(np.mean(samples["y"])) - 0.5) < 0.15
 
 
-def test_flowmc_output_has_log_posterior(flowmc_jim):
-    out = flowmc_jim.sampler.get_output()
-    assert out.log_posterior is not None
-    assert out.log_posterior.shape == (out.samples.shape[0],)
+def test_flowmc_output_has_log_likelihood(flowmc_jim):
+    result = flowmc_jim.sampler.get_samples()
+    assert "log_likelihood" in result
+    assert result["log_likelihood"].shape == (result["samples"].shape[0],)

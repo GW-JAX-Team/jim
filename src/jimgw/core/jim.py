@@ -1,12 +1,12 @@
 import logging
 from collections.abc import Sequence
-from typing import Optional
+from typing import Any, Optional
 
 import jax
 import jax.numpy as jnp
 import numpy as np
-from anesthetic.samples import NestedSamples
 from jaxtyping import Array, Float, Key
+from ripplegw.interfaces import Waveform
 
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.prior import Prior
@@ -15,12 +15,7 @@ from jimgw.core.single_event.likelihood import (
     SingleEventLikelihood,
     TransientLikelihoodFD,
 )
-from ripplegw.interfaces import Waveform
 from jimgw.samplers import Sampler, SamplerConfig, build_sampler
-from jimgw.samplers.base import SamplerDiagnostics
-
-# Fixed key used for deterministic downsampling in get_samples().
-_DOWNSAMPLE_KEY: Key = jax.random.key(42)
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +25,16 @@ logger = logging.getLogger(__name__)
 _NAN_TEST_POINTS = 10
 _NAN_FAIL_THRESHOLD = 5
 
+# Fixed key used for downsampling in get_samples.
+_DOWNSAMPLE_KEY: Key = jax.random.key(42)
+
 
 class Jim:
     """Master class for gravitational-wave parameter estimation.
 
-    Wires together a :class:`~jimgw.core.base.LikelihoodBase`, a
-    :class:`~jimgw.core.prior.Prior`, optional parameter transforms, and a
-    pluggable JAX :class:`~jimgw.samplers.Sampler` selected via a typed
+    Wires together a [`LikelihoodBase`][jimgw.core.base.LikelihoodBase], a
+    [`Prior`][jimgw.core.prior.Prior], optional parameter transforms, and a
+    pluggable JAX [`Sampler`][jimgw.samplers.base.Sampler] selected via a typed
     ``sampler_config`` object.
     """
 
@@ -63,13 +61,13 @@ class Jim:
             likelihood: The likelihood to evaluate.
             prior: The prior distribution.
             sampler_config: Pydantic config selecting and configuring the
-                sampler backend (e.g. :class:`~jimgw.samplers.FlowMCConfig`).
+                sampler backend (e.g. [`FlowMCConfig`][jimgw.samplers.config.FlowMCConfig]).
             sample_transforms: Bijective transforms applied in the sampling
                 space (reversed when retrieving posterior samples).
             likelihood_transforms: Transforms applied to reach the likelihood
                 parameter space from the prior parameter space.
             seed: Integer random seed. The key for the sampling run is derived
-                from this seed at construction time, so :meth:`sample` is
+                from this seed at construction time, so `sample` is
                 reproducible regardless of any intermediate operations (sanity
                 checks, initial-position draws, etc.).
         """
@@ -101,6 +99,22 @@ class Jim:
         sample_transforms: Sequence[BijectiveTransform],
         likelihood_transforms: Sequence[NtoMTransform],
     ) -> None:
+        """Wire together likelihood, prior, and transforms; build sampling-space callables.
+
+        Validates that the prior and likelihood parameter spaces are compatible,
+        then constructs ``_log_prior_fn``, ``_log_likelihood_fn``, and
+        ``_log_posterior_fn`` — flat-array callables injected into the sampler.
+
+        Args:
+            likelihood: The likelihood to evaluate.
+            prior: The prior distribution.
+            sample_transforms: Bijective transforms from prior space to sampling space.
+            likelihood_transforms: Transforms from prior space to likelihood space.
+
+        Raises:
+            ValueError: If prior parameters overlap with fixed parameters, or if
+                prior parameters are not consumed by the likelihood.
+        """
         self.likelihood = likelihood
         self.prior = prior
         self.sample_transforms = sample_transforms
@@ -192,6 +206,12 @@ class Jim:
         self._log_posterior_fn = _log_posterior_fn
 
     def _sanity_check_posterior(self) -> None:
+        """Draw test points from the prior and verify the posterior is not mostly NaN.
+
+        Raises:
+            ValueError: If more than ``_NAN_FAIL_THRESHOLD`` out of
+                ``_NAN_TEST_POINTS`` test points return NaN posterior values.
+        """
         self._rng_key, check_key = jax.random.split(self._rng_key)
         check_positions = self._draw_initial_positions(check_key, _NAN_TEST_POINTS)
         log_posteriors = jax.vmap(self._log_posterior_fn)(check_positions)
@@ -213,6 +233,18 @@ class Jim:
     def _validate_normalized_prior(
         self, prior: Prior, sampler_config: SamplerConfig
     ) -> None:
+        """Raise if a normalization-requiring sampler is paired with an unnormalized prior.
+
+        Args:
+            prior: The prior to check.
+            sampler_config: The sampler configuration to check against.
+
+        Raises:
+            ValueError: If ``sampler_config`` is a
+                [`BlackJAXNSSConfig`][jimgw.samplers.config.BlackJAXNSSConfig] or
+                [`BlackJAXSMCConfig`][jimgw.samplers.config.BlackJAXSMCConfig] and
+                ``prior.is_normalized`` is ``False``.
+        """
         from jimgw.samplers.config import BlackJAXNSSConfig, BlackJAXSMCConfig
 
         if (
@@ -227,6 +259,18 @@ class Jim:
             )
 
     def _draw_initial_positions(self, key: Key, n: int) -> Float[Array, "n n_dims"]:
+        """Sample ``n`` initial positions from the prior in sampling space.
+
+        Args:
+            key: JAX PRNG key.
+            n: Number of positions to draw.
+
+        Returns:
+            Array of shape ``(n, n_dims)`` in sampling space.
+
+        Raises:
+            ValueError: If any drawn position contains non-finite values.
+        """
         initial = self.prior.sample(key, n)
         for transform in self.sample_transforms:
             initial = jax.vmap(transform.forward)(initial)
@@ -318,107 +362,54 @@ class Jim:
         self,
         n_samples: int = 0,
     ) -> dict[str, np.ndarray]:
-        """Retrieve posterior samples, optionally resampled.
+        """Retrieve posterior samples in prior space, optionally downsampled.
 
-        For NS-AW and NSS backends, anesthetic computes posterior weights from
-        the nested sampling data (``log_likelihood`` + ``log_likelihood_birth``).
-
-        For SMC, posterior weights are pre-computed by the sampler.
-
-        For both cases, samples are drawn with replacement proportional to
-        those weights.  When ``n_samples == 0``, the target count is the
-        equal-weight effective sample size ``floor(1 / max(weights))``,
-        matching the behaviour of anesthetic's ``posterior_points()``.
-
-        For flowMC (no weights), samples are drawn uniformly without
-        replacement.  When ``n_samples == 0``, all available samples are
-        returned.
+        Calls [`Sampler.get_samples`][jimgw.samplers.base.Sampler.get_samples] on the
+        underlying sampler, which returns equally-weighted posterior samples.
+        Pass ``n_samples`` to further downsample.
 
         Args:
-            n_samples: Target number of samples.  If 0 (default) the backend
-                chooses a sensible count (see above).  Downsampling always uses
-                a fixed internal key so results are deterministic.
+            n_samples: Target number of samples.  If 0 (default) returns all
+            available samples, otherwise downsample uniformly without replacement.
 
         Returns:
-            Dict mapping prior parameter names to 1-D numpy arrays in prior space.
+            Dict mapping prior parameter names to 1-D numpy arrays in prior
+            space, plus an extra item containing the log-likelihood values.
         """
-        output = self.sampler.get_output()
-        sample_array = np.asarray(output.samples)
+        result = self.sampler.get_samples()
+        sample_array = result["samples"]  # (n, n_dims) in sampling space
+        log_likelihood = result["log_likelihood"]  # (n,)
         n_available = sample_array.shape[0]
 
-        # Determine posterior weights.
-        if output.log_likelihood_birth is not None:
-            # NS-AW / NSS: use anesthetic to compute weights from nested sampling data.
-            logL_birth = np.asarray(output.log_likelihood_birth)
-            df = NestedSamples(
-                sample_array,
-                logL=np.asarray(output.log_likelihood),
-                logL_birth=logL_birth,
-                logzero=np.nan,
-                dtype=np.float64,
-            )
-            weights: np.ndarray | None = np.asarray(df.get_weights())
-        elif output.weights is not None:
-            # SMC: weights already computed by sampler.
-            weights = np.asarray(output.weights)
-        else:
-            weights = None
-
-        if weights is not None:
-            if n_samples > 0:
-                n_target = n_samples
-            else:
-                # Equal-weight ESS: 1/max(w), matching anesthetic's posterior_points().
-                n_target = max(1, int(1.0 / float(np.max(weights))))
-            if n_target > n_available:
-                logger.warning(
-                    "Requested %d samples but only %d available. Returning all available samples.",
-                    n_target,
-                    n_available,
-                )
-                n_target = n_available
-            indices = np.array(
-                jax.random.choice(
-                    _DOWNSAMPLE_KEY,
-                    n_available,
-                    shape=(n_target,),
-                    replace=True,
-                    p=weights,
-                )
-            )
-        else:
-            n_target = n_samples if n_samples > 0 else n_available
-            if n_samples > 0 and n_samples > n_available:
+        if n_samples > 0:
+            if n_samples > n_available:
                 logger.warning(
                     "Requested %d samples but only %d available. Returning all available samples.",
                     n_samples,
                     n_available,
                 )
-                n_target = n_available
-            # Uniform downsampling without replacement (flowMC MCMC samples).
-            if n_target < n_available:
+                n_samples = n_available
+            if n_samples < n_available:
                 indices = np.array(
                     jax.random.choice(
-                        _DOWNSAMPLE_KEY, n_available, shape=(n_target,), replace=False
+                        _DOWNSAMPLE_KEY, n_available, shape=(n_samples,), replace=False
                     )
                 )
-            else:
-                indices = np.arange(n_available)
-
-        sample_array = sample_array[indices]
+                sample_array = sample_array[indices]
+                log_likelihood = log_likelihood[indices]
 
         # Backward-transform from sampling space to prior space and add names.
         named = jax.vmap(self.add_name)(jnp.array(sample_array))
         for transform in reversed(self.sample_transforms):
             named = jax.vmap(transform.backward)(named)
-        return {k: np.array(named[k]) for k in self.prior.parameter_names}
+        out = {k: np.array(named[k]) for k in self.prior.parameter_names}
+        out["log_likelihood"] = np.asarray(log_likelihood)
+        return out
 
-    def get_diagnostics(self) -> SamplerDiagnostics:
-        """Return run-level diagnostics from the most recent :meth:`sample` call.
+    def get_diagnostics(self) -> dict[str, Any]:
+        """Return run-level diagnostics from the most recent `sample` call.
 
         Returns:
-            :class:`~jimgw.samplers.base.SamplerDiagnostics` with wall-clock
-            time, likelihood-evaluation count, and backend-specific convergence
-            histories.  Only valid after :meth:`sample` has been called.
+            Plain dict of backend-specific diagnostics.
         """
         return self.sampler.get_diagnostics()

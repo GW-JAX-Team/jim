@@ -12,7 +12,6 @@ jax.config.update("jax_enable_x64", True)
 from jimgw.core.jim import Jim
 from jimgw.core.prior import CombinePrior, UniformPrior
 from jimgw.core.transforms import BoundToUnbound
-from jimgw.samplers.base import SamplerOutput
 from jimgw.samplers.config import FlowMCConfig
 from tests.utils import assert_all_finite
 
@@ -116,10 +115,10 @@ def jim_with_likelihood_transforms(
 
 @pytest.fixture
 def jim_sampler(mock_likelihood, gw_prior, monkeypatch):
-    """Jim with get_output() mocked to avoid actual sampling.
+    """Jim with get_samples() mocked to avoid actual sampling.
 
     sampling space = prior space (no sample_transforms), so
-    SamplerOutput.samples is a flat (N, 2) array with [M_c, q] columns.
+    samples is a flat (N, 2) array with [M_c, q] columns.
     """
     jim = Jim(
         likelihood=mock_likelihood,
@@ -132,12 +131,12 @@ def jim_sampler(mock_likelihood, gw_prior, monkeypatch):
     mock_samples = np.column_stack(
         [np.ones(n_samples) * 30.0, np.ones(n_samples) * 0.5]
     )
-    mock_output = SamplerOutput(
-        samples=mock_samples,
-        log_posterior=np.ones(n_samples) * -2.0,
-    )
+    mock_result = {
+        "samples": mock_samples,
+        "log_likelihood": np.ones(n_samples) * -2.0,
+    }
 
-    monkeypatch.setattr(jim.sampler, "get_output", lambda: mock_output)
+    monkeypatch.setattr(jim.sampler, "get_samples", lambda: mock_result)
     jim.sampler._sampled = True
     return jim
 
@@ -160,6 +159,7 @@ class TestGetSamples:
     def test_get_samples_shape(self, jim_sampler):
         samples = jim_sampler.get_samples()
         assert "M_c" in samples and "q" in samples
+        assert "log_likelihood" in samples
         assert samples["M_c"].shape == samples["q"].shape
         assert samples["M_c"].ndim == 1
 
@@ -190,18 +190,19 @@ class TestGetSamples:
         # sampling space is ("M_c_unbounded", "q") — use flat array in sampling space.
         n = 10
         # M_c_unbounded=0.0 → M_c = sigmoid(0) * 70 + 10 ≈ 45 (in prior range)
-        mock_output = SamplerOutput(
-            samples=np.column_stack([np.zeros(n), np.ones(n) * 0.5]),
-            log_posterior=np.ones(n) * -2.0,
-        )
-        monkeypatch.setattr(jim.sampler, "get_output", lambda: mock_output)
+        mock_result = {
+            "samples": np.column_stack([np.zeros(n), np.ones(n) * 0.5]),
+            "log_likelihood": np.ones(n) * -2.0,
+        }
+        monkeypatch.setattr(jim.sampler, "get_samples", lambda: mock_result)
         jim.sampler._sampled = True
 
         samples = jim.get_samples()
         assert "M_c" in samples
         assert "q" in samples
         assert "M_c_unbounded" not in samples
-        for val in samples.values():
+        assert "log_likelihood" in samples
+        for key, val in samples.items():
             assert isinstance(val, np.ndarray)
             assert_all_finite(val)
 

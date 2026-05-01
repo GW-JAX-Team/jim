@@ -7,20 +7,20 @@ from typing import Any, Callable, Sequence
 import jax
 import jax.numpy as jnp
 import numpy as np
+from anesthetic.samples import NestedSamples
 from jaxtyping import Array, Float, Key
 
-from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
+import blackjax
+from jimgw.samplers.base import Sampler
 from jimgw.samplers.blackjax._imports import (
-    import_blackjax,
     require_nested_sampling,
     require_nss,
 )
 from jimgw.samplers.config import BlackJAXNSSConfig
 from jimgw.samplers.periodic import to_prior_space_stepper
 
-_blackjax = import_blackjax()
-require_nested_sampling(_blackjax)
-require_nss(_blackjax)
+require_nested_sampling(blackjax)
+require_nss(blackjax)
 
 
 class BlackJAXNSSSampler(Sampler):
@@ -31,13 +31,15 @@ class BlackJAXNSSSampler(Sampler):
     (no unit-cube constraint required).  Operates on flat arrays of shape
     ``(n_dims,)``; the NSS kernel is pytree-generic.
 
-    Configure via :class:`~jimgw.samplers.config.BlackJAXNSSConfig`.
+    Configure via [`BlackJAXNSSConfig`][jimgw.samplers.config.BlackJAXNSSConfig].
     """
 
     _config: BlackJAXNSSConfig
     _stepper_fn: Callable
     _sampled: bool
     _final_state: Any
+    _nested_samples: NestedSamples
+    _n_iterations: int
 
     def __init__(
         self,
@@ -60,11 +62,22 @@ class BlackJAXNSSSampler(Sampler):
         self._stepper_fn = to_prior_space_stepper(config.periodic, parameter_names)
         self._sampled = False
 
-    def _sample_impl(
+    def sample(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n_live n_dims"],
     ) -> None:
+        """Run the BlackJAX NSS sampler.
+
+        Args:
+            rng_key: JAX PRNG key.
+            initial_position: Starting live points in the sampling space,
+                shape ``(n_live, n_dims)``.  Must match ``config.n_live``.
+
+        Raises:
+            ValueError: If ``initial_position`` shape does not match
+                ``(n_live, n_dims)``.
+        """
         config = self._config
         n_live = config.n_live
         n_delete = int(n_live * config.n_delete_frac)
@@ -78,7 +91,7 @@ class BlackJAXNSSSampler(Sampler):
             )
         initial_particles = arr
 
-        nested_sampler = _blackjax.nss(
+        nested_sampler = blackjax.nss(
             logprior_fn=self._log_prior_fn,
             loglikelihood_fn=self._log_likelihood_fn,
             num_delete=n_delete,
@@ -106,47 +119,71 @@ class BlackJAXNSSSampler(Sampler):
 
         self._final_state = finalise(state, dead)
         self._n_iterations = n_iter
+
+        # Build anesthetic NestedSamples for use in get_samples() and get_diagnostics().
+        particles_sample = np.array(self._final_state.particles.position)
+        log_likelihood = np.array(self._final_state.particles.loglikelihood)
+        logL_birth = jnp.array(self._final_state.particles.loglikelihood_birth)
+        logL_birth = jnp.where(jnp.isnan(logL_birth), -jnp.inf, logL_birth)
+        self._nested_samples = NestedSamples(  # type: ignore[call-arg]
+            particles_sample,
+            logL=log_likelihood,
+            logL_birth=np.asarray(logL_birth),
+            logzero=np.nan,
+            dtype=np.float64,
+        )
         self._sampled = True
 
-    def get_output(self) -> SamplerOutput:
+    def get_samples(self) -> dict[str, np.ndarray]:
+        """Return equally-weighted posterior samples via anesthetic's ``posterior_points``.
+
+        Uses `NestedSamples.posterior_points` to
+        resample the nested dead-point collection to a set of truly equal-weight
+        samples (rows duplicated proportional to integer weights).
+
+        Returns:
+            Dict with keys ``"samples"`` (shape ``(n, n_dims)``) and
+            ``"log_likelihood"`` (shape ``(n,)``).
+        """
         if not self._sampled:
-            raise RuntimeError("get_output() called before sample()")
+            raise RuntimeError("get_samples() called before sample()")
+        posterior = self._nested_samples.posterior_points()
+        samples = np.asarray(posterior.iloc[:, : self.n_dims])
+        log_L = np.asarray(posterior["logL"])
+        return {"samples": samples, "log_likelihood": log_L}
 
-        final_state = self._final_state
-
-        particles_sample = np.array(final_state.particles.position)
-        log_likelihood = np.array(final_state.particles.loglikelihood)
-
-        logL_birth = jnp.array(final_state.particles.loglikelihood_birth)
-        logL_birth = jnp.where(jnp.isnan(logL_birth), -jnp.inf, logL_birth)
-
-        return SamplerOutput(
-            samples=particles_sample,
-            log_likelihood=log_likelihood,
-            log_likelihood_birth=np.asarray(logL_birth),
-        )
-
-    def get_diagnostics(self) -> SamplerDiagnostics:
+    def get_diagnostics(self) -> dict[str, Any]:
         """Return NSS run diagnostics.
 
-        Populates: ``ns_n_iterations``, ``nss_num_steps_history``,
-        ``nss_num_shrink_history``, ``nss_total_stepping_out_evals``,
-        ``nss_total_shrinking_evals``, ``nss_is_accepted_history``.
-        ``n_likelihood_evaluations`` equals the sum of stepping-out and
-        shrinking evaluations.
+        Returns a dict with the following keys:
+
+        * ``"n_likelihood_evaluations"`` — total likelihood calls.
+        * ``"n_iterations"`` — total nested-sampling iterations.
+        * ``"n_stepping_out_history"`` — stepping-out evaluations per iteration.
+        * ``"n_shrinking_history"`` — shrinking evaluations per iteration.
+        * ``"n_likelihood_evaluations_stepping_out"`` — total stepping-out evaluations.
+        * ``"n_likelihood_evaluations_shrinking"`` — total shrinking evaluations.
+        * ``"acceptance_history"`` — per-iteration acceptance flag.
+        * ``"log_Z"`` — log Bayesian evidence (anesthetic mean estimate).
+        * ``"log_Z_error"`` — standard deviation of log Z from 100 bootstrap samples.
         """
         if not self._sampled:
             raise RuntimeError("get_diagnostics() called before sample()")
         ui = self._final_state.update_info  # SliceInfo concatenated across all steps
         total_steps = int(jnp.sum(ui.num_steps))
         total_shrink = int(jnp.sum(ui.num_shrink))
-        return SamplerDiagnostics(
-            sampling_time_seconds=self._sampling_time_seconds,  # type: ignore[arg-type]
-            n_likelihood_evaluations=total_steps + total_shrink,
-            ns_n_iterations=self._n_iterations,
-            nss_num_steps_history=np.asarray(ui.num_steps),
-            nss_num_shrink_history=np.asarray(ui.num_shrink),
-            nss_total_stepping_out_evals=total_steps,
-            nss_total_shrinking_evals=total_shrink,
-            nss_is_accepted_history=np.asarray(ui.is_accepted),
-        )
+
+        log_Z = np.asarray(self._nested_samples.logZ()).item()
+        log_Z_error = np.std(np.asarray(self._nested_samples.logZ(nsamples=100))).item()
+
+        return {
+            "n_likelihood_evaluations": total_steps + total_shrink,
+            "n_iterations": self._n_iterations,
+            "n_stepping_out_history": np.asarray(ui.num_steps),
+            "n_shrinking_history": np.asarray(ui.num_shrink),
+            "n_likelihood_evaluations_stepping_out": total_steps,
+            "n_likelihood_evaluations_shrinking": total_shrink,
+            "acceptance_history": np.asarray(ui.is_accepted),
+            "log_Z": log_Z,
+            "log_Z_error": log_Z_error,
+        }

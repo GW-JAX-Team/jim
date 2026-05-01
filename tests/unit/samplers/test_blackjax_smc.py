@@ -9,7 +9,6 @@ import pytest
 blackjax = pytest.importorskip("blackjax")
 
 from jimgw.core.prior import CombinePrior, UniformPrior  # noqa: E402
-from jimgw.samplers.base import SamplerDiagnostics, SamplerOutput  # noqa: E402
 from jimgw.samplers.blackjax.smc import BlackJAXSMCSampler  # noqa: E402
 from jimgw.samplers.config import BlackJAXSMCConfig  # noqa: E402
 
@@ -70,49 +69,45 @@ def test_smc_construction():
     assert sampler.n_dims == 2
 
 
-def test_smc_get_output_before_sample_raises():
+def test_smc_get_samples_before_sample_raises():
     sampler = _make_sampler()
     with pytest.raises(RuntimeError, match="before sample"):
-        sampler.get_output()
+        sampler.get_samples()
 
 
 def _init_pos(n: int, seed: int = 99) -> "jax.Array":
     return jax.random.uniform(jax.random.key(seed), (n, 2))
 
 
-def test_smc_sample_and_output():
+def test_smc_sample_and_get_samples():
     sampler = _make_sampler()
     sampler.sample(jax.random.key(0), _init_pos(200))
-    out = sampler.get_output()
-    assert isinstance(out, SamplerOutput)
+    result = sampler.get_samples()
+    assert isinstance(result, dict)
+    assert "samples" in result
+    assert "log_likelihood" in result
 
 
-def test_smc_output_fields():
+def test_smc_samples_fields():
     sampler = _make_sampler()
     sampler.sample(jax.random.key(1), _init_pos(200))
-    out = sampler.get_output()
+    result = sampler.get_samples()
 
-    # Samples are flat (N, n_dims) array in sampling space.
-    # AP mode stacks all-temperature particles, so N >= n_particles.
-    assert isinstance(out.samples, np.ndarray)
-    assert out.samples.ndim == 2
-    assert out.samples.shape[1] == 2
-    assert out.samples.shape[0] >= 200
-
-    # AP mode returns log_likelihood (from persistent state) and weights.
-    assert out.log_likelihood is not None
-    assert out.log_posterior is None
-    assert out.weights is not None
-    assert abs(float(np.sum(out.weights)) - 1.0) < 1e-5
+    assert isinstance(result["samples"], np.ndarray)
+    assert result["samples"].ndim == 2
+    assert result["samples"].shape[1] == 2
+    n = result["samples"].shape[0]
+    assert n > 0
+    assert result["log_likelihood"].shape == (n,)
 
 
 def test_smc_samples_in_prior_support():
     sampler = _make_sampler()
     sampler.sample(jax.random.key(2), _init_pos(200))
-    out = sampler.get_output()
+    result = sampler.get_samples()
 
-    assert np.all(out.samples[:, 0] >= 0.0) and np.all(out.samples[:, 0] <= 1.0)
-    assert np.all(out.samples[:, 1] >= 0.0) and np.all(out.samples[:, 1] <= 1.0)
+    assert np.all(result["samples"][:, 0] >= 0.0) and np.all(result["samples"][:, 0] <= 1.0)
+    assert np.all(result["samples"][:, 1] >= 0.0) and np.all(result["samples"][:, 1] <= 1.0)
 
 
 def test_smc_diagnostics_before_sample_raises():
@@ -127,25 +122,23 @@ def test_smc_ap_diagnostics():
     sampler.sample(jax.random.key(4), _init_pos(200))
     diag = sampler.get_diagnostics()
 
-    assert isinstance(diag, SamplerDiagnostics)
-    assert diag.sampling_time_seconds > 0
-    assert diag.n_likelihood_evaluations > 0
+    assert isinstance(diag, dict)
+    assert diag["n_likelihood_evaluations"] > 0
 
     # Adaptive mode fields
-    assert diag.smc_n_iterations is not None and diag.smc_n_iterations > 0
-    assert diag.smc_acceptance_history is not None
-    assert len(diag.smc_acceptance_history) == diag.smc_n_iterations
-    assert diag.smc_cov_scale_history is not None
-    assert len(diag.smc_cov_scale_history) == diag.smc_n_iterations
+    assert diag["n_iterations"] > 0
+    assert diag["acceptance_history"] is not None
+    assert len(diag["acceptance_history"]) == diag["n_iterations"]
+    assert diag["cov_scale_history"] is not None
+    assert len(diag["cov_scale_history"]) == diag["n_iterations"]
 
     # Persistent mode fields
-    assert diag.smc_tempering_schedule is not None
-    assert diag.smc_persistent_log_Z is not None
-    assert len(diag.smc_tempering_schedule) == len(diag.smc_persistent_log_Z)
-    assert float(diag.smc_tempering_schedule[-1]) == pytest.approx(1.0, abs=1e-6)
-
-    # Non-persistent/non-adaptive fields not set
-    assert diag.smc_ess_history is None
+    assert diag["tempering_schedule"] is not None
+    assert diag["persistent_log_Z"] is not None
+    assert len(diag["tempering_schedule"]) == len(diag["persistent_log_Z"])
+    assert float(diag["tempering_schedule"][-1]) == pytest.approx(1.0, abs=1e-6)
+    assert "log_Z" in diag
+    assert np.isfinite(diag["log_Z"])
 
 
 def test_smc_n_evals_formula():
@@ -157,5 +150,5 @@ def test_smc_n_evals_formula():
     sampler.sample(jax.random.key(5), _init_pos(n_particles))
     diag = sampler.get_diagnostics()
 
-    expected = n_mcmc_per_dim * n_dims * diag.smc_n_iterations * n_particles  # type: ignore[operator]
-    assert diag.n_likelihood_evaluations == expected
+    expected = n_mcmc_per_dim * n_dims * diag["n_iterations"] * n_particles
+    assert diag["n_likelihood_evaluations"] == expected

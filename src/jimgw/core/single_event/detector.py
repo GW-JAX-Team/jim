@@ -749,7 +749,7 @@ class GroundBased2G(Detector):
 
 
 def get_H1() -> GroundBased2G:
-    """Return a :class:`GroundBased2G` instance for LIGO Hanford (H1)."""
+    """Return a [`GroundBased2G`][jimgw.core.single_event.detector.GroundBased2G] instance for LIGO Hanford (H1)."""
     return GroundBased2G(
         "H1",
         latitude=(46 + 27.0 / 60 + 18.528 / 3600) * DEG_TO_RAD,
@@ -764,7 +764,7 @@ def get_H1() -> GroundBased2G:
 
 
 def get_L1() -> GroundBased2G:
-    """Return a :class:`GroundBased2G` instance for LIGO Livingston (L1)."""
+    """Return a [`GroundBased2G`][jimgw.core.single_event.detector.GroundBased2G] instance for LIGO Livingston (L1)."""
     return GroundBased2G(
         "L1",
         latitude=(30 + 33.0 / 60 + 46.4196 / 3600) * DEG_TO_RAD,
@@ -779,7 +779,7 @@ def get_L1() -> GroundBased2G:
 
 
 def get_V1() -> GroundBased2G:
-    """Return a :class:`GroundBased2G` instance for Virgo (V1)."""
+    """Return a [`GroundBased2G`][jimgw.core.single_event.detector.GroundBased2G] instance for Virgo (V1)."""
     return GroundBased2G(
         "V1",
         latitude=(43 + 37.0 / 60 + 53.0921 / 3600) * DEG_TO_RAD,
@@ -794,7 +794,7 @@ def get_V1() -> GroundBased2G:
 
 
 def get_ET() -> list[GroundBased2G]:
-    """Return a list of three :class:`GroundBased2G` instances for Einstein Telescope (ET).
+    """Return a list of three [`GroundBased2G`][jimgw.core.single_event.detector.GroundBased2G] instances for Einstein Telescope (ET).
 
     ET is modelled as a triangle of three interferometers at adjacent vertices,
     with arms rotated by 120° relative to each other. Vertex positions are
@@ -859,7 +859,7 @@ def get_ET() -> list[GroundBased2G]:
 
 
 def get_CE() -> GroundBased2G:
-    """Return a :class:`GroundBased2G` instance for Cosmic Explorer (CE).
+    """Return a [`GroundBased2G`][jimgw.core.single_event.detector.GroundBased2G] instance for Cosmic Explorer (CE).
 
     CE shares the LIGO Hanford site geometry.
     """
@@ -882,7 +882,7 @@ def get_detector_preset() -> dict[str, GroundBased2G | list[GroundBased2G]]:
     Returns:
         dict: Mapping of detector name to detector object(s).
             Keys are ``"H1"``, ``"L1"``, ``"V1"``, ``"CE"`` (single
-            :class:`GroundBased2G`) and ``"ET"`` (list of three).
+            [`GroundBased2G`][jimgw.core.single_event.detector.GroundBased2G]) and ``"ET"`` (list of three).
     """
     return {
         "H1": get_H1(),

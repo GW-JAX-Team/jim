@@ -154,20 +154,20 @@ class TransientLikelihoodFD(SingleEventLikelihood):
             Can be a single float or a per-detector dictionary.
         trigger_time: GPS time of the event trigger.
         time_marginalization: If provided, marginalize over coalescence time
-            ``t_c``.  Pass a :class:`TimeMargConfig` object, a plain dict
-            (e.g. ``{"tc_range": (-0.1, 0.1)}``), or ``True`` (shorthand for
-            ``TimeMargConfig()``).  ``False`` or the default ``None`` disables
-            time marginalization.
+            ``t_c``.  Pass a [`TimeMargConfig`][jimgw.core.single_event.likelihood.TimeMargConfig]
+            object, a plain dict (e.g. ``{"tc_range": (-0.1, 0.1)}``), or ``True``
+            (shorthand for ``TimeMargConfig()``).  ``False`` or the default ``None``
+            disables time marginalization.
         phase_marginalization: If provided, marginalize over coalescence phase
-            ``phase_c``.  Pass a :class:`PhaseMargConfig` object, a plain dict
-            ``{}``, or ``True`` (shorthand for ``PhaseMargConfig()``).  ``False``
-            or the default ``None`` disables phase marginalization.
+            ``phase_c``.  Pass a [`PhaseMargConfig`][jimgw.core.single_event.likelihood.PhaseMargConfig]
+            object, a plain dict ``{}``, or ``True`` (shorthand for ``PhaseMargConfig()``).
+            ``False`` or the default ``None`` disables phase marginalization.
         distance_marginalization: If provided, marginalize over luminosity
-            distance ``d_L``.  Pass a :class:`DistanceMargConfig` object or a
-            plain dict (e.g. ``{"distance_prior": prior, "n_dist_points": 10000}``).
+            distance ``d_L``.  Pass a [`DistanceMargConfig`][jimgw.core.single_event.likelihood.DistanceMargConfig]
+            object or a plain dict (e.g. ``{"distance_prior": prior, "n_dist_points": 10000}``).
             ``False`` or the default ``None`` disables distance marginalization.
             ``True`` is not supported — ``distance_prior`` has no default; pass a
-            dict or :class:`DistanceMargConfig` instead.
+            dict or `DistanceMargConfig` instead.
 
     Example:
         >>> likelihood = TransientLikelihoodFD(
@@ -526,8 +526,8 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         fixed_parameters: Dictionary of fixed parameter values.  Each value
             may be a constant ``Float``, a callable returning a scalar, **or**
             a callable returning a ``dict`` (e.g. ``transform.backward``).
-            See :class:`TransientLikelihoodFD` for a detailed description and
-            example.
+            See [`TransientLikelihoodFD`][jimgw.core.single_event.likelihood.TransientLikelihoodFD]
+            for a detailed description and example.
         f_min: Minimum frequency for likelihood evaluation.
         f_max: Maximum frequency for likelihood evaluation.
         trigger_time: GPS time of the event trigger.
@@ -537,17 +537,16 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         optimizer_n_steps: Maximum number of CMA-ES generations.  Defaults to 1000.
         reference_parameters: Pre-computed reference parameters (dict).  If
             supplied, the optimizer is skipped entirely.
-        reference_waveform: Optional :class:`~ripplegw.interfaces.Waveform` instance
-            used to compute the reference waveform.  Defaults to ``waveform`` when
-            not provided.
+        reference_waveform: Optional waveform instance used to compute the
+            reference waveform.  Defaults to ``waveform`` when not provided.
         prior: Prior distribution from which the initial CMA-ES mean is
             drawn.  Required when ``reference_parameters`` is not provided.
         likelihood_transforms: Transforms mapping sampling parameters to
             likelihood parameters (e.g. mass-ratio → symmetric mass-ratio).
         phase_marginalization: If provided, marginalize over coalescence phase
-            ``phase_c``.  Pass a :class:`PhaseMargConfig` object, a plain dict
-            ``{}``, or ``True`` (shorthand for ``PhaseMargConfig()``).  ``None``
-            or ``False`` (default) disables phase marginalization.
+            ``phase_c``.  Pass a [`PhaseMargConfig`][jimgw.core.single_event.likelihood.PhaseMargConfig]
+            object, a plain dict ``{}``, or ``True`` (shorthand for ``PhaseMargConfig()``).
+            ``None`` or ``False`` (default) disables phase marginalization.
     """
 
     n_bins: int

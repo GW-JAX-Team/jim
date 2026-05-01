@@ -38,7 +38,7 @@ def smc_jim(request):
 
 def test_smc_get_samples_shape(smc_jim):
     samples = smc_jim.get_samples()
-    assert set(samples.keys()) == {"x", "y"}
+    assert set(samples.keys()) == {"x", "y", "log_likelihood"}
     n = samples["x"].shape[0]
     assert n > 0
     assert samples["y"].shape == (n,)
@@ -50,7 +50,7 @@ def test_smc_posterior_mean_near_half(smc_jim):
     assert abs(float(np.mean(samples["y"])) - 0.5) < 0.2
 
 
-def test_smc_output_has_weights(smc_jim):
-    output = smc_jim.sampler.get_output()
-    assert output.log_likelihood is not None
-    assert output.weights is not None
+def test_smc_output_has_log_likelihood(smc_jim):
+    result = smc_jim.sampler.get_samples()
+    assert "log_likelihood" in result
+    assert result["log_likelihood"] is not None

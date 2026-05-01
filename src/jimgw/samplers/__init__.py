@@ -2,22 +2,21 @@
 
 Public API:
 
-* :class:`Sampler` — ABC every backend subclasses.
-* :class:`SamplerOutput` — unified result type.
-* :data:`SamplerConfig` — discriminated-union annotation of concrete configs.
-* :func:`build_sampler` — factory that dispatches to the right concrete class.
+* [`Sampler`][jimgw.samplers.base.Sampler] — ABC every backend subclasses.
+* `SamplerConfig` — discriminated-union annotation of concrete configs.
+* [`build_sampler`][jimgw.samplers.build_sampler] — factory that dispatches to the right concrete class.
 
 The registry uses lazy loaders so that ``import jimgw.samplers`` does not fail
-when an optional backend (e.g. BlackJAX) is not installed; ImportError is
+when an optional backend (e.g. BlackJAX NSS) is not installed; ImportError is
 raised only when the caller actually asks for that backend via
-:func:`build_sampler`.
+`build_sampler`.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
+from jimgw.samplers.base import Sampler
 from jimgw.samplers.config import (
     BaseSamplerConfig,
     BlackJAXNSAWConfig,
@@ -29,8 +28,6 @@ from jimgw.samplers.config import (
 
 __all__ = [
     "Sampler",
-    "SamplerOutput",
-    "SamplerDiagnostics",
     "SamplerConfig",
     "BaseSamplerConfig",
     "FlowMCConfig",
@@ -48,9 +45,9 @@ _REGISTRY: dict[str, Callable[[], SamplerBuilder]] = {}
 
 
 def register_sampler(type_str: str, lazy_loader: Callable[[], SamplerBuilder]) -> None:
-    """Register a concrete :class:`Sampler` class under ``type_str``.
+    """Register a concrete [`Sampler`][jimgw.samplers.base.Sampler] class under ``type_str``.
 
-    ``lazy_loader`` is called (with no args) only when :func:`build_sampler`
+    ``lazy_loader`` is called (with no args) only when `build_sampler`
     dispatches to this type — this is how we defer BlackJAX imports until
     someone actually asks for a BlackJAX sampler.
     """
@@ -66,7 +63,7 @@ def build_sampler(
     log_posterior_fn: Callable,
     parameter_names: Sequence[str] = (),
 ) -> Sampler:
-    """Instantiate the concrete :class:`Sampler` identified by ``config.type``.
+    """Instantiate the concrete [`Sampler`][jimgw.samplers.base.Sampler] identified by ``config.type``.
 
     Args:
         config: Typed sampler config; its ``type`` field selects the backend.
@@ -100,41 +97,37 @@ def build_sampler(
     )
 
 
-# --- flowMC (always available; flowMC is a required dep) ---
 from jimgw.samplers.flowmc import FlowMCSampler  # noqa: E402
 
 register_sampler("flowmc", lambda: FlowMCSampler)
 
-# --- BlackJAX samplers (NS-AW/NSS need `uv sync --group nested-sampling`; SMC is in core deps) ---
+from jimgw.samplers.blackjax.smc import BlackJAXSMCSampler  # noqa: E402
+
+register_sampler("blackjax-smc", lambda: BlackJAXSMCSampler)
+
+# --- BlackJAX NS-AW / NSS (require `uv sync --group nested-sampling`) ---
 
 
 def _load_ns_aw() -> SamplerBuilder:
-    from jimgw.samplers.blackjax._imports import import_blackjax
+    import blackjax
+    from jimgw.samplers.blackjax._imports import require_nested_sampling
 
-    import_blackjax()  # raises ImportError if blackjax is not installed
-    from jimgw.samplers.blackjax.ns_aw import BlackJAXNSAWSampler  # type: ignore[import]
+    require_nested_sampling(blackjax)
+    from jimgw.samplers.blackjax.ns_aw import BlackJAXNSAWSampler
 
-    return BlackJAXNSAWSampler  # type: ignore[return-value]
+    return BlackJAXNSAWSampler
 
 
 def _load_nss() -> SamplerBuilder:
-    from jimgw.samplers.blackjax._imports import import_blackjax
+    import blackjax
+    from jimgw.samplers.blackjax._imports import require_nested_sampling, require_nss
 
-    import_blackjax()  # raises ImportError if blackjax is not installed
-    from jimgw.samplers.blackjax.nss import BlackJAXNSSSampler  # type: ignore[import]
+    require_nested_sampling(blackjax)
+    require_nss(blackjax)
+    from jimgw.samplers.blackjax.nss import BlackJAXNSSSampler
 
-    return BlackJAXNSSSampler  # type: ignore[return-value]
-
-
-def _load_smc() -> SamplerBuilder:
-    from jimgw.samplers.blackjax._imports import import_blackjax
-
-    import_blackjax()  # raises ImportError if blackjax is not installed
-    from jimgw.samplers.blackjax.smc import BlackJAXSMCSampler  # type: ignore[import]
-
-    return BlackJAXSMCSampler  # type: ignore[return-value]
+    return BlackJAXNSSSampler
 
 
 register_sampler("blackjax-ns-aw", _load_ns_aw)
 register_sampler("blackjax-nss", _load_nss)
-register_sampler("blackjax-smc", _load_smc)

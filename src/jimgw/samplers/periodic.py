@@ -9,7 +9,7 @@ Each backend wants a different shape (flowMC: an index-keyed dict; BlackJAX
 NS-AW: a stepper function on flat arrays; BlackJAX NSS: a stepper returning
 a ``(position, accepted)`` tuple; BlackJAX SMC: a displacement wrapper).
 The adapters in this module do that conversion — validation of the parameter
-names themselves lives on :class:`~jimgw.core.jim.Jim`, since it is a property
+names themselves lives on [`Jim`][jimgw.core.jim.Jim], since it is a property
 of the problem, not of any particular sampler.
 
 All three BlackJAX adapters operate on flat JAX arrays of shape ``(n_dims,)``

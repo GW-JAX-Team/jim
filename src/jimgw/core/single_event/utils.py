@@ -94,7 +94,7 @@ def inner_product(
 ) -> Float:
     """Compute the real noise-weighted inner product of two frequency-domain waveforms.
 
-    Returns the real part of :func:`complex_inner_product`:
+    Returns the real part of `complex_inner_product`:
 
     .. math::
 
