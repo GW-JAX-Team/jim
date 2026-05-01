@@ -236,8 +236,7 @@ class BlackJAXNSSConfig(BaseSamplerConfig):
 
 
 class BlackJAXSMCConfig(BaseSamplerConfig):
-    """Configuration for the BlackJAX SMC sampler.
-    """
+    """Configuration for the BlackJAX SMC sampler."""
 
     type: Literal["blackjax-smc"] = "blackjax-smc"
 
