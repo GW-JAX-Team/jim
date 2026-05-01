@@ -7,14 +7,14 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+jax.config.update("jax_enable_x64", True)
+
 from jimgw.core.jim import Jim
 from jimgw.core.prior import CombinePrior, UniformPrior
 from jimgw.core.transforms import BoundToUnbound
 from jimgw.samplers.base import SamplerOutput
 from jimgw.samplers.config import FlowMCConfig
 from tests.utils import assert_all_finite
-
-jax.config.update("jax_enable_x64", True)
 
 
 class MockLikelihood:
@@ -261,7 +261,7 @@ class TestJimTempering:
             likelihood=mock_likelihood,
             prior=gw_prior,
             sampler_config=_tiny_flowmc_config(
-                parallel_tempering={"enabled": True, "n_temperatures": 3}
+                parallel_tempering=True,
             ),
         )
         assert "parallel_tempering" in jim.sampler.strategy_order  # type: ignore[attr-defined]
@@ -270,7 +270,7 @@ class TestJimTempering:
         jim = Jim(
             likelihood=mock_likelihood,
             prior=gw_prior,
-            sampler_config=_tiny_flowmc_config(parallel_tempering={"enabled": False}),
+            sampler_config=_tiny_flowmc_config(parallel_tempering=False),
         )
         assert "parallel_tempering" not in jim.sampler.strategy_order  # type: ignore[attr-defined]
 
