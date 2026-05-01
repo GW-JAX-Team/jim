@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float, Key
 
-from jimgw.samplers.base import Sampler, SamplerOutput
+from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
 from jimgw.samplers.blackjax._acceptance_walk_kernel import bilby_adaptive_de_sampler
 from jimgw.samplers.blackjax._imports import (
     import_anesthetic,
@@ -97,7 +97,7 @@ class BlackJAXNSAWSampler(Sampler):
                 "log_prior_fn must return -inf for all points outside [0, 1]^n_dims. "
             )
 
-    def sample(
+    def _sample_impl(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n_live n_dims"],
@@ -134,14 +134,17 @@ class BlackJAXNSAWSampler(Sampler):
         step_fn = jax.jit(nested_sampler.step)
 
         dead = []
+        n_iter = 0
         while not _terminate(state):
             rng_key, subkey = jax.random.split(rng_key)
             state, dead_info = step_fn(subkey, state)
             dead.append(dead_info)
+            n_iter += 1
 
         from blackjax.ns.utils import finalise  # type: ignore[import]
 
         self._final_state = finalise(state, dead)
+        self._n_iterations = n_iter
         self._sampled = True
 
     def get_output(self) -> SamplerOutput:
@@ -176,4 +179,26 @@ class BlackJAXNSAWSampler(Sampler):
             log_evidence=log_evidence,
             log_evidence_err=log_evidence_err,
             weights=weights,
+        )
+
+    def get_diagnostics(self) -> SamplerDiagnostics:
+        """Return NS-AW run diagnostics.
+
+        Populates: ``ns_n_iterations``, ``ns_aw_n_accept``,
+        ``ns_aw_walks_completed``, ``ns_aw_total_proposals``.
+        ``n_likelihood_evaluations`` is derived from the concatenated
+        :class:`DEWalkInfo`.
+        """
+        if not self._sampled:
+            raise RuntimeError("get_diagnostics() called before sample()")
+        ui = self._final_state.update_info  # DEWalkInfo concatenated across all steps
+        n_evals = int(jnp.sum(ui.n_likelihood_evals))
+        return SamplerDiagnostics(
+            backend="blackjax_ns_aw",
+            sampling_time_seconds=self._sampling_time_seconds,  # type: ignore[arg-type]
+            n_likelihood_evaluations=n_evals,
+            ns_n_iterations=self._n_iterations,
+            ns_aw_n_accept=np.asarray(ui.n_accept),
+            ns_aw_walks_completed=np.asarray(ui.walks_completed),
+            ns_aw_total_proposals=np.asarray(ui.total_proposals),
         )

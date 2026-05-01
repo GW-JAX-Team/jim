@@ -22,7 +22,7 @@ from flowMC.resource_strategy_bundle.RQSpline_MALA_PT import RQSpline_MALA_PT_Bu
 from flowMC.Sampler import Sampler as FlowMCSamplerBackend
 from jaxtyping import Array, Float, Key
 
-from jimgw.samplers.base import Sampler, SamplerOutput
+from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
 from jimgw.samplers.config import FlowMCConfig
 from jimgw.samplers.periodic import to_index_dict
 
@@ -100,7 +100,7 @@ class FlowMCSampler(Sampler):
                 return order
         return self._strategy_order_from_config
 
-    def sample(
+    def _sample_impl(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n_chains n_dims"],
@@ -234,4 +234,40 @@ class FlowMCSampler(Sampler):
         return SamplerOutput(
             samples=prod_positions,
             log_posterior=log_posterior,
+        )
+
+    def get_diagnostics(self) -> SamplerDiagnostics:
+        """Return flowMC run diagnostics.
+
+        Populates: ``n_training_loops_actual``, ``training_loss_history``,
+        ``local_acceptance_training``, ``global_acceptance_training``,
+        ``local_acceptance_production``, ``global_acceptance_production``.
+        """
+        if not self._sampled or self._flowmc_sampler is None:
+            raise RuntimeError("get_diagnostics() called before sample()")
+        cfg = self._config
+        res = self._flowmc_sampler.resources
+
+        loss_data = np.asarray(res["loss_buffer"].data)  # type: ignore[union-attr]
+        epochs_run = int(np.sum(~np.isinf(loss_data)))
+        actual_training_loops = epochs_run // max(cfg.n_epochs, 1)
+
+        n_evals = int(
+            cfg.n_chains
+            * (cfg.n_local_steps + cfg.n_global_steps)
+            * (actual_training_loops + cfg.n_production_loops)
+        )
+
+        return SamplerDiagnostics(
+            backend="flowmc",
+            sampling_time_seconds=self._sampling_time_seconds,  # type: ignore[arg-type]
+            n_likelihood_evaluations=n_evals,
+            n_training_loops_actual=actual_training_loops,
+            training_loss_history=loss_data[:epochs_run]
+            if epochs_run > 0
+            else loss_data,
+            local_acceptance_training=np.asarray(res["local_accs_training"].data),  # type: ignore[union-attr]
+            global_acceptance_training=np.asarray(res["global_accs_training"].data),  # type: ignore[union-attr]
+            local_acceptance_production=np.asarray(res["local_accs_production"].data),  # type: ignore[union-attr]
+            global_acceptance_production=np.asarray(res["global_accs_production"].data),  # type: ignore[union-attr]
         )

@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float, Key
 
-from jimgw.samplers.base import Sampler, SamplerOutput
+from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
 from jimgw.samplers.blackjax._imports import (
     import_anesthetic,
     import_blackjax,
@@ -62,7 +62,7 @@ class BlackJAXNSSSampler(Sampler):
         self._stepper_fn = to_prior_space_stepper(config.periodic, parameter_names)
         self._sampled = False
 
-    def sample(
+    def _sample_impl(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n_live n_dims"],
@@ -97,14 +97,17 @@ class BlackJAXNSSSampler(Sampler):
         step_fn = jax.jit(nested_sampler.step)
 
         dead = []
+        n_iter = 0
         while not _terminate(state):
             rng_key, subkey = jax.random.split(rng_key)
             state, dead_info = step_fn(subkey, state)
             dead.append(dead_info)
+            n_iter += 1
 
         from blackjax.ns.utils import finalise  # type: ignore[import]
 
         self._final_state = finalise(state, dead)
+        self._n_iterations = n_iter
         self._sampled = True
 
     def get_output(self) -> SamplerOutput:
@@ -139,4 +142,30 @@ class BlackJAXNSSSampler(Sampler):
             log_evidence=log_evidence,
             log_evidence_err=log_evidence_err,
             weights=weights,
+        )
+
+    def get_diagnostics(self) -> SamplerDiagnostics:
+        """Return NSS run diagnostics.
+
+        Populates: ``ns_n_iterations``, ``nss_num_steps_history``,
+        ``nss_num_shrink_history``, ``nss_total_stepping_out_evals``,
+        ``nss_total_shrinking_evals``, ``nss_is_accepted_history``.
+        ``n_likelihood_evaluations`` equals the sum of stepping-out and
+        shrinking evaluations.
+        """
+        if not self._sampled:
+            raise RuntimeError("get_diagnostics() called before sample()")
+        ui = self._final_state.update_info  # SliceInfo concatenated across all steps
+        total_steps = int(jnp.sum(ui.num_steps))
+        total_shrink = int(jnp.sum(ui.num_shrink))
+        return SamplerDiagnostics(
+            backend="blackjax_nss",
+            sampling_time_seconds=self._sampling_time_seconds,  # type: ignore[arg-type]
+            n_likelihood_evaluations=total_steps + total_shrink,
+            ns_n_iterations=self._n_iterations,
+            nss_num_steps_history=np.asarray(ui.num_steps),
+            nss_num_shrink_history=np.asarray(ui.num_shrink),
+            nss_total_stepping_out_evals=total_steps,
+            nss_total_shrinking_evals=total_shrink,
+            nss_is_accepted_history=np.asarray(ui.is_accepted),
         )

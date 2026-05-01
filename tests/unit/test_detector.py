@@ -182,7 +182,9 @@ class TestET:
         _a = EARTH_SEMI_MAJOR_AXIS / 1e3
         _b = EARTH_SEMI_MINOR_AXIS / 1e3
         lat0 = float(self.ifos[0].latitude)
-        R = (_a * _b / np.sqrt(_a**2 * np.sin(lat0)**2 + _b**2 * np.cos(lat0)**2)) * 1e3
+        R = (
+            _a * _b / np.sqrt(_a**2 * np.sin(lat0) ** 2 + _b**2 * np.cos(lat0) ** 2)
+        ) * 1e3
         for ifo_a, ifo_b in combinations(self.ifos, 2):
             lat1 = float(ifo_a.latitude)
             lon1 = float(ifo_a.longitude)
@@ -190,7 +192,10 @@ class TestET:
             lon2 = float(ifo_b.longitude)
             dlat = lat2 - lat1
             dlon = lon2 - lon1
-            a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+            a = (
+                np.sin(dlat / 2) ** 2
+                + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+            )
             dist = R * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
             assert abs(dist - self.ET_ARM_LENGTH_M) < 50.0, (
                 f"{ifo_a.name}↔{ifo_b.name}: {dist:.0f} m "

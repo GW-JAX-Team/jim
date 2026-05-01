@@ -12,7 +12,7 @@ blackjax = pytest.importorskip("blackjax")
 anesthetic = pytest.importorskip("anesthetic")
 
 from jimgw.core.prior import CombinePrior, UniformPrior  # noqa: E402
-from jimgw.samplers.base import SamplerOutput  # noqa: E402
+from jimgw.samplers.base import SamplerDiagnostics, SamplerOutput  # noqa: E402
 from jimgw.samplers.blackjax.nss import BlackJAXNSSSampler  # noqa: E402
 from jimgw.samplers.config import BlackJAXNSSConfig  # noqa: E402
 
@@ -124,4 +124,28 @@ def test_nss_log_evidence_reasonable():
     assert out.log_evidence is not None
     assert abs(out.log_evidence - logZ_analytic) < 2.0, (
         f"log Z = {out.log_evidence:.3f}, expected ≈ {logZ_analytic:.3f}"
+    )
+
+
+def test_nss_diagnostics_before_sample_raises():
+    sampler = _make_sampler()
+    with pytest.raises(RuntimeError, match="before sample"):
+        sampler.get_diagnostics()
+
+
+def test_nss_diagnostics():
+    sampler = _make_sampler()
+    sampler.sample(jax.random.key(4), _init_pos(100))
+    diag = sampler.get_diagnostics()
+
+    assert isinstance(diag, SamplerDiagnostics)
+    assert diag.backend == "blackjax_nss"
+    assert diag.sampling_time_seconds > 0
+    assert diag.ns_n_iterations is not None and diag.ns_n_iterations > 0
+    assert diag.nss_num_steps_history is not None
+    assert diag.nss_num_shrink_history is not None
+    assert diag.nss_total_stepping_out_evals is not None
+    assert diag.nss_total_shrinking_evals is not None
+    assert diag.n_likelihood_evaluations == (
+        diag.nss_total_stepping_out_evals + diag.nss_total_shrinking_evals
     )

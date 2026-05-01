@@ -11,7 +11,7 @@ import pytest
 
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.prior import CombinePrior, UniformPrior  # type: ignore[attr-defined]
-from jimgw.samplers.base import SamplerOutput
+from jimgw.samplers.base import SamplerDiagnostics, SamplerOutput
 from jimgw.samplers.config import FlowMCConfig
 from jimgw.samplers.flowmc import FlowMCSampler
 
@@ -119,3 +119,21 @@ def test_flowmc_sampler_get_output_before_sample_raises():
     s = _make_sampler()
     with pytest.raises(Exception):
         s.get_output()
+
+
+@pytest.mark.slow
+def test_flowmc_diagnostics():
+    s = _make_sampler()
+    s.sample(jax.random.key(2), jnp.ones((10, 2)) * 0.5)
+    diag = s.get_diagnostics()
+
+    assert isinstance(diag, SamplerDiagnostics)
+    assert diag.backend == "flowmc"
+    assert diag.sampling_time_seconds > 0
+    assert diag.n_likelihood_evaluations > 0
+    assert diag.n_training_loops_actual is not None
+    assert diag.training_loss_history is not None
+    assert diag.local_acceptance_training is not None
+    assert diag.global_acceptance_training is not None
+    assert diag.local_acceptance_production is not None
+    assert diag.global_acceptance_production is not None

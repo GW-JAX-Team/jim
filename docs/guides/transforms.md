@@ -67,14 +67,25 @@ All transforms are importable from `jimgw.core.single_event.transforms`.
 
 ### Mass transforms
 
+Transforms marked *pre-instantiated* are ready-to-use objects exported directly
+from the module — use them **without parentheses** in your transform lists:
+
+```python
+# Correct:
+likelihood_transforms = [MassRatioToSymmetricMassRatioTransform]
+
+# Wrong — do not call it:
+likelihood_transforms = [MassRatioToSymmetricMassRatioTransform()]  # TypeError
+```
+
 | Transform | Mapping | Notes |
 | --- | --- | --- |
-| `MassRatioToSymmetricMassRatioTransform` | `q → eta` | Module-level instance |
-| `SymmetricMassRatioToMassRatioTransform` | `eta → q` | Module-level instance |
-| `ComponentMassesToChirpMassMassRatioTransform` | `(m1, m2) → (M_c, q)` | Module-level instance |
-| `ComponentMassesToChirpMassSymmetricMassRatioTransform` | `(m1, m2) → (M_c, eta)` | Module-level instance |
-| `ChirpMassMassRatioToComponentMassesTransform` | `(M_c, q) → (m1, m2)` | Module-level instance |
-| `ChirpMassSymmetricMassRatioToComponentMassesTransform` | `(M_c, eta) → (m1, m2)` | Module-level instance |
+| `MassRatioToSymmetricMassRatioTransform` | `q → eta` | Pre-instantiated |
+| `SymmetricMassRatioToMassRatioTransform` | `eta → q` | Pre-instantiated |
+| `ComponentMassesToChirpMassMassRatioTransform` | `(m1, m2) → (M_c, q)` | Pre-instantiated |
+| `ComponentMassesToChirpMassSymmetricMassRatioTransform` | `(m1, m2) → (M_c, eta)` | Pre-instantiated |
+| `ChirpMassMassRatioToComponentMassesTransform` | `(M_c, q) → (m1, m2)` | Pre-instantiated |
+| `ChirpMassSymmetricMassRatioToComponentMassesTransform` | `(M_c, eta) → (m1, m2)` | Pre-instantiated |
 
 ### Spin transforms
 

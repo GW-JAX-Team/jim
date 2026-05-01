@@ -16,6 +16,7 @@ from jimgw.core.single_event.likelihood import (
 )
 from ripplegw.interfaces import Waveform
 from jimgw.samplers import Sampler, SamplerConfig, build_sampler
+from jimgw.samplers.base import SamplerDiagnostics
 
 # Fixed key used for deterministic downsampling in get_samples().
 _DOWNSAMPLE_KEY: Key = jax.random.key(42)
@@ -352,3 +353,13 @@ class Jim:
         for transform in reversed(self.sample_transforms):
             named = jax.vmap(transform.backward)(named)
         return {k: np.array(named[k]) for k in self.prior.parameter_names}
+
+    def get_diagnostics(self) -> SamplerDiagnostics:
+        """Return run-level diagnostics from the most recent :meth:`sample` call.
+
+        Returns:
+            :class:`~jimgw.samplers.base.SamplerDiagnostics` with wall-clock
+            time, likelihood-evaluation count, and backend-specific convergence
+            histories.  Only valid after :meth:`sample` has been called.
+        """
+        return self.sampler.get_diagnostics()

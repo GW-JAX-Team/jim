@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jimgw.samplers.base import Sampler, SamplerOutput
+from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
 from jimgw.samplers.config import BaseSamplerConfig
 
 jax.config.update("jax_enable_x64", True)
@@ -30,7 +30,7 @@ def _make_callables(n_dims: int = 1):
 class _TrivialSampler(Sampler):
     """Minimal concrete Sampler for ABC contract tests."""
 
-    def sample(self, rng_key, initial_position):
+    def _sample_impl(self, rng_key, initial_position) -> None:  # noqa: ARG002
         self._ran = True
 
     def get_output(self) -> SamplerOutput:
@@ -38,6 +38,48 @@ class _TrivialSampler(Sampler):
             samples=np.zeros((3, self.n_dims)),
             log_posterior=np.zeros(3),
         )
+
+    def get_diagnostics(self) -> SamplerDiagnostics:
+        return SamplerDiagnostics(
+            backend="trivial",
+            sampling_time_seconds=0.0,
+            n_likelihood_evaluations=0,
+        )
+
+
+# --- SamplerDiagnostics invariants ---
+
+
+def test_diagnostics_rejects_negative_time():
+    with pytest.raises(ValueError, match="non-negative"):
+        SamplerDiagnostics(
+            backend="x", sampling_time_seconds=-1.0, n_likelihood_evaluations=0
+        )
+
+
+def test_diagnostics_rejects_negative_evals():
+    with pytest.raises(ValueError, match="non-negative"):
+        SamplerDiagnostics(
+            backend="x", sampling_time_seconds=0.0, n_likelihood_evaluations=-1
+        )
+
+
+def test_diagnostics_is_frozen():
+    diag = SamplerDiagnostics(
+        backend="x", sampling_time_seconds=1.0, n_likelihood_evaluations=10
+    )
+    with pytest.raises(Exception):
+        diag.backend = "y"  # type: ignore[misc]
+
+
+def test_diagnostics_optional_fields_default_none():
+    diag = SamplerDiagnostics(
+        backend="x", sampling_time_seconds=0.5, n_likelihood_evaluations=5
+    )
+    assert diag.n_training_loops_actual is None
+    assert diag.ns_n_iterations is None
+    assert diag.smc_n_iterations is None
+    assert diag.smc_acceptance_history is None
 
 
 # --- SamplerOutput invariants ---

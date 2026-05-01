@@ -1,8 +1,15 @@
-"""Sampler abstraction and unified result type.
+"""Sampler abstraction and unified result types.
 
 This module defines :class:`Sampler`, an abstract base class that encapsulates
-everything Jim needs from a JAX sampler backend, and :class:`SamplerOutput`,
-a frozen dataclass that every concrete sampler returns from :meth:`get_output`.
+everything Jim needs from a JAX sampler backend, and two frozen dataclasses:
+
+- :class:`SamplerOutput` — the slim, user-analysis-facing result returned by
+  :meth:`Sampler.get_output`.  Carries samples, per-sample log-densities,
+  evidence, and posterior weights.
+- :class:`SamplerDiagnostics` — run-level metadata and per-backend
+  instrumentation returned by :meth:`Sampler.get_diagnostics`.  Contains only
+  information the user *cannot* derive from their sampler config: wall-clock
+  time, likelihood-evaluation counts, convergence histories.
 
 Samplers operate entirely in the **sampling space** (flat arrays of shape
 ``(n_dims,)``).  They have zero knowledge of parameter names, transforms, or
@@ -14,6 +21,7 @@ Jim is responsible for building those callables and for converting
 
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -70,6 +78,83 @@ class SamplerOutput:
         return self.samples.shape[0]
 
 
+@dataclass(frozen=True)
+class SamplerDiagnostics:
+    """Run-level metadata and per-backend instrumentation.
+
+    Only fields that the user *cannot* derive from their sampler config are
+    included here.  Config fields (n_chains, n_live, step sizes, user-specified
+    temperature ladders …) are omitted — the user already knows them.
+
+    The three mandatory fields (``backend``, ``sampling_time_seconds``,
+    ``n_likelihood_evaluations``) are populated by every backend.
+    All other fields are ``Optional``; check whether they are ``None`` before
+    use — the docstring for each group specifies which backends populate them.
+
+    **flowMC fields** (prefix: none / ``training_`` / ``local_`` / ``global_``):
+    populated only when ``backend == "flowmc"``.
+
+    **NS-AW fields** (prefix: ``ns_aw_``):
+    populated only when ``backend == "blackjax_ns_aw"``.
+
+    **NSS fields** (prefix: ``nss_``):
+    populated only when ``backend == "blackjax_nss"``.
+
+    **SMC fields** (prefix: ``smc_``):
+    populated only when ``backend == "blackjax_smc"``.
+    ``smc_n_iterations`` and ``smc_tempering_schedule`` are populated only for
+    adaptive modes (AP/AT) whose convergence count and schedule are unknown at
+    call time.  ``smc_persistent_log_Z`` is populated only for persistent modes
+    (AP/FP).
+    """
+
+    # ---- Universal (all backends) ----
+    backend: str
+    sampling_time_seconds: float
+    n_likelihood_evaluations: int
+
+    # ---- flowMC ----
+    n_training_loops_actual: Optional[int] = None
+    training_loss_history: Optional[np.ndarray] = None
+    local_acceptance_training: Optional[np.ndarray] = None
+    global_acceptance_training: Optional[np.ndarray] = None
+    local_acceptance_production: Optional[np.ndarray] = None
+    global_acceptance_production: Optional[np.ndarray] = None
+
+    # ---- NS-AW + NSS (shared) ----
+    ns_n_iterations: Optional[int] = None
+
+    # ---- NS-AW only ----
+    ns_aw_n_accept: Optional[np.ndarray] = None
+    ns_aw_walks_completed: Optional[np.ndarray] = None
+    ns_aw_total_proposals: Optional[np.ndarray] = None
+
+    # ---- NSS only ----
+    nss_num_steps_history: Optional[np.ndarray] = None
+    nss_num_shrink_history: Optional[np.ndarray] = None
+    nss_total_stepping_out_evals: Optional[int] = None
+    nss_total_shrinking_evals: Optional[int] = None
+    nss_is_accepted_history: Optional[np.ndarray] = None
+
+    # ---- SMC ----
+    # smc_n_iterations / smc_tempering_schedule: adaptive modes only (AP/AT).
+    # smc_ess_history / smc_cov_scale_history: adaptive modes only (AP/AT).
+    # smc_acceptance_history: all modes.
+    # smc_persistent_log_Z: persistent modes only (AP/FP).
+    smc_n_iterations: Optional[int] = None
+    smc_tempering_schedule: Optional[np.ndarray] = None
+    smc_ess_history: Optional[np.ndarray] = None
+    smc_acceptance_history: Optional[np.ndarray] = None
+    smc_cov_scale_history: Optional[np.ndarray] = None
+    smc_persistent_log_Z: Optional[np.ndarray] = None
+
+    def __post_init__(self) -> None:
+        if self.sampling_time_seconds < 0:
+            raise ValueError("sampling_time_seconds must be non-negative")
+        if self.n_likelihood_evaluations < 0:
+            raise ValueError("n_likelihood_evaluations must be non-negative")
+
+
 class Sampler(ABC):
     """Abstract base class for JAX sampler backends.
 
@@ -85,6 +170,7 @@ class Sampler(ABC):
     """
 
     n_dims: int
+    _sampling_time_seconds: Optional[float]
 
     def __init__(
         self,
@@ -93,21 +179,40 @@ class Sampler(ABC):
         log_prior_fn: Callable[[Float[Array, " n_dims"]], Float],
         log_likelihood_fn: Callable[[Float[Array, " n_dims"]], Float],
         log_posterior_fn: Callable[[Float[Array, " n_dims"]], Float],
-        config: BaseSamplerConfig,
+        config: BaseSamplerConfig,  # noqa: ARG002
     ) -> None:
         self.n_dims = n_dims
         self._log_prior_fn = log_prior_fn
         self._log_likelihood_fn = log_likelihood_fn
         self._log_posterior_fn = log_posterior_fn
+        self._sampling_time_seconds = None
 
-    @abstractmethod
     def sample(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n n_dims"],
     ) -> None:
-        """Run the sampler. Must populate internal state consumable by :meth:`get_output`."""
+        """Run the sampler and record wall-clock time.
+
+        Delegates to :meth:`_sample_impl` and stores the elapsed seconds in
+        ``self._sampling_time_seconds`` for :meth:`get_diagnostics`.
+        """
+        t0 = time.perf_counter()
+        self._sample_impl(rng_key, initial_position)
+        self._sampling_time_seconds = time.perf_counter() - t0
+
+    @abstractmethod
+    def _sample_impl(
+        self,
+        rng_key: Key,
+        initial_position: Float[Array, "n n_dims"],
+    ) -> None:
+        """Backend-specific sampling implementation. Called by :meth:`sample`."""
 
     @abstractmethod
     def get_output(self) -> SamplerOutput:
         """Return the standardized sampling result. Only valid after :meth:`sample`."""
+
+    @abstractmethod
+    def get_diagnostics(self) -> SamplerDiagnostics:
+        """Return run-level diagnostics. Only valid after :meth:`sample`."""

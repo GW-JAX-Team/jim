@@ -29,9 +29,7 @@ class MockLikelihood:
 # ---------------------------------------------------------------------------
 
 
-def _tiny_flowmc_config(
-    pt: Optional[dict] = None, **kwargs
-) -> FlowMCConfig:
+def _tiny_flowmc_config(pt: Optional[dict] = None, **kwargs) -> FlowMCConfig:
     """Minimal FlowMCConfig for fast unit tests."""
     defaults: dict = dict(
         n_chains=5,
@@ -272,9 +270,7 @@ class TestJimTempering:
         jim = Jim(
             likelihood=mock_likelihood,
             prior=gw_prior,
-            sampler_config=_tiny_flowmc_config(
-                parallel_tempering={"enabled": False}
-            ),
+            sampler_config=_tiny_flowmc_config(parallel_tempering={"enabled": False}),
         )
         assert "parallel_tempering" not in jim.sampler.strategy_order  # type: ignore[attr-defined]
 
@@ -512,7 +508,18 @@ class TestJimNaNPosteriorCheck:
         # Provide fixed test positions (shape n_points x n_dims) so the NaN
         # count is deterministic: 2 out of 10 have M_c > 70.
         _fixed_positions = jnp.array(
-            [[20.0], [30.0], [40.0], [45.0], [50.0], [55.0], [60.0], [65.0], [75.0], [78.0]]
+            [
+                [20.0],
+                [30.0],
+                [40.0],
+                [45.0],
+                [50.0],
+                [55.0],
+                [60.0],
+                [65.0],
+                [75.0],
+                [78.0],
+            ]
         )
         monkeypatch.setattr(
             Jim,

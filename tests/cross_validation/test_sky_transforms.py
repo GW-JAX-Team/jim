@@ -185,7 +185,9 @@ class TestAngleRotation:
 
     def test_angle_rotation(self):
         """Compare Jim's angle_rotation with bilby_cython's zenith_azimuth_to_theta_phi."""
-        from jimgw.core.single_event.transform_utils import angle_rotation as jim_angle_rotation
+        from jimgw.core.single_event.transform_utils import (
+            angle_rotation as jim_angle_rotation,
+        )
         from jimgw.core.single_event.transform_utils import euler_rotation
         from bilby_cython.geometry import (
             zenith_azimuth_to_theta_phi as bilby_angle_rotation,

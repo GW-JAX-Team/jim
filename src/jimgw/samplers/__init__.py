@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from jimgw.samplers.base import Sampler, SamplerOutput
+from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
 from jimgw.samplers.config import (
     BaseSamplerConfig,
     BlackJAXNSAWConfig,
@@ -30,6 +30,7 @@ from jimgw.samplers.config import (
 __all__ = [
     "Sampler",
     "SamplerOutput",
+    "SamplerDiagnostics",
     "SamplerConfig",
     "BaseSamplerConfig",
     "FlowMCConfig",

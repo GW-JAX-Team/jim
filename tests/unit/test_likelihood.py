@@ -1071,7 +1071,10 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
                 f_min=fmin,
                 f_max=fmax,
                 trigger_time=gps,
-                distance_marginalization={"dist_prior": self.make_d_L_prior(), "n_dist_points": 1},
+                distance_marginalization={
+                    "dist_prior": self.make_d_L_prior(),
+                    "n_dist_points": 1,
+                },
             )
 
     def test_init_negative_ref_dist_raises(self, detectors_and_waveform):
@@ -1084,7 +1087,10 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
                 f_min=fmin,
                 f_max=fmax,
                 trigger_time=gps,
-                distance_marginalization={"dist_prior": self.make_d_L_prior(), "ref_dist": -100.0},
+                distance_marginalization={
+                    "dist_prior": self.make_d_L_prior(),
+                    "ref_dist": -100.0,
+                },
             )
 
     # ------------------------------------------------------------------
@@ -1141,7 +1147,10 @@ class TestDistanceMarginalizedTransientLikelihoodFD:
             f_min=fmin,
             f_max=fmax,
             trigger_time=gps,
-            distance_marginalization={"dist_prior": self.make_d_L_prior(), "ref_dist": 500.0},
+            distance_marginalization={
+                "dist_prior": self.make_d_L_prior(),
+                "ref_dist": 500.0,
+            },
         )
         assert jnp.isclose(likelihood.ref_dist, 500.0)
 
@@ -1380,7 +1389,10 @@ class TestPhaseDistanceMarginalizedTransientLikelihoodFD:
             f_min=fmin,
             f_max=fmax,
             trigger_time=gps,
-            distance_marginalization={"dist_prior": d_prior, "ref_dist": phase_distance_likelihood.ref_dist},
+            distance_marginalization={
+                "dist_prior": d_prior,
+                "ref_dist": phase_distance_likelihood.ref_dist,
+            },
         )
 
         params = self.params_without_d_L_phase()

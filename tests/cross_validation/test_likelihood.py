@@ -496,7 +496,10 @@ class TestDistanceMarginalizedLikelihood:
             f_min=F_MIN,
             f_max=F_MAX,
             trigger_time=GPS,
-            distance_marginalization={"dist_prior": jim_dist_prior, "n_dist_points": 10000},
+            distance_marginalization={
+                "dist_prior": jim_dist_prior,
+                "n_dist_points": 10000,
+            },
         ).evaluate(setup["jim_params"].copy(), {})
 
         bilby_priors = bilby.core.prior.PriorDict()
@@ -558,7 +561,10 @@ class TestPhaseDistanceMarginalizedLikelihood:
             f_max=F_MAX,
             trigger_time=GPS,
             phase_marginalization=True,
-            distance_marginalization={"dist_prior": jim_dist_prior, "n_dist_points": 10000},
+            distance_marginalization={
+                "dist_prior": jim_dist_prior,
+                "n_dist_points": 10000,
+            },
         ).evaluate(jim_params_ph0.copy(), {})
 
         bilby_priors = bilby.core.prior.PriorDict()

@@ -12,14 +12,14 @@ Supports four mode combinations selected by
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, Optional
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float, Key
 
-from jimgw.samplers.base import Sampler, SamplerOutput
+from jimgw.samplers.base import Sampler, SamplerDiagnostics, SamplerOutput
 from jimgw.samplers.blackjax._imports import import_blackjax, require_persistent_smc
 from jimgw.samplers.config import BlackJAXSMCConfig
 from jimgw.samplers.periodic import to_displacement_wrapper
@@ -46,8 +46,14 @@ class BlackJAXSMCSampler(Sampler):
     _displacement_wrapper: Callable
     _sampled: bool
     _final_state: Any
-    # Mode tag set in sample() so get_output() knows which path was taken.
+    # Mode tag set in _sample_impl() so get_output() / get_diagnostics() know which path was taken.
     _mode: str  # "ap" | "fp" | "at" | "ft"
+    _n_iterations: int
+    # Per-mode diagnostics stashes (set in the corresponding _run_* method).
+    _acceptance_history: np.ndarray  # AP/AT: per-step mean acceptance rate
+    _cov_scale_history: np.ndarray  # AP only: per-step covariance scale factor
+    _tempering_schedule: np.ndarray  # AT only: per-step tempering parameter
+    _scan_infos: Any  # FP/FT: stacked SMCInfo from jax.lax.scan
 
     def __init__(
         self,
@@ -136,12 +142,15 @@ class BlackJAXSMCSampler(Sampler):
 
         state = smc_alg.init(initial_particles)  # type: ignore[call-arg]
 
+        accept_history = jnp.zeros(max_iterations)
+        cov_scale_history = jnp.zeros(max_iterations)
+
         def cond_fn(carry: tuple) -> Any:
             s = carry[0]
             return s.sampler_state.tempering_param < 1.0  # type: ignore[attr-defined]
 
         def body_fn(carry: tuple) -> tuple:
-            s, key, cov_scale = carry
+            s, key, cov_scale, n_iter, accept_h, cov_scale_h = carry
             key, subkey = jax.random.split(key)
             s, info = smc_alg.step(subkey, s)  # type: ignore[call-arg]
 
@@ -156,16 +165,31 @@ class BlackJAXSMCSampler(Sampler):
             current_cov = s.parameter_override["cov"]  # type: ignore[attr-defined]
             new_params = extend_params({"cov": current_cov[0] * new_scale})  # type: ignore[arg-type]
             s = StateWithParameterOverride(ps, new_params)  # type: ignore[arg-type]
-            return (s, key, new_scale)
 
-        state, _, _ = jax.lax.while_loop(
+            accept_h = accept_h.at[n_iter].set(acceptance_rate)
+            cov_scale_h = cov_scale_h.at[n_iter].set(new_scale)
+
+            return (s, key, new_scale, n_iter + 1, accept_h, cov_scale_h)
+
+        state, _, _, n_iter, accept_h, cov_scale_h = jax.lax.while_loop(
             cond_fn,
             body_fn,
-            (state, rng_key, jnp.array(config.initial_cov_scale)),
+            (
+                state,
+                rng_key,
+                jnp.array(config.initial_cov_scale),
+                jnp.array(0),
+                accept_history,
+                cov_scale_history,
+            ),
         )
 
+        n_iter_int = int(n_iter)
         self._final_state = state
         self._mode = "ap"
+        self._n_iterations = n_iter_int
+        self._acceptance_history = np.asarray(accept_h[:n_iter_int])
+        self._cov_scale_history = np.asarray(cov_scale_h[:n_iter_int])
 
     def _run_fixed_persistent(
         self, rng_key: Key, initial_particles, ladder: list[float]
@@ -201,10 +225,12 @@ class BlackJAXSMCSampler(Sampler):
             s, info = smc_alg.step(subkey, s, lmbda)  # type: ignore[call-arg]
             return (s, key), info
 
-        (state, _), _ = jax.lax.scan(scan_body, (state, rng_key), lambdas)
+        (state, _), scan_infos = jax.lax.scan(scan_body, (state, rng_key), lambdas)
 
         self._final_state = state
         self._mode = "fp"
+        self._n_iterations = n_schedule
+        self._scan_infos = scan_infos
 
     def _run_adaptive_tempered(self, rng_key: Key, initial_particles) -> None:
         """Mode AT: adaptive_tempered_smc + inner_kernel_tuning + while_loop."""
@@ -215,6 +241,7 @@ class BlackJAXSMCSampler(Sampler):
         config = self._config
         n_mcmc_steps = config.n_mcmc_steps_per_dim * self.n_dims
         target_ess = config.absolute_target_ess / config.n_particles
+        max_iterations = 1000
 
         mcmc_step = self._build_mcmc_step()
         cov0 = jnp.cov(initial_particles.T) * config.initial_cov_scale
@@ -237,20 +264,38 @@ class BlackJAXSMCSampler(Sampler):
 
         state = smc_alg.init(initial_particles)  # type: ignore[call-arg]
 
+        accept_history = jnp.zeros(max_iterations)
+        temp_history = jnp.zeros(max_iterations)
+
         def cond_fn(carry: tuple) -> Any:
             s = carry[0]
             return s.sampler_state.tempering_param < 1.0  # type: ignore[attr-defined]
 
         def body_fn(carry: tuple) -> tuple:
-            s, key = carry
+            s, key, n_iter, accept_h, temp_h = carry
             key, subkey = jax.random.split(key)
-            s, _ = smc_alg.step(subkey, s)  # type: ignore[call-arg]
-            return (s, key)
+            s, info = smc_alg.step(subkey, s)  # type: ignore[call-arg]
 
-        state, _ = jax.lax.while_loop(cond_fn, body_fn, (state, rng_key))
+            acceptance_rate = info.update_info.acceptance_rate.mean()  # type: ignore[attr-defined]
+            tempering_param = s.sampler_state.tempering_param  # type: ignore[attr-defined]
 
+            accept_h = accept_h.at[n_iter].set(acceptance_rate)
+            temp_h = temp_h.at[n_iter].set(tempering_param)
+
+            return (s, key, n_iter + 1, accept_h, temp_h)
+
+        state, _, n_iter, accept_h, temp_h = jax.lax.while_loop(
+            cond_fn,
+            body_fn,
+            (state, rng_key, jnp.array(0), accept_history, temp_history),
+        )
+
+        n_iter_int = int(n_iter)
         self._final_state = state
         self._mode = "at"
+        self._n_iterations = n_iter_int
+        self._acceptance_history = np.asarray(accept_h[:n_iter_int])
+        self._tempering_schedule = np.asarray(temp_h[:n_iter_int])
 
     def _run_fixed_tempered(
         self, rng_key: Key, initial_particles, ladder: list[float]
@@ -284,16 +329,18 @@ class BlackJAXSMCSampler(Sampler):
             s, info = smc_alg.step(subkey, s, lmbda)  # type: ignore[call-arg]
             return (s, key), info
 
-        (state, _), _ = jax.lax.scan(scan_body, (state, rng_key), lambdas)
+        (state, _), scan_infos = jax.lax.scan(scan_body, (state, rng_key), lambdas)
 
         self._final_state = state
         self._mode = "ft"
+        self._n_iterations = len(ladder) - 1
+        self._scan_infos = scan_infos
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def sample(
+    def _sample_impl(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n_particles n_dims"],
@@ -324,40 +371,130 @@ class BlackJAXSMCSampler(Sampler):
         self._sampled = True
 
     def get_output(self) -> SamplerOutput:
+        """Return posterior samples.
+
+        For AP/FP modes: returns all-temperature particles stacked into a single
+        ``(n_steps * n_particles, n_dims)`` array with posterior weights computed
+        via the persistent-sampling weight formula.  This mirrors how NS-AW/NSS
+        use anesthetic weights over dead points.
+
+        For AT/FT modes: returns only the final-temperature particles with equal
+        (implicit) weights.
+        """
         if not self._sampled:
             raise RuntimeError("get_output() called before sample()")
 
+        from blackjax.smc.persistent_sampling import (  # type: ignore[import]
+            compute_log_persistent_weights,
+        )
+
         mode = self._mode
         state = self._final_state
-        log_evidence: Optional[float] = None
+
+        if mode in ("ap", "fp"):
+            ps = state.sampler_state if mode == "ap" else state  # type: ignore[attr-defined]
+            n_iter = int(ps.iteration)  # type: ignore[attr-defined]
+
+            all_particles = np.asarray(
+                ps.persistent_particles[: n_iter + 1]  # type: ignore[attr-defined]
+            ).reshape(-1, self.n_dims)
+            all_log_likelihoods = np.asarray(
+                ps.persistent_log_likelihoods[: n_iter + 1]  # type: ignore[attr-defined]
+            ).reshape(-1)
+
+            log_w, _ = compute_log_persistent_weights(
+                ps.persistent_log_likelihoods,  # type: ignore[attr-defined]
+                ps.persistent_log_Z,  # type: ignore[attr-defined]
+                ps.tempering_schedule,  # type: ignore[attr-defined]
+                ps.iteration,  # type: ignore[attr-defined]
+                include_current=True,
+            )
+            weights = np.asarray(jax.nn.softmax(log_w[: n_iter + 1].reshape(-1)))
+            log_evidence = float(ps.persistent_log_Z[n_iter])  # type: ignore[attr-defined]
+
+            return SamplerOutput(
+                samples=all_particles,
+                log_likelihood=all_log_likelihoods,
+                log_evidence=log_evidence,
+                weights=weights,
+            )
+
+        elif mode == "at":
+            ps = state.sampler_state  # type: ignore[attr-defined]
+            final_particles = np.array(ps.particles)
+            log_posterior_arr = np.array(jax.vmap(self._log_posterior_fn)(ps.particles))
+            return SamplerOutput(
+                samples=final_particles,
+                log_posterior=log_posterior_arr,
+            )
+
+        else:  # mode == "ft"
+            final_particles = np.array(state.particles)  # type: ignore[attr-defined]
+            log_posterior_arr = np.array(
+                jax.vmap(self._log_posterior_fn)(state.particles)  # type: ignore[attr-defined]
+            )
+            return SamplerOutput(
+                samples=final_particles,
+                log_posterior=log_posterior_arr,
+            )
+
+    def get_diagnostics(self) -> SamplerDiagnostics:
+        """Return SMC run diagnostics.
+
+        Universal fields populated: ``backend``, ``sampling_time_seconds``,
+        ``n_likelihood_evaluations``.
+
+        ``smc_acceptance_history`` is populated for all modes.
+
+        ``smc_n_iterations``, ``smc_tempering_schedule``, and
+        ``smc_cov_scale_history`` are populated only for adaptive modes
+        (AP/AT) because for fixed-ladder modes these are user-specified.
+
+        ``smc_persistent_log_Z`` is populated only for persistent modes (AP/FP).
+        """
+        if not self._sampled:
+            raise RuntimeError("get_diagnostics() called before sample()")
+
+        cfg = self._config
+        mode = self._mode
+        n_mcmc = cfg.n_mcmc_steps_per_dim * self.n_dims
+        n_iter = self._n_iterations
+
+        kwargs: dict = dict(
+            backend="blackjax_smc",
+            sampling_time_seconds=self._sampling_time_seconds,
+            n_likelihood_evaluations=n_mcmc * n_iter * cfg.n_particles,
+        )
+
+        if mode in ("ap", "at"):
+            kwargs["smc_n_iterations"] = n_iter
+            kwargs["smc_acceptance_history"] = self._acceptance_history
 
         if mode == "ap":
-            # adaptive persistent: state = StateWithParameterOverride(persistent_state, ...)
-            ps = state.sampler_state  # type: ignore[attr-defined]
-            final_particles = np.array(ps.particles)
-            log_posterior_arr = np.array(jax.vmap(self._log_posterior_fn)(ps.particles))
-            log_evidence = float(ps.log_Z)  # type: ignore[attr-defined]
-        elif mode == "fp":
-            # fixed persistent: state = PersistentSMCState
-            final_particles = np.array(state.particles)  # type: ignore[attr-defined]
-            log_posterior_arr = np.array(
-                jax.vmap(self._log_posterior_fn)(state.particles)  # type: ignore[attr-defined]
+            kwargs["smc_cov_scale_history"] = self._cov_scale_history
+            # Extract tempering schedule and log-Z trajectory from persistent state.
+            ps = self._final_state.sampler_state  # type: ignore[attr-defined]
+            n = int(ps.iteration)  # type: ignore[attr-defined]
+            kwargs["smc_tempering_schedule"] = np.asarray(
+                ps.tempering_schedule[: n + 1]  # type: ignore[attr-defined]
             )
-            log_evidence = float(state.persistent_log_Z[state.iteration])  # type: ignore[attr-defined]
-        elif mode == "at":
-            # adaptive tempered: state = StateWithParameterOverride(TemperedSMCState, ...)
-            ps = state.sampler_state  # type: ignore[attr-defined]
-            final_particles = np.array(ps.particles)
-            log_posterior_arr = np.array(jax.vmap(self._log_posterior_fn)(ps.particles))
-        else:  # mode == "ft"
-            # fixed tempered: state = TemperedSMCState
-            final_particles = np.array(state.particles)  # type: ignore[attr-defined]
-            log_posterior_arr = np.array(
-                jax.vmap(self._log_posterior_fn)(state.particles)  # type: ignore[attr-defined]
+            kwargs["smc_persistent_log_Z"] = np.asarray(
+                ps.persistent_log_Z[: n + 1]  # type: ignore[attr-defined]
             )
 
-        return SamplerOutput(
-            samples=final_particles,
-            log_posterior=log_posterior_arr,
-            log_evidence=log_evidence,
-        )
+        elif mode == "at":
+            kwargs["smc_tempering_schedule"] = self._tempering_schedule
+
+        elif mode in ("fp", "ft"):
+            kwargs["smc_acceptance_history"] = np.asarray(
+                self._scan_infos.update_info.acceptance_rate.mean(axis=-1)
+            )
+
+        if mode == "fp":
+            ps = self._final_state
+            n = int(ps.iteration)  # type: ignore[attr-defined]
+            kwargs["smc_persistent_log_Z"] = np.asarray(
+                ps.persistent_log_Z[: n + 1]  # type: ignore[attr-defined]
+            )
+
+        return SamplerDiagnostics(**kwargs)

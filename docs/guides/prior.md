@@ -2,6 +2,9 @@
 
 Jim priors are built by composing individual prior components with `CombinePrior`, which joins them into a joint prior. Each component can cover one or more parameters.
 
+!!! note "BlackJAX NS-AW sampler requirement"
+    If you plan to use the BlackJAX NS-AW backend, every parameter must have a **uniform prior** and your `sample_transforms` must map each parameter into `[0, 1]`. See the [Samplers guide](samplers.md#blackjax-ns-aw) for details.
+
 ## CombinePrior
 
 `CombinePrior` takes a list of priors and treats them as independent:

@@ -12,8 +12,8 @@ blackjax = pytest.importorskip("blackjax")
 anesthetic = pytest.importorskip("anesthetic")
 
 from jimgw.core.prior import CombinePrior, UniformPrior  # noqa: E402
+from jimgw.samplers.base import SamplerDiagnostics, SamplerOutput  # noqa: E402
 from jimgw.samplers.blackjax.ns_aw import BlackJAXNSAWSampler  # noqa: E402
-from jimgw.samplers.base import SamplerOutput  # noqa: E402
 from jimgw.samplers.config import BlackJAXNSAWConfig  # noqa: E402
 
 jax.config.update("jax_enable_x64", True)
@@ -147,3 +147,24 @@ def test_ns_aw_log_evidence_reasonable():
     assert abs(out.log_evidence - logZ_analytic) < 2.0, (
         f"log Z = {out.log_evidence:.3f}, expected ≈ {logZ_analytic:.3f}"
     )
+
+
+def test_ns_aw_diagnostics_before_sample_raises():
+    sampler = _make_sampler()
+    with pytest.raises(RuntimeError, match="before sample"):
+        sampler.get_diagnostics()
+
+
+def test_ns_aw_diagnostics():
+    sampler = _make_sampler(n_live=100)
+    sampler.sample(jax.random.key(4), _init_pos(100))
+    diag = sampler.get_diagnostics()
+
+    assert isinstance(diag, SamplerDiagnostics)
+    assert diag.backend == "blackjax_ns_aw"
+    assert diag.sampling_time_seconds > 0
+    assert diag.n_likelihood_evaluations > 0
+    assert diag.ns_n_iterations is not None and diag.ns_n_iterations > 0
+    assert diag.ns_aw_n_accept is not None
+    assert diag.ns_aw_walks_completed is not None
+    assert diag.ns_aw_total_proposals is not None

@@ -7,13 +7,25 @@ This page gives you a bird's-eye view of Jim's main components and how they fit 
 A Jim analysis is assembled from the following building blocks:
 
 ```text
-Waveform Model ── Likelihood ───────────────┬──────────── 1 ──┐
-                      │                     │                 │
-Data ─────────────────┘          Likelihood Transforms ── 2 ──│
+Waveform Model ─┐
+                ├── Likelihood ──────────────────────────────┐
+Data ───────────┘                                            │
+                                  Likelihood Transforms ─────┤
+                                                             ├─→ Jim
+                    Prior ───────────────────────────────────┤
+                      │                                      │
+                      └──────────── Sample Transforms ───────┘
+```
+
+```text
+Waveform Model ─┐
+                ├── Likelihood ────────────────────────── 1 ──┐
+Data ───────────┘                           │                 │
+                                 Likelihood Transforms ── 2 ──│
                                             │                 ├─→ Jim 
-                    Prior ──────────────────┴──────────── 3 ──│
-                      │                                       │
-                      └─────────── Sample Transforms ──── 4 ──┘
+                      Prior ────────────────┴──────────── 3 ──│
+                        │                                     │
+                        └───────── Sample Transforms ──── 4 ──┘
 ```
 
 ### Data
@@ -105,7 +117,7 @@ jim = Jim(
         n_chains=500,
         n_training_loops=20,
         n_production_loops=10,
-        # ... other hyperparameters
+        # See the Samplers guide for the full parameter reference.
     ),
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
