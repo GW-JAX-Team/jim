@@ -919,7 +919,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         # Set up CMA-ES in normalized space: init_mean=0, std_init=1
         # ------------------------------------------------------------------
         es = CMA_ES(population_size=optimizer_popsize, solution=jnp.zeros(n_dim))
-        es_params = es.default_params.replace(std_init=1e-3)  # type: ignore
+        es_params = es.default_params.replace(std_init=1e-3)  # type: ignore[attr-defined]  # evosax stubs
         key = jax.random.key(42)
         state = es.init(key, jnp.zeros(n_dim), es_params)
 

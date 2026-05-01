@@ -132,7 +132,7 @@ class BlackJAXNSAWSampler(Sampler):
             max_proposals=config.max_proposals,
         )
 
-        state = nested_sampler.init(initial_particles)  # type: ignore[call-arg]
+        state = nested_sampler.init(initial_particles)  # type: ignore[call-arg]  # blackjax fork API
 
         def _terminate(state: Any) -> bool:
             dlogz = jnp.logaddexp(0, state.integrator.logZ_live - state.integrator.logZ)
@@ -148,7 +148,7 @@ class BlackJAXNSAWSampler(Sampler):
             dead.append(dead_info)
             n_iter += 1
 
-        from blackjax.ns.utils import finalise  # type: ignore[import]
+        from blackjax.ns.utils import finalise
 
         self._final_state = finalise(state, dead)
         self._n_iterations = n_iter
@@ -158,7 +158,7 @@ class BlackJAXNSAWSampler(Sampler):
         log_likelihood = np.array(self._final_state.particles.loglikelihood)
         logL_birth = jnp.array(self._final_state.particles.loglikelihood_birth)
         logL_birth = jnp.where(jnp.isnan(logL_birth), -jnp.inf, logL_birth)
-        self._nested_samples = NestedSamples(  # type: ignore[call-arg]
+        self._nested_samples = NestedSamples(
             particles_sample,
             logL=log_likelihood,
             logL_birth=np.asarray(logL_birth),

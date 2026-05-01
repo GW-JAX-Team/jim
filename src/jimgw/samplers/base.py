@@ -46,7 +46,7 @@ class Sampler(ABC):
         log_prior_fn: Callable[[Float[Array, " n_dims"]], Float],
         log_likelihood_fn: Callable[[Float[Array, " n_dims"]], Float],
         log_posterior_fn: Callable[[Float[Array, " n_dims"]], Float],
-        config: BaseSamplerConfig,  # noqa: ARG002
+        config: BaseSamplerConfig,
     ) -> None:
         self.n_dims = n_dims
         self._log_prior_fn = log_prior_fn

@@ -371,7 +371,7 @@ class BoundedMixin:
         return False
 
     def log_prob(self, z: dict[str, Float]) -> Float:
-        x = z[self.parameter_names[0]]  # type: ignore
+        x = z[self.parameter_names[0]]  # type: ignore[attr-defined]
         base_log_prob = super().log_prob(z)  # type: ignore[misc]
         return jnp.where(
             jnp.logical_and(x >= self.xmin, x <= self.xmax),

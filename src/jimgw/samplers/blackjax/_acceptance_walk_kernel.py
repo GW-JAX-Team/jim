@@ -19,14 +19,14 @@ import jax
 import jax.flatten_util
 import jax.numpy as jnp
 
-from blackjax.base import SamplingAlgorithm  # type: ignore[import]
-from blackjax.ns.base import (  # type: ignore[import]
+from blackjax.base import SamplingAlgorithm
+from blackjax.ns.base import (
     NSState,
     StateWithLogLikelihood,
     delete_fn as default_delete_fn,
     init_state_strategy,
 )
-from blackjax.ns.adaptive import (  # type: ignore[import]
+from blackjax.ns.adaptive import (
     AdaptiveNSState,
     build_kernel as build_adaptive_kernel,
     init as adaptive_init,
@@ -212,7 +212,7 @@ def _update_bilby_walks(
     max_mcmc: int,
     n_delete: int,
 ) -> DEKernelParams:
-    prev_params = ns_state.inner_kernel_params["params"]  # type: ignore[attr-defined]
+    prev_params = ns_state.inner_kernel_params["params"]  # type: ignore[attr-defined]  # blackjax fork stubs
     is_uninitialized = prev_params.n_accept_total < 0
 
     default_walks_float = jnp.array(100.0, dtype=jnp.float32)
@@ -347,7 +347,7 @@ def bilby_adaptive_de_sampler(
 
         return jax.vmap(single)(sub_keys, start_states)
 
-    base_kernel_step = build_adaptive_kernel(delete_fn, inner_kernel, update_fn)  # type: ignore[arg-type]
+    base_kernel_step = build_adaptive_kernel(delete_fn, inner_kernel, update_fn)  # type: ignore[arg-type]  # blackjax fork stubs
 
     def init_fn(particles):
         _init_state_fn = partial(
@@ -382,4 +382,4 @@ def bilby_adaptive_de_sampler(
     def step_fn(rng_key, state: AdaptiveNSState):
         return base_kernel_step(rng_key, state)
 
-    return SamplingAlgorithm(init_fn, step_fn)  # type: ignore[arg-type]
+    return SamplingAlgorithm(init_fn, step_fn)  # type: ignore[arg-type]  # blackjax fork stubs

@@ -128,7 +128,7 @@ class BlackJAXSMCSampler(Sampler):
         cov0 = jnp.cov(initial_particles.T) * config.initial_cov_scale
 
         def mcmc_parameter_update_fn(_key, state, _info):
-            return extend_params({"cov": jnp.cov(state.particles.T)})  # type: ignore[arg-type]
+            return extend_params({"cov": jnp.cov(state.particles.T)})  # type: ignore[arg-type]  # blackjax fork stubs: extend_params accepts dict
 
         smc_alg = inner_kernel_tuning(
             smc_algorithm=adaptive_persistent_sampling_smc,
@@ -139,36 +139,36 @@ class BlackJAXSMCSampler(Sampler):
             mcmc_init_fn=rmh.init,
             resampling_fn=systematic,
             mcmc_parameter_update_fn=mcmc_parameter_update_fn,
-            initial_parameter_value=extend_params({"cov": cov0}),  # type: ignore[arg-type]
+            initial_parameter_value=extend_params({"cov": cov0}),  # type: ignore[arg-type]  # blackjax fork stubs: extend_params accepts dict
             num_mcmc_steps=n_mcmc_steps,
             target_ess=target_ess,
         )
 
-        state = smc_alg.init(initial_particles)  # type: ignore[call-arg]
+        state = smc_alg.init(initial_particles)  # type: ignore[call-arg]  # blackjax fork API: init takes only particles
 
         accept_history = jnp.zeros(max_iterations)
         cov_scale_history = jnp.zeros(max_iterations)
 
         def cond_fn(carry: tuple) -> Any:
             s = carry[0]
-            return s.sampler_state.tempering_param < 1.0  # type: ignore[attr-defined]
+            return s.sampler_state.tempering_param < 1.0
 
         def body_fn(carry: tuple) -> tuple:
             s, key, cov_scale, n_iter, accept_h, cov_scale_h = carry
             key, subkey = jax.random.split(key)
-            s, info = smc_alg.step(subkey, s)  # type: ignore[call-arg]
+            s, info = smc_alg.step(subkey, s)
 
-            ps = s.sampler_state  # type: ignore[attr-defined]
-            acceptance_rate = info.update_info.acceptance_rate.mean()  # type: ignore[attr-defined]
+            ps = s.sampler_state  # type: ignore[attr-defined]  # blackjax fork stubs
+            acceptance_rate = info.update_info.acceptance_rate.mean()  # type: ignore[attr-defined]  # blackjax fork stubs
 
             new_scale = jnp.exp(
                 jnp.log(cov_scale)
                 + config.scale_adaptation_gain
                 * (acceptance_rate - config.target_acceptance_rate)
             )
-            current_cov = s.parameter_override["cov"]  # type: ignore[attr-defined]
-            new_params = extend_params({"cov": current_cov[0] * new_scale})  # type: ignore[arg-type]
-            s = StateWithParameterOverride(ps, new_params)  # type: ignore[arg-type]
+            current_cov = s.parameter_override["cov"]  # type: ignore[attr-defined]  # blackjax fork stubs
+            new_params = extend_params({"cov": current_cov[0] * new_scale})  # type: ignore[arg-type]  # blackjax fork stubs
+            s = StateWithParameterOverride(ps, new_params)  # type: ignore[arg-type]  # blackjax fork stubs
 
             accept_h = accept_h.at[n_iter].set(acceptance_rate)
             cov_scale_h = cov_scale_h.at[n_iter].set(new_scale)
@@ -218,12 +218,12 @@ class BlackJAXSMCSampler(Sampler):
             num_mcmc_steps=n_mcmc_steps,
         )
 
-        state = smc_alg.init(initial_particles)  # type: ignore[call-arg]
+        state = smc_alg.init(initial_particles)  # type: ignore[call-arg]  # blackjax fork API
 
         def scan_body(carry, lmbda):
             s, key = carry
             key, subkey = jax.random.split(key)
-            s, info = smc_alg.step(subkey, s, lmbda)  # type: ignore[call-arg]
+            s, info = smc_alg.step(subkey, s, lmbda)  # type: ignore[call-arg]  # blackjax fork API: step accepts extra arg
             return (s, key), info
 
         (state, _), scan_infos = jax.lax.scan(scan_body, (state, rng_key), lambdas)
@@ -244,7 +244,7 @@ class BlackJAXSMCSampler(Sampler):
         cov0 = jnp.cov(initial_particles.T) * config.initial_cov_scale
 
         def mcmc_parameter_update_fn(_key, state, _info):
-            return extend_params({"cov": jnp.cov(state.particles.T)})  # type: ignore[arg-type]
+            return extend_params({"cov": jnp.cov(state.particles.T)})  # type: ignore[arg-type]  # blackjax fork stubs: extend_params accepts dict
 
         smc_alg = inner_kernel_tuning(
             smc_algorithm=adaptive_tempered_smc,
@@ -254,27 +254,27 @@ class BlackJAXSMCSampler(Sampler):
             mcmc_init_fn=rmh.init,
             resampling_fn=systematic,
             mcmc_parameter_update_fn=mcmc_parameter_update_fn,
-            initial_parameter_value=extend_params({"cov": cov0}),  # type: ignore[arg-type]
+            initial_parameter_value=extend_params({"cov": cov0}),  # type: ignore[arg-type]  # blackjax fork stubs: extend_params accepts dict
             num_mcmc_steps=n_mcmc_steps,
             target_ess=target_ess,
         )
 
-        state = smc_alg.init(initial_particles)  # type: ignore[call-arg]
+        state = smc_alg.init(initial_particles)  # type: ignore[call-arg]  # blackjax fork API
 
         accept_history = jnp.zeros(max_iterations)
         temp_history = jnp.zeros(max_iterations)
 
         def cond_fn(carry: tuple) -> Any:
             s = carry[0]
-            return s.sampler_state.tempering_param < 1.0  # type: ignore[attr-defined]
+            return s.sampler_state.tempering_param < 1.0
 
         def body_fn(carry: tuple) -> tuple:
             s, key, n_iter, accept_h, temp_h = carry
             key, subkey = jax.random.split(key)
-            s, info = smc_alg.step(subkey, s)  # type: ignore[call-arg]
+            s, info = smc_alg.step(subkey, s)
 
-            acceptance_rate = info.update_info.acceptance_rate.mean()  # type: ignore[attr-defined]
-            tempering_param = s.sampler_state.tempering_param  # type: ignore[attr-defined]
+            acceptance_rate = info.update_info.acceptance_rate.mean()  # type: ignore[attr-defined]  # blackjax fork stubs
+            tempering_param = s.sampler_state.tempering_param  # type: ignore[attr-defined]  # blackjax fork stubs
 
             accept_h = accept_h.at[n_iter].set(acceptance_rate)
             temp_h = temp_h.at[n_iter].set(tempering_param)
@@ -315,12 +315,12 @@ class BlackJAXSMCSampler(Sampler):
             num_mcmc_steps=n_mcmc_steps,
         )
 
-        state = smc_alg.init(initial_particles)  # type: ignore[call-arg]
+        state = smc_alg.init(initial_particles)  # type: ignore[call-arg]  # blackjax fork API
 
         def scan_body(carry, lmbda):
             s, key = carry
             key, subkey = jax.random.split(key)
-            s, info = smc_alg.step(subkey, s, lmbda)  # type: ignore[call-arg]
+            s, info = smc_alg.step(subkey, s, lmbda)  # type: ignore[call-arg]  # blackjax fork API: step accepts extra arg
             return (s, key), info
 
         (state, _), scan_infos = jax.lax.scan(scan_body, (state, rng_key), lambdas)
@@ -397,21 +397,21 @@ class BlackJAXSMCSampler(Sampler):
         state = self._final_state
 
         if mode in ("ap", "fp"):
-            ps = state.sampler_state if mode == "ap" else state  # type: ignore[attr-defined]
-            n_iter = int(ps.iteration)  # type: ignore[attr-defined]
+            ps = state.sampler_state if mode == "ap" else state
+            n_iter = int(ps.iteration)
 
-            all_particles = np.asarray(
-                ps.persistent_particles[: n_iter + 1]  # type: ignore[attr-defined]
-            ).reshape(-1, self.n_dims)
+            all_particles = np.asarray(ps.persistent_particles[: n_iter + 1]).reshape(
+                -1, self.n_dims
+            )
             all_log_likelihoods = np.asarray(
-                ps.persistent_log_likelihoods[: n_iter + 1]  # type: ignore[attr-defined]
+                ps.persistent_log_likelihoods[: n_iter + 1]
             ).reshape(-1)
 
             log_w, _ = compute_log_persistent_weights(
-                ps.persistent_log_likelihoods,  # type: ignore[attr-defined]
-                ps.persistent_log_Z,  # type: ignore[attr-defined]
-                ps.tempering_schedule,  # type: ignore[attr-defined]
-                ps.iteration,  # type: ignore[attr-defined]
+                ps.persistent_log_likelihoods,
+                ps.persistent_log_Z,
+                ps.tempering_schedule,
+                ps.iteration,
                 include_current=True,
             )
             weights = np.asarray(jax.nn.softmax(log_w[: n_iter + 1].reshape(-1)))
@@ -434,15 +434,15 @@ class BlackJAXSMCSampler(Sampler):
             }
 
         elif mode == "at":
-            ps = state.sampler_state  # type: ignore[attr-defined]
+            ps = state.sampler_state
             final_particles = np.array(ps.particles)
             log_likelihoods = np.array(jax.vmap(self._log_likelihood_fn)(ps.particles))
             return {"samples": final_particles, "log_likelihood": log_likelihoods}
 
         else:  # mode == "ft"
-            final_particles = np.array(state.particles)  # type: ignore[attr-defined]
+            final_particles = np.array(state.particles)
             log_likelihoods = np.array(
-                jax.vmap(self._log_likelihood_fn)(state.particles)  # type: ignore[attr-defined]
+                jax.vmap(self._log_likelihood_fn)(state.particles)
             )
             return {"samples": final_particles, "log_likelihood": log_likelihoods}
 

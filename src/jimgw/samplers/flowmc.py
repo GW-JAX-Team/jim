@@ -227,12 +227,12 @@ class FlowMCSampler(Sampler):
             )
         resources = self._flowmc_sampler.resources
 
-        prod_positions = resources["positions_production"].data  # type: ignore[union-attr]
+        prod_positions = resources["positions_production"].data  # type: ignore[union-attr]  # flowMC stubs
         prod_positions = np.array(prod_positions.reshape(-1, self.n_dims))
         pos_jnp = jnp.array(prod_positions)
 
         log_posterior = np.array(
-            resources["log_prob_production"].data  # type: ignore[union-attr]
+            resources["log_prob_production"].data  # type: ignore[union-attr]  # flowMC stubs
         ).reshape(-1)
         log_prior = np.array(jax.vmap(self._log_prior_fn)(pos_jnp))
         log_likelihood = log_posterior - log_prior
@@ -259,7 +259,7 @@ class FlowMCSampler(Sampler):
         res = self._flowmc_sampler.resources
 
         actual_training_loops = (
-            self._flowmc_sampler.strategies["check_early_stop"]._call_count  # type: ignore[reportAttributeAccessIssue]
+            self._flowmc_sampler.strategies["check_early_stop"]._call_count  # type: ignore[attr-defined]  # flowMC stubs: Strategy._call_count
             if "check_early_stop" in self._flowmc_sampler.strategies
             else cfg.n_training_loops
         )
@@ -273,13 +273,13 @@ class FlowMCSampler(Sampler):
         return {
             "n_likelihood_evaluations": n_evals,
             "n_training_loops_actual": actual_training_loops,
-            "training_loss_history": np.asarray(res["loss_buffer"].data),  # type: ignore[reportAttributeAccessIssue]
-            "acceptance_training_local": np.asarray(res["local_accs_training"].data),  # type: ignore[reportAttributeAccessIssue]
-            "acceptance_training_global": np.asarray(res["global_accs_training"].data),  # type: ignore[reportAttributeAccessIssue]
+            "training_loss_history": np.asarray(res["loss_buffer"].data),  # type: ignore[union-attr]  # flowMC stubs
+            "acceptance_training_local": np.asarray(res["local_accs_training"].data),  # type: ignore[union-attr]  # flowMC stubs
+            "acceptance_training_global": np.asarray(res["global_accs_training"].data),  # type: ignore[union-attr]  # flowMC stubs
             "acceptance_production_local": np.asarray(
-                res["local_accs_production"].data  # type: ignore[reportAttributeAccessIssue]
+                res["local_accs_production"].data  # type: ignore[union-attr]  # flowMC stubs
             ),
             "acceptance_production_global": np.asarray(
-                res["global_accs_production"].data  # type: ignore[reportAttributeAccessIssue]
+                res["global_accs_production"].data  # type: ignore[union-attr]  # flowMC stubs
             ),
         }
