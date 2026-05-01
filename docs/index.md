@@ -2,8 +2,6 @@
 
 ## A JAX-based gravitational-wave inference toolkit
 
-[![license](https://img.shields.io/badge/License-MIT-blue)](https://github.com/GW-JAX-Team/jim/blob/main/LICENSE) [![coverage](https://img.shields.io/coveralls/github/GW-JAX-Team/jim/main)](https://coveralls.io/github/GW-JAX-Team/jim?branch=main) [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/GW-JAX-Team/jim/main.svg)](https://results.pre-commit.ci/latest/github/GW-JAX-Team/jim/main)
-
 Jim is a JAX-based toolkit for Bayesian parameter estimation of gravitational-wave sources. It pairs differentiable waveform models from [ripple](https://github.com/GW-JAX-Team/ripple) with GPU-accelerated JAX-based samplers, enabling massively parallel inference.
 
 **Supported samplers:**
