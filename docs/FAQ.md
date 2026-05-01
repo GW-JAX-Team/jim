@@ -54,7 +54,7 @@ Most computation goes into the training phase. The production phase with a train
 
 This section applies to the flowMC backend.
 
-The most targeted fix is to set `chain_batch_size` inside `FlowMCConfig`. By default (`chain_batch_size=0`) all chains are evaluated simultaneously; setting it to a smaller integer processes chains in batches, directly reducing peak memory at the cost of slightly slower throughput:
+The most targeted fix is to set `chain_batch_size` inside `FlowMCConfig`. By default, (`chain_batch_size=0`) all chains are evaluated simultaneously; setting it to a smaller integer processes chains in batches, directly reducing peak memory at the cost of slightly slower throughput:
 
 ```python
 from jimgw.samplers.config import FlowMCConfig

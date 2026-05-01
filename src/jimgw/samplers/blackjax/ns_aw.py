@@ -156,12 +156,12 @@ class BlackJAXNSAWSampler(Sampler):
         # Build anesthetic NestedSamples for use in get_samples() and get_diagnostics().
         particles_sample = np.array(self._final_state.particles.position)
         log_likelihood = np.array(self._final_state.particles.loglikelihood)
-        logL_birth = jnp.array(self._final_state.particles.loglikelihood_birth)
-        logL_birth = jnp.where(jnp.isnan(logL_birth), -jnp.inf, logL_birth)
+        logL_birth = np.array(self._final_state.particles.loglikelihood_birth)
+        logL_birth = np.where(np.isnan(logL_birth), -np.inf, logL_birth)
         self._nested_samples = NestedSamples(
             particles_sample,
             logL=log_likelihood,
-            logL_birth=np.asarray(logL_birth),
+            logL_birth=logL_birth,
             logzero=np.nan,
             dtype=np.float64,
         )

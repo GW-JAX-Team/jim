@@ -121,8 +121,12 @@ def test_ns_aw_samples_in_prior_support():
     result = sampler.get_samples()
 
     # Sampling space = prior space (no sample_transforms), so [0,1]^2.
-    assert np.all(result["samples"][:, 0] >= 0.0) and np.all(result["samples"][:, 0] <= 1.0)
-    assert np.all(result["samples"][:, 1] >= 0.0) and np.all(result["samples"][:, 1] <= 1.0)
+    assert np.all(result["samples"][:, 0] >= 0.0) and np.all(
+        result["samples"][:, 0] <= 1.0
+    )
+    assert np.all(result["samples"][:, 1] >= 0.0) and np.all(
+        result["samples"][:, 1] <= 1.0
+    )
 
 
 def test_ns_aw_diagnostics_before_sample_raises():

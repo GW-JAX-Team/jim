@@ -189,4 +189,4 @@ likelihood = HeterodynedTransientLikelihoodFD(
 )
 ```
 
-The optimizer runs `evosax.CMA_ES` with a JAX-native ask/tell loop so the waveform evaluations are fully batched and JIT-compiled on CPU/GPU.
+The optimiser runs `evosax.CMA_ES` with a JAX-native ask/tell loop so the waveform evaluations are fully batched and JIT-compiled on CPU/GPU.

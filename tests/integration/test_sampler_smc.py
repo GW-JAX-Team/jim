@@ -46,8 +46,8 @@ def test_smc_get_samples_shape(smc_jim):
 
 def test_smc_posterior_mean_near_half(smc_jim):
     samples = smc_jim.get_samples()
-    assert abs(float(np.mean(samples["x"])) - 0.5) < 0.2
-    assert abs(float(np.mean(samples["y"])) - 0.5) < 0.2
+    assert abs(float(np.mean(samples["x"])) - 0.5) < 0.1
+    assert abs(float(np.mean(samples["y"])) - 0.5) < 0.1
 
 
 def test_smc_output_has_log_likelihood(smc_jim):

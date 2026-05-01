@@ -175,7 +175,7 @@ class Jim:
         names = self.parameter_names
 
         def _log_prior_fn(arr: Float[Array, " n_dims"]) -> Float:
-            named = dict(zip(names, arr))
+            named = dict(zip(names, arr, strict=True))
             jac: Float = 0.0
             for transform in reversed(sample_transforms):
                 named, j = transform.inverse(named)
@@ -183,7 +183,7 @@ class Jim:
             return prior.log_prob(named) + jac
 
         def _log_likelihood_fn(arr: Float[Array, " n_dims"]) -> Float:
-            named = dict(zip(names, arr))
+            named = dict(zip(names, arr, strict=True))
             for transform in reversed(sample_transforms):
                 named, _ = transform.inverse(named)
             for transform in likelihood_transforms:
@@ -191,7 +191,7 @@ class Jim:
             return likelihood.evaluate(named, {})
 
         def _log_posterior_fn(arr: Float[Array, " n_dims"]) -> Float:
-            named = dict(zip(names, arr))
+            named = dict(zip(names, arr, strict=True))
             jac: Float = 0.0
             for transform in reversed(sample_transforms):
                 named, j = transform.inverse(named)

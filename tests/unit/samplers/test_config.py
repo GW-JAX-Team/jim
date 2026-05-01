@@ -182,12 +182,12 @@ def test_smc_temperature_ladder_valid():
 
 
 def test_smc_temperature_ladder_must_start_at_zero():
-    with pytest.raises(ValidationError, match="start at 0.0"):
+    with pytest.raises(ValidationError, match=r"start at 0\.0"):
         BlackJAXSMCConfig(temperature_ladder=[0.1, 0.5, 1.0])
 
 
 def test_smc_temperature_ladder_must_end_at_one():
-    with pytest.raises(ValidationError, match="end at 1.0"):
+    with pytest.raises(ValidationError, match=r"end at 1\.0"):
         BlackJAXSMCConfig(temperature_ladder=[0.0, 0.5, 0.9])
 
 
@@ -242,7 +242,7 @@ def test_smc_fraction_above_one_in_persistent_ok():
 
 
 def test_smc_fraction_above_one_in_tempered_raises():
-    with pytest.raises(ValidationError, match="1.0"):
+    with pytest.raises(ValidationError, match=r"1\.0"):
         BlackJAXSMCConfig(target_ess_fraction=1.5, persistent_sampling=False)
 
 

@@ -44,4 +44,4 @@ This installs the `blackjax` fork declared in `[tool.uv.sources]`. The fork is r
 pip install "git+https://github.com/GW-JAX-Team/blackjax.git@jim"
 ```
 
-> **Note:** `pip install jimgw[nested-sampling]` will not work until the required features land in an PyPI release. Use one of the commands above instead.
+> **Note:** `pip install jimgw[nested-sampling]` will not work until the required features land in a PyPI release. Use one of the commands above instead.

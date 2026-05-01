@@ -52,11 +52,11 @@ def _make_sampler() -> FlowMCSampler:
     n_dims = len(parameter_names)
 
     def log_prior_fn(arr):
-        named = dict(zip(parameter_names, arr))
+        named = dict(zip(parameter_names, arr, strict=True))
         return prior.log_prob(named)
 
     def log_likelihood_fn(arr):
-        named = dict(zip(parameter_names, arr))
+        named = dict(zip(parameter_names, arr, strict=True))
         return likelihood.evaluate(named, {})
 
     def log_posterior_fn(arr):
@@ -114,7 +114,7 @@ def test_flowmc_sampler_samples_in_prior_range():
 
 def test_flowmc_sampler_get_samples_before_sample_raises():
     s = _make_sampler()
-    with pytest.raises(Exception):
+    with pytest.raises(RuntimeError):
         s.get_samples()
 
 

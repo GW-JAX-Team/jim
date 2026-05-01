@@ -267,8 +267,8 @@ print(f"Sampling took {(end_time - start_time) / 60:.2f} mins")
 
 # --- Evidence and posterior ---
 
-out = jim.sampler.get_output()
-print(f"log Z = {out.log_evidence:.2f} ± {out.log_evidence_err:.2f}")
+diagnostics = jim.sampler.get_diagnostics()
+print(f"log Z = {diagnostics['log_Z']:.2f} ± {diagnostics['log_Z_error']:.2f}")
 
 chains = jim.get_samples()
 

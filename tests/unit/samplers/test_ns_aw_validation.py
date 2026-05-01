@@ -56,7 +56,7 @@ def test_non_flat_prior_raises():
     def gaussian_prior(arr):
         return -0.5 * jnp.sum(arr**2)
 
-    with pytest.raises(ValueError, match="must return 0.0 for all points"):
+    with pytest.raises(ValueError, match=r"must return 0\.0 for all points"):
         _make_sampler(gaussian_prior)
 
 
@@ -79,5 +79,5 @@ def test_prior_with_zero_mass_at_origin_raises():
         inside = (norm > 0.01) & jnp.all((arr >= 0.0) & (arr <= 1.0))
         return jnp.where(inside, 0.0, -jnp.inf)
 
-    with pytest.raises(ValueError, match="must return 0.0 for all points"):
+    with pytest.raises(ValueError, match=r"must return 0\.0 for all points"):
         _make_sampler(holed_prior)

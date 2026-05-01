@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import jax
 
+jax.config.update("jax_enable_x64", True)
+
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.jim import Jim
 from jimgw.core.prior import CombinePrior, UniformPrior
 from jimgw.samplers.config import SamplerConfig
-
-jax.config.update("jax_enable_x64", True)
 
 
 class _GaussianLikelihood(LikelihoodBase):

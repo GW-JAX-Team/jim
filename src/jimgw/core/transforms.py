@@ -766,7 +766,7 @@ class PeriodicTransform(BijectiveTransform):
 class RayleighTransform(BijectiveTransform):
     """CDF transform from Uniform(0, 1) to a Rayleigh distribution.
 
-    Maps ``u ∈ [0, 1]`` to ``x = σ * sqrt(-2 * log(u))``.
+    Maps ``u ∈ [0, 1]`` to ``x = sigma * sqrt(-2 * log(u))``.
 
     Attributes:
         sigma: Scale parameter of the Rayleigh distribution.

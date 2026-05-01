@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 import pytest
 
@@ -34,11 +32,11 @@ def test_ns_aw_get_samples_shape(ns_aw_jim):
 
 def test_ns_aw_posterior_mean_near_half(ns_aw_jim):
     samples = ns_aw_jim.get_samples()
-    assert abs(float(np.mean(samples["x"])) - 0.5) < 0.2
-    assert abs(float(np.mean(samples["y"])) - 0.5) < 0.2
+    assert abs(float(np.mean(samples["x"])) - 0.5) < 0.1
+    assert abs(float(np.mean(samples["y"])) - 0.5) < 0.1
 
 
 def test_ns_aw_log_evidence_finite(ns_aw_jim):
     diag = ns_aw_jim.sampler.get_diagnostics()
     log_z = diag["log_Z"]
-    assert math.isfinite(log_z)
+    assert np.isfinite(log_z)

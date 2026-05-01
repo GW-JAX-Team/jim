@@ -74,10 +74,19 @@ def _build_masks_arrays(
                 f"Periodic parameter {name!r} not found in sampling parameters "
                 f"{tuple(parameter_names)}."
             )
+        lo_f, hi_f = float(lo), float(hi)
+        if not jnp.isfinite(lo_f) or not jnp.isfinite(hi_f):
+            raise ValueError(
+                f"Periodic bounds for {name!r} must be finite, got ({lo_f}, {hi_f})."
+            )
+        if hi_f <= lo_f:
+            raise ValueError(
+                f"Periodic bounds for {name!r} must satisfy hi > lo, got ({lo_f}, {hi_f})."
+            )
         i = names.index(name)
         mask = mask.at[i].set(True)
-        lower = lower.at[i].set(float(lo))
-        period = period.at[i].set(float(hi - lo))
+        lower = lower.at[i].set(lo_f)
+        period = period.at[i].set(hi_f - lo_f)
 
     return mask, lower, period
 

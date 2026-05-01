@@ -104,8 +104,12 @@ def test_nss_samples_in_prior_support():
     sampler.sample(jax.random.key(2), _init_pos(100))
     result = sampler.get_samples()
 
-    assert np.all(result["samples"][:, 0] >= 0.0) and np.all(result["samples"][:, 0] <= 1.0)
-    assert np.all(result["samples"][:, 1] >= 0.0) and np.all(result["samples"][:, 1] <= 1.0)
+    assert np.all(result["samples"][:, 0] >= 0.0) and np.all(
+        result["samples"][:, 0] <= 1.0
+    )
+    assert np.all(result["samples"][:, 1] >= 0.0) and np.all(
+        result["samples"][:, 1] <= 1.0
+    )
 
 
 def test_nss_diagnostics_before_sample_raises():
@@ -126,7 +130,8 @@ def test_nss_diagnostics():
     assert diag["n_likelihood_evaluations_stepping_out"] is not None
     assert diag["n_likelihood_evaluations_shrinking"] is not None
     assert diag["n_likelihood_evaluations"] == (
-        diag["n_likelihood_evaluations_stepping_out"] + diag["n_likelihood_evaluations_shrinking"]
+        diag["n_likelihood_evaluations_stepping_out"]
+        + diag["n_likelihood_evaluations_shrinking"]
     )
     assert "log_Z" in diag
     assert "log_Z_error" in diag

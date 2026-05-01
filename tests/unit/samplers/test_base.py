@@ -1,5 +1,6 @@
 """Unit tests for the Sampler ABC."""
 
+import inspect
 from typing import Any
 
 import jax
@@ -122,8 +123,6 @@ def test_sampler_does_not_own_initial_position_callable():
 
 def test_initial_position_is_required():
     """sample() must require initial_position; calling without it raises TypeError."""
-    import inspect
-
     lp, ll, lpost = _make_callables(n_dims=2)
     s = _TrivialSampler(
         n_dims=2,

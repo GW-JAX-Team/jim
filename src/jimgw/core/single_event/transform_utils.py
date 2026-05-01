@@ -300,7 +300,7 @@ def spin_angles_to_cartesian_spin(
     Jhat = J / jnp.linalg.norm(J)
     theta0, phi0 = carte_to_spherical_angles(*Jhat)
 
-    # Rotations 1–3 combined.
+    # Rotations 1-3 combined.
     # LNh only needs R2 and R3 (it starts along z, so R1 has no effect).
     # s1hat and s2hat need all three: R3 @ R2 @ R1.
     R_23 = _rotate_z(phi_jl - jnp.pi) @ _rotate_y(-theta0)
@@ -315,7 +315,7 @@ def spin_angles_to_cartesian_spin(
 
     thetaLJ, phiL = carte_to_spherical_angles(*LNh)
 
-    # Rotations 4–6 combined.
+    # Rotations 4-6 combined.
     # N only needs R4 and R5; s1hat/s2hat need all three: R6 @ R5 @ R4.
     R_45 = _rotate_y(-thetaLJ) @ _rotate_z(-phiL)
     N = R_45 @ N
@@ -533,7 +533,7 @@ def angle_rotation(
     )
     rotated_vec = jnp.einsum("ij,j...->i...", rotation, sky_loc_vec)
 
-    theta = jnp.acos(rotated_vec[2])
+    theta = jnp.acos(jnp.clip(rotated_vec[2], -1.0, 1.0))
     phi = jnp.fmod(
         jnp.arctan2(rotated_vec[1], rotated_vec[0]) + 2 * jnp.pi,
         2 * jnp.pi,

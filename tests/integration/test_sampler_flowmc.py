@@ -38,8 +38,8 @@ def test_flowmc_get_samples_shape(flowmc_jim):
 
 def test_flowmc_posterior_mean_near_half(flowmc_jim):
     samples = flowmc_jim.get_samples()
-    assert abs(float(np.mean(samples["x"])) - 0.5) < 0.15
-    assert abs(float(np.mean(samples["y"])) - 0.5) < 0.15
+    assert abs(float(np.mean(samples["x"])) - 0.5) < 0.1
+    assert abs(float(np.mean(samples["y"])) - 0.5) < 0.1
 
 
 def test_flowmc_output_has_log_likelihood(flowmc_jim):

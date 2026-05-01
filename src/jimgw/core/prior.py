@@ -63,7 +63,7 @@ class Prior(eqx.Module):
         Returns:
             Dict mapping parameter names to scalar values.
         """
-        return dict(zip(self.parameter_names, x))
+        return dict(zip(self.parameter_names, x, strict=True))
 
     def __call__(self, x: dict[str, Float]) -> Float:
         """Alias for `log_prob`."""

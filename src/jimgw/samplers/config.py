@@ -275,8 +275,8 @@ class BlackJAXSMCConfig(BaseSamplerConfig):
     @model_validator(mode="after")
     def _validate_ess_args(self) -> BlackJAXSMCConfig:
         both_set = (
-            "absolute_target_ess" in self.model_fields_set
-            and "target_ess_fraction" in self.model_fields_set
+            self.absolute_target_ess is not None
+            and self.target_ess_fraction is not None
         )
         if both_set:
             raise ValueError(

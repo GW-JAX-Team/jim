@@ -125,10 +125,10 @@ class BlackJAXSMCSampler(Sampler):
         max_iterations = 1000
 
         mcmc_step = self._build_mcmc_step()
-        cov0 = jnp.cov(initial_particles.T) * config.initial_cov_scale
+        cov0 = jnp.atleast_2d(jnp.cov(initial_particles.T)) * config.initial_cov_scale
 
         def mcmc_parameter_update_fn(_key, state, _info):
-            return extend_params({"cov": jnp.cov(state.particles.T)})  # type: ignore[arg-type]  # blackjax fork stubs: extend_params accepts dict
+            return extend_params({"cov": jnp.atleast_2d(jnp.cov(state.particles.T))})  # type: ignore[arg-type]  # blackjax fork stubs: extend_params accepts dict
 
         smc_alg = inner_kernel_tuning(
             smc_algorithm=adaptive_persistent_sampling_smc,
@@ -205,7 +205,7 @@ class BlackJAXSMCSampler(Sampler):
         n_schedule = len(ladder) - 1
 
         mcmc_step = self._build_mcmc_step()
-        cov0 = jnp.cov(initial_particles.T) * config.initial_cov_scale
+        cov0 = jnp.atleast_2d(jnp.cov(initial_particles.T)) * config.initial_cov_scale
 
         smc_alg = persistent_sampling_smc(
             logprior_fn=self._log_prior_fn,
@@ -241,10 +241,10 @@ class BlackJAXSMCSampler(Sampler):
         max_iterations = 1000
 
         mcmc_step = self._build_mcmc_step()
-        cov0 = jnp.cov(initial_particles.T) * config.initial_cov_scale
+        cov0 = jnp.atleast_2d(jnp.cov(initial_particles.T)) * config.initial_cov_scale
 
         def mcmc_parameter_update_fn(_key, state, _info):
-            return extend_params({"cov": jnp.cov(state.particles.T)})  # type: ignore[arg-type]  # blackjax fork stubs: extend_params accepts dict
+            return extend_params({"cov": jnp.atleast_2d(jnp.cov(state.particles.T))})  # type: ignore[arg-type]  # blackjax fork stubs: extend_params accepts dict
 
         smc_alg = inner_kernel_tuning(
             smc_algorithm=adaptive_tempered_smc,
@@ -303,7 +303,7 @@ class BlackJAXSMCSampler(Sampler):
         lambdas = jnp.array(ladder[1:])  # skip 0.0
 
         mcmc_step = self._build_mcmc_step()
-        cov0 = jnp.cov(initial_particles.T) * config.initial_cov_scale
+        cov0 = jnp.atleast_2d(jnp.cov(initial_particles.T)) * config.initial_cov_scale
 
         smc_alg = tempered_smc(
             logprior_fn=self._log_prior_fn,

@@ -34,8 +34,8 @@ def test_nss_get_samples_shape(nss_jim):
 
 def test_nss_posterior_mean_near_half(nss_jim):
     samples = nss_jim.get_samples()
-    assert abs(float(np.mean(samples["x"])) - 0.5) < 0.2
-    assert abs(float(np.mean(samples["y"])) - 0.5) < 0.2
+    assert abs(float(np.mean(samples["x"])) - 0.5) < 0.1
+    assert abs(float(np.mean(samples["y"])) - 0.5) < 0.1
 
 
 def test_nss_log_evidence_finite(nss_jim):

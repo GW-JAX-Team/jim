@@ -23,7 +23,7 @@ def test_require_nested_sampling_ok():
 
 def test_require_nested_sampling_missing():
     fake = types.SimpleNamespace()  # no `ns`
-    with pytest.raises(ImportError, match="blackjax.ns"):
+    with pytest.raises(ImportError, match=r"blackjax\.ns"):
         require_nested_sampling(fake)
 
 
@@ -39,5 +39,5 @@ def test_require_nss_ok():
 
 def test_require_nss_missing():
     fake = types.SimpleNamespace()  # no `nss`
-    with pytest.raises(ImportError, match="blackjax.nss"):
+    with pytest.raises(ImportError, match=r"blackjax\.nss"):
         require_nss(fake)
