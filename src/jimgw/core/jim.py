@@ -5,7 +5,7 @@ from typing import Optional
 import jax
 import jax.numpy as jnp
 import numpy as np
-from anesthetic.samples import NestedSamples  # type: ignore[import]
+from anesthetic.samples import NestedSamples
 from jaxtyping import Array, Float, Key
 
 from jimgw.core.base import LikelihoodBase
