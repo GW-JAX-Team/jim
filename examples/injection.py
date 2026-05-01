@@ -35,7 +35,7 @@ label = "injection"
 
 current_time = time.time()
 
-gps_time = current_time - 1000
+gps = current_time - 1000
 random_samples = jax.random.uniform(jax.random.key(42), (3,), maxval=jnp.pi)
 
 # Injection parameters in likelihood space.
@@ -82,7 +82,7 @@ for ifo in ifos:
     ifo.inject_signal(
         duration=duration,
         sampling_frequency=sampling_frequency,
-        trigger_time=gps_time,
+        trigger_time=gps,
         waveform_model=waveform,
         parameters=injection_parameters,
         f_min=f_min,
@@ -136,8 +136,8 @@ prior = CombinePrior(prior)
 # --- Define transforms ---
 
 sample_transforms = [
-    GeocentricArrivalTimeToDetectorArrivalTimeTransform(trigger_time=gps_time, ifo=ifos[0]),
-    SkyFrameToDetectorFrameSkyPositionTransform(trigger_time=gps_time, ifos=ifos),
+    GeocentricArrivalTimeToDetectorArrivalTimeTransform(trigger_time=gps, ifo=ifos[0]),
+    SkyFrameToDetectorFrameSkyPositionTransform(trigger_time=gps, ifos=ifos),
 ]
 
 likelihood_transforms = [
@@ -151,7 +151,7 @@ likelihood_transforms = [
 likelihood = TransientLikelihoodFD(
     ifos,
     waveform=waveform,
-    trigger_time=gps_time,
+    trigger_time=gps,
     f_min=f_min,
     f_max=f_max,
 )
@@ -161,6 +161,8 @@ likelihood = TransientLikelihoodFD(
 jim = Jim(
     likelihood,
     prior,
+    sample_transforms=sample_transforms,
+    likelihood_transforms=likelihood_transforms,
     sampler_config=FlowMCConfig(
         n_chains=1000,
         n_local_steps=100,
@@ -169,7 +171,6 @@ jim = Jim(
         n_production_loops=10,
         n_epochs=20,
         mala={"step_size": 1e-2},
-        parallel_tempering={"enabled": True, "n_temperatures": 5, "max_temperature": 10.0, "n_tempered_steps": 5},
         rq_spline_hidden_units=[128, 128],
         rq_spline_n_bins=10,
         rq_spline_n_layers=8,
@@ -180,10 +181,14 @@ jim = Jim(
         local_thinning=1,
         global_thinning=100,
         history_window=100,
+        parallel_tempering={
+            "enabled": True,
+            "n_temperatures": 5,
+            "max_temperature": 10.0,
+            "n_tempered_steps": 5,
+        },
         verbose=True,
     ),
-    sample_transforms=sample_transforms,
-    likelihood_transforms=likelihood_transforms,
 )
 
 start_time = time.time()

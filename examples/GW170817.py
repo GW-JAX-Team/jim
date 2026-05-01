@@ -141,6 +141,8 @@ likelihood = HeterodynedTransientLikelihoodFD(
 jim = Jim(
     likelihood,
     prior,
+    sample_transforms=sample_transforms,
+    likelihood_transforms=likelihood_transforms,
     sampler_config=FlowMCConfig(
         n_chains=1000,
         n_local_steps=100,
@@ -161,8 +163,6 @@ jim = Jim(
         history_window=100,
         verbose=True,
     ),
-    sample_transforms=sample_transforms,
-    likelihood_transforms=likelihood_transforms,
 )
 
 start_time = time.time()
