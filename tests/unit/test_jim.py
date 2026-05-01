@@ -39,7 +39,7 @@ def _tiny_flowmc_config(pt: Optional[dict] = None, **kwargs) -> FlowMCConfig:
         n_training_loops=1,
         n_production_loops=1,
         n_epochs=1,
-        parallel_tempering=pt if pt is not None else {"enabled": False},
+        parallel_tempering=pt if pt is not None else False,
     )
     defaults.update(kwargs)
     return FlowMCConfig(**defaults)

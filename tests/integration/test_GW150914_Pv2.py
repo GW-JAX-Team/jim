@@ -89,7 +89,6 @@ def test_runs():
             n_training_loops=1,
             n_production_loops=1,
             n_epochs=1,
-            parallel_tempering={"enabled": False},
         ),
         likelihood_transforms=likelihood_transforms,
     )

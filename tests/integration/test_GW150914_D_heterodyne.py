@@ -89,7 +89,6 @@ def test_runs():
             learning_rate=1e-4,
             n_max_examples=30,
             batch_size=100,
-            parallel_tempering={"enabled": False},
         ),
         likelihood_transforms=likelihood_transforms,
     )

@@ -22,7 +22,6 @@ def flowmc_jim():
         n_training_loops=2,
         n_production_loops=2,
         n_epochs=3,
-        parallel_tempering={"enabled": False},
     )
     jim = make_gaussian_jim(cfg)
     jim.sample()
