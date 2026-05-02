@@ -1,4 +1,4 @@
-"""GW150914 analysis with the flowMC sampler."""
+"""GW150914 analysis with the BlackJAX NSS nested sampler."""
 
 import time
 from pathlib import Path
@@ -28,7 +28,7 @@ from jimgw.core.single_event.transforms import (
     MassRatioToSymmetricMassRatioTransform,
     GeocentricArrivalTimeToDetectorArrivalTimeTransform,
 )
-from jimgw.samplers.config import FlowMCConfig
+from jimgw.samplers.config import BlackJAXNSSConfig
 
 
 # --- Fetch data ---
@@ -49,8 +49,10 @@ ifos = [get_H1(), get_L1()]
 for ifo in ifos:
     data = Data.from_gwosc(ifo.name, start, end)
     ifo.set_data(data)
+
     psd_data = Data.from_gwosc(ifo.name, psd_start, psd_end)
-    ifo.set_psd(psd_data.to_psd(nperseg=data.duration * data.sampling_frequency))
+    psd_fftlength = data.duration * data.sampling_frequency
+    ifo.set_psd(psd_data.to_psd(nperseg=psd_fftlength))
 
 # --- Waveform model ---
 
@@ -102,31 +104,28 @@ jim = Jim(
     prior,
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    sampler_config=FlowMCConfig(
-        n_chains=1000,
-        n_local_steps=100,
-        n_global_steps=1000,
-        n_training_loops=50,
-        n_production_loops=10,
-        n_NFproposal_batch_size=100,
-        global_thinning=100,
+    sampler_config=BlackJAXNSSConfig(
+        n_live=1000,
+        n_delete_frac=0.5,
+        num_inner_steps_per_dim=20,
+        termination_dlogz=0.1,
         periodic={
             "phase_c": (0.0, 2 * float(jnp.pi)),
             "psi": (0.0, float(jnp.pi)),
             "azimuth": (0.0, 2 * float(jnp.pi)),
         },
-        verbose=True,
     ),
 )
 
 start_time = time.time()
 jim.sample()
 end_time = time.time()
-print(f"Sampling time: {(end_time - start_time) / 60:.2f} minutes")
+print(f"Sampling took {(end_time - start_time) / 60:.2f} mins")
 
 # --- Results ---
 
 diagnostics = jim.get_diagnostics()
+print(f"log Z = {diagnostics['log_Z']:.2f} ± {diagnostics['log_Z_error']:.2f}")
 print(f"Likelihood evaluations: {diagnostics['n_likelihood_evaluations']:,}")
 
 chains = jim.get_samples()
@@ -146,7 +145,7 @@ parameter_labels = {
 }
 
 fig = corner.corner(
-    np.stack([chains[key] for key in jim.prior.parameter_names]).T[::10],
+    np.stack([chains[key] for key in jim.prior.parameter_names]).T,
     labels=[parameter_labels.get(k, k) for k in jim.prior.parameter_names],
 )
-fig.savefig(Path(__file__).parent / "GW150914_flowMC.png")
+fig.savefig(Path(__file__).parent / "GW150914_NSS.png")

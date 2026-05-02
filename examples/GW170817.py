@@ -1,3 +1,5 @@
+"""GW170817 analysis with the flowMC sampler."""
+
 import time
 from pathlib import Path
 
@@ -6,6 +8,8 @@ import corner
 import numpy as np
 import jax
 import jax.numpy as jnp
+
+jax.config.update("jax_enable_x64", True)
 
 from jimgw.core.jim import Jim
 from jimgw.core.prior import (
@@ -26,7 +30,6 @@ from jimgw.core.single_event.transforms import (
 )
 from jimgw.samplers.config import FlowMCConfig
 
-jax.config.update("jax_enable_x64", True)
 
 # --- Fetch data ---
 
@@ -49,70 +52,38 @@ fmax = 2048.0
 ifos = [get_H1(), get_L1(), get_V1()]
 
 for ifo in ifos:
-    # set analysis data
     strain_data = Data.from_gwosc(ifo.name, start, end)
     ifo.set_data(strain_data)
-
-    # set PSD (Welch estimate)
     psd_data = Data.from_gwosc(ifo.name, psd_start, psd_end)
-    # set an NFFT corresponding to the analysis segment duration
-    psd_fftlength = strain_data.duration * strain_data.sampling_frequency
-    ifo.set_psd(psd_data.to_psd(nperseg=psd_fftlength))
+    ifo.set_psd(
+        psd_data.to_psd(nperseg=strain_data.duration * strain_data.sampling_frequency)
+    )
 
 # --- Waveform model ---
 
-# initialize waveform
 waveform = IMRPhenomXAS_NRTidalv3(f_ref=20)
 
-# --- Define the prior ---
+# --- Prior ---
 
-prior = []
+prior = CombinePrior(
+    [
+        UniformPrior(1.18, 1.21, parameter_names=["M_c"]),
+        UniformPrior(0.125, 1.0, parameter_names=["q"]),
+        UniformPrior(-0.05, 0.05, parameter_names=["s1_z"]),
+        UniformPrior(-0.05, 0.05, parameter_names=["s2_z"]),
+        SinePrior(parameter_names=["iota"]),
+        PowerLawPrior(1.0, 100.0, 2.0, parameter_names=["d_L"]),
+        UniformPrior(-0.1, 0.1, parameter_names=["t_c"]),
+        UniformPrior(0.0, 2 * jnp.pi, parameter_names=["phase_c"]),
+        UniformPrior(0.0, jnp.pi, parameter_names=["psi"]),
+        UniformPrior(0.0, 2 * jnp.pi, parameter_names=["ra"]),
+        CosinePrior(parameter_names=["dec"]),
+        UniformPrior(0.0, 5000.0, parameter_names=["lambda_1"]),
+        UniformPrior(0.0, 5000.0, parameter_names=["lambda_2"]),
+    ]
+)
 
-# Mass prior
-M_c_min, M_c_max = 1.18, 1.21
-q_min, q_max = 0.125, 1.0
-Mc_prior = UniformPrior(M_c_min, M_c_max, parameter_names=["M_c"])
-q_prior = UniformPrior(q_min, q_max, parameter_names=["q"])
-
-prior = prior + [Mc_prior, q_prior]
-
-# Spin prior
-s1_prior = UniformPrior(-0.05, 0.05, parameter_names=["s1_z"])
-s2_prior = UniformPrior(-0.05, 0.05, parameter_names=["s2_z"])
-iota_prior = SinePrior(parameter_names=["iota"])
-
-prior = prior + [
-    s1_prior,
-    s2_prior,
-    iota_prior,
-]
-
-# Extrinsic prior
-dL_prior = PowerLawPrior(1.0, 100.0, 2.0, parameter_names=["d_L"])
-t_c_prior = UniformPrior(-0.1, 0.1, parameter_names=["t_c"])
-phase_c_prior = UniformPrior(0.0, 2 * jnp.pi, parameter_names=["phase_c"])
-psi_prior = UniformPrior(0.0, jnp.pi, parameter_names=["psi"])
-ra_prior = UniformPrior(0.0, 2 * jnp.pi, parameter_names=["ra"])
-dec_prior = CosinePrior(parameter_names=["dec"])
-
-prior = prior + [
-    dL_prior,
-    t_c_prior,
-    phase_c_prior,
-    psi_prior,
-    ra_prior,
-    dec_prior,
-]
-
-# Tidal priors
-lambda_1_prior = UniformPrior(0.0, 5000.0, parameter_names=["lambda_1"])
-lambda_2_prior = UniformPrior(0.0, 5000.0, parameter_names=["lambda_2"])
-
-prior = prior + [lambda_1_prior, lambda_2_prior]
-
-prior = CombinePrior(prior)
-
-# --- Define transforms ---
+# --- Transforms ---
 
 sample_transforms = [
     GeocentricArrivalTimeToDetectorArrivalTimeTransform(trigger_time=gps, ifo=ifos[0]),
@@ -123,7 +94,7 @@ likelihood_transforms = [
     MassRatioToSymmetricMassRatioTransform,
 ]
 
-# --- Build the likelihood ---
+# --- Likelihood ---
 
 likelihood = HeterodynedTransientLikelihoodFD(
     ifos,
@@ -136,7 +107,7 @@ likelihood = HeterodynedTransientLikelihoodFD(
     likelihood_transforms=likelihood_transforms,
 )
 
-# --- Sample with Jim ---
+# --- Sample ---
 
 jim = Jim(
     likelihood,
@@ -147,20 +118,15 @@ jim = Jim(
         n_chains=1000,
         n_local_steps=100,
         n_global_steps=1000,
-        n_training_loops=20,
+        n_training_loops=50,
         n_production_loops=10,
-        n_epochs=20,
-        mala={"step_size": 1e-4},
-        rq_spline_hidden_units=[128, 128],
-        rq_spline_n_bins=10,
-        rq_spline_n_layers=8,
-        learning_rate=1e-3,
-        batch_size=10000,
-        n_max_examples=30000,
         n_NFproposal_batch_size=100,
-        local_thinning=1,
         global_thinning=100,
-        history_window=100,
+        periodic={
+            "phase_c": (0.0, 2 * float(jnp.pi)),
+            "psi": (0.0, float(jnp.pi)),
+            "azimuth": (0.0, 2 * float(jnp.pi)),
+        },
         verbose=True,
     ),
 )
@@ -168,11 +134,12 @@ jim = Jim(
 start_time = time.time()
 jim.sample()
 end_time = time.time()
-print("Done!")
-sample_time_mins = (end_time - start_time) / 60
-print(f"Sampling took {sample_time_mins:.2f} mins")
+print(f"Sampling took {(end_time - start_time) / 60:.2f} mins")
 
-# --- Inspect the results ---
+# --- Results ---
+
+diagnostics = jim.get_diagnostics()
+print(f"Likelihood evaluations: {diagnostics['n_likelihood_evaluations']:,}")
 
 chains = jim.get_samples()
 
