@@ -76,9 +76,12 @@ class BlackJAXNSAWSampler(Sampler):
     def _validate_unit_cube_prior(self, log_prior_fn: Callable) -> None:
         """Raise ValueError if log_prior_fn is not the normalized uniform on [0, 1]^n_dims."""
         n = self.n_dims
-        diag_vs = jnp.linspace(0.0, 1.0, 5)
+        # Use interior points only (avoid 0.0 and 1.0 boundaries)
+        diag_vs = jnp.linspace(0.0 + 1e-3, 1.0 - 1e-3, 5)
         diag_pts = jnp.stack([jnp.full(n, v) for v in diag_vs])
         random_pts = jax.random.uniform(jax.random.key(123), (5, n))
+        # Clip random_pts to avoid exact 0.0 and 1.0 boundaries
+        random_pts = jnp.clip(random_pts, 0.0 + 1e-3, 1.0 - 1e-3)
         in_support = jnp.concatenate([diag_pts, random_pts], axis=0)
         out_support = jnp.stack([jnp.full(n, -1e-3), jnp.full(n, 1.0 + 1e-3)])
 
@@ -86,11 +89,11 @@ class BlackJAXNSAWSampler(Sampler):
         lp_in = log_prior_vmap(in_support)
         lp_out = log_prior_vmap(out_support)
 
-        if not jnp.array_equal(lp_in, jnp.zeros_like(lp_in)):
+        if not jnp.allclose(lp_in, jnp.zeros_like(lp_in)):
             raise ValueError(
                 "log_prior_fn must return 0.0 for all points in [0, 1]^n_dims. "
             )
-        if not jnp.all(jnp.isneginf(lp_out)):
+        if not jnp.all(jnp.isnan(lp_out) | jnp.isneginf(lp_out)):
             raise ValueError(
                 "log_prior_fn must return -inf for all points outside [0, 1]^n_dims. "
             )
