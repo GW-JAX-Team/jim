@@ -54,4 +54,8 @@ def test_smc_posterior_mean_near_half(smc_jim):
 def test_smc_output_has_log_likelihood(smc_jim):
     result = smc_jim.sampler.get_samples()
     assert "log_likelihood" in result
-    assert result["log_likelihood"] is not None
+    ll = result["log_likelihood"]
+    assert isinstance(ll, np.ndarray), "log_likelihood must be a numpy ndarray"
+    assert ll.ndim >= 1, "log_likelihood must have at least one dimension"
+    assert ll.size > 0, "log_likelihood must be non-empty"
+    assert np.all(np.isfinite(ll)), "log_likelihood must contain only finite values"

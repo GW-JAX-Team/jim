@@ -11,6 +11,7 @@ from anesthetic.samples import NestedSamples
 from jaxtyping import Array, Float, Key
 
 import blackjax
+from blackjax.ns.utils import finalise
 from jimgw.samplers.base import Sampler
 from jimgw.samplers.blackjax._imports import (
     require_nested_sampling,
@@ -116,8 +117,6 @@ class BlackJAXNSSSampler(Sampler):
             state, dead_info = step_fn(subkey, state)
             dead.append(dead_info)
             n_iter += 1
-
-        from blackjax.ns.utils import finalise
 
         self._final_state = finalise(state, dead)
         self._n_iterations = n_iter

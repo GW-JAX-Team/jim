@@ -123,7 +123,7 @@ jim = Jim(
         n_chains=500,
         n_training_loops=20,
         n_production_loops=10,
-        # See the Samplers guide for the full parameter reference.
+        # See the Samplers guide (guides/samplers) for the full parameter reference.
     ),
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
@@ -133,4 +133,4 @@ jim.sample()
 samples = jim.get_samples()
 ```
 
-For a full worked example, see the [Getting Started tutorial](tutorials/getting_started). For production-grade scripts, browse the [`example/` directory on GitHub](https://github.com/GW-JAX-Team/jim/tree/main/example).
+For a full worked example, see the [Getting Started tutorial](tutorials/getting_started). For production-grade scripts, browse the [`examples/` directory on GitHub](https://github.com/GW-JAX-Team/jim/tree/main/examples).
