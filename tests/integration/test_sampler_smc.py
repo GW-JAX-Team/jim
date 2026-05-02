@@ -42,6 +42,7 @@ def test_smc_get_samples_shape(smc_jim):
     n = samples["x"].shape[0]
     assert n > 0
     assert samples["y"].shape == (n,)
+    assert samples["log_likelihood"].shape == (n,)
 
 
 def test_smc_posterior_mean_near_half(smc_jim):

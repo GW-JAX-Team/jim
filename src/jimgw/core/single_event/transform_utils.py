@@ -311,7 +311,7 @@ def spin_angles_to_cartesian_spin(
 
     # Compute iota
     N = jnp.array([0.0, jnp.sin(theta_jn), jnp.cos(theta_jn)])
-    iota = jnp.arccos(jnp.dot(N, LNh))
+    iota = jnp.arccos(jnp.clip(jnp.dot(N, LNh), -1.0, 1.0))
 
     thetaLJ, phiL = carte_to_spherical_angles(*LNh)
 
@@ -415,7 +415,7 @@ def cartesian_spin_to_spin_angles(
     )
 
     # Inclination w.r.t. J
-    theta_jn = jnp.arccos(jnp.dot(Jhat, N))
+    theta_jn = jnp.arccos(jnp.clip(jnp.dot(Jhat, N), -1.0, 1.0))
 
     # Rotate from L-frame to J-frame: combine the two rotations into one matrix.
     # N and LNh both need Ry(-thetaJL) @ Rz(-phiJ).

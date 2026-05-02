@@ -1,8 +1,10 @@
 """GW150914 analysis with the BlackJAX NS-AW nested sampler.
 
-The NS-AW sampler requires the sampling space to be the unit hypercube [0, 1]^n,
-with a uniform prior in the original parameter space.  The sample_transforms below
-build the full unit-cube chain for each parameter.
+The NS-AW sampler requires the sampling space to be the unit hypercube [0, 1]^n
+with a uniform prior in that sampling space.  Physical priors such as SinePrior,
+CosinePrior, and PowerLawPrior are allowed because the sample_transforms remap
+each parameter so the sampler sees a uniform unit-cube prior.  The transforms
+below build the full unit-cube chain for each parameter.
 
 See docs/guides/transforms.md for a full explanation of each transform pattern.
 """
@@ -71,7 +73,7 @@ for ifo in ifos:
 
 waveform = RippleIMRPhenomPv2(f_ref=20)
 
-# --- Define the prior (must be uniform over bounded support for NS-AW) ---
+# --- Define the prior (NS-AW requires a uniform prior in the unit-cube sampling space) ---
 
 M_c_min, M_c_max = 10.0, 80.0
 q_min, q_max = 0.125, 1.0
@@ -255,7 +257,7 @@ jim = Jim(
         max_mcmc=5000,
         max_proposals=1000,
         termination_dlogz=0.1,
-        periodic=["ra_unit", "phase_c_unit"],
+        periodic=["ra_unit", "phase_c_unit", "s1_phi_unit", "s2_phi_unit"],
     ),
 )
 

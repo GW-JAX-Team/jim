@@ -12,7 +12,7 @@ Supports four mode combinations selected by
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, Optional
 
 import jax
 import jax.numpy as jnp
@@ -77,9 +77,11 @@ class BlackJAXSMCSampler(Sampler):
         log_prior_fn: Callable,
         log_likelihood_fn: Callable,
         log_posterior_fn: Callable,
-        config: BlackJAXSMCConfig = BlackJAXSMCConfig(),
+        config: Optional[BlackJAXSMCConfig] = None,
         parameter_names: Sequence[str] = (),
     ) -> None:
+        if config is None:
+            config = BlackJAXSMCConfig()
         super().__init__(
             n_dims=n_dims,
             log_prior_fn=log_prior_fn,

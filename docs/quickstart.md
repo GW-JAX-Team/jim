@@ -106,7 +106,7 @@ Jim's sampler is selected by passing a typed config object.  Four backends are a
 
 flowMC is a normalizing-flow-enhanced MCMC sampler.
 BlackJAX NS-AW and NSS are nested samplers with different sampling algorithms.
-BlackJAX SMC uses a particle population tempered from the prior to the posterior.
+BlackJAX SMC uses a particle population tempered from prior to posterior.
 
 See the [Samplers guide](guides/samplers.md) for configuration details and per-backend requirements.
 

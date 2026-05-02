@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -56,9 +56,11 @@ class BlackJAXNSAWSampler(Sampler):
         log_prior_fn: Callable,
         log_likelihood_fn: Callable,
         log_posterior_fn: Callable,
-        config: BlackJAXNSAWConfig = BlackJAXNSAWConfig(),
+        config: Optional[BlackJAXNSAWConfig] = None,
         parameter_names: Sequence[str] = (),
     ) -> None:
+        if config is None:
+            config = BlackJAXNSAWConfig()
         super().__init__(
             n_dims=n_dims,
             log_prior_fn=log_prior_fn,
