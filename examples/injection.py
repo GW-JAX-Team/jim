@@ -47,7 +47,7 @@ injection_parameters = {
     "s2_z": -0.2,
     "ra": random_samples[0] * 2.0,
     "dec": random_samples[1] - jnp.pi / 2,
-    "psi": random_samples[2] - jnp.pi / 2,
+    "psi": random_samples[2],
     "d_L": 500.0,
     "iota": 0.5,
     "phase_c": jnp.pi - 0.3,
