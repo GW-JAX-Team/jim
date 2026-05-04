@@ -2143,14 +2143,14 @@
 <p>A Jim analysis is assembled from the following building blocks:</p>
 <pre class="mermaid"><code>flowchart LR
     WM[Waveform Model] &amp; D[Data] --&gt; L[Likelihood]
-    L == 1 ==&gt; J((Jim))
+    L --&gt; J((Jim))
     L --- LT[Likelihood Transforms]
     P[Prior] --- LT
-    LT == 2 ==&gt; J
-    P == 3 ==&gt; J
+    LT --&gt; J
+    P --&gt; J
     P --- ST[Sample Transforms]
-    ST == 4 ==&gt; J
-    J &lt;== 5 ==&gt; S[Sampler]</code></pre>
+    ST --&gt; J
+    J &lt;-- S[Sampler]</code></pre>
 <h3 id="data">Data<a class="headerlink" href="#data" title="Permanent link">¤</a></h3>
 <p>Detector data lives in <code>Detector</code> objects. You can fetch public LIGO/Virgo strain from GWOSC, load local files, or inject a simulated signal:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">jimgw.core.single_event.detector</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_H1</span><span class="p">,</span> <span class="n">get_L1</span>
@@ -2199,10 +2199,9 @@
 </code></pre></div>
 <h3 id="transforms">Transforms<a class="headerlink" href="#transforms" title="Permanent link">¤</a></h3>
 <p>Jim uses two kinds of transforms to bridge three parameter spaces:</p>
-<div class="highlight"><pre><span></span><code>     ┌───────── Likelihood Transforms ────────→ Likelihood Space
-Prior Space
-     └─────────── Sample Transforms ───────────→ Sampling Space
-</code></pre></div>
+<pre class="mermaid"><code>flowchart LR
+    PS[Prior Space] --&gt; LT[Likelihood Transforms] --&gt; LS[Likelihood Space]
+    PS --&gt; ST[Sample Transforms] --&gt; SS[Sampling Space]</code></pre>
 <ul>
 <li>
 <p><strong>Likelihood transforms</strong> — map from the prior parameter space to the likelihood parameter space. The likelihood space is fixed by your waveform model (e.g. ripple expects <code>eta</code>, Cartesian spins), so the likelihood transforms you need depend on how you define your prior. For example, if your prior is on mass ratio <code>q</code> but the waveform expects symmetric mass ratio <code>eta</code>, a likelihood transform handles that conversion.</p>
