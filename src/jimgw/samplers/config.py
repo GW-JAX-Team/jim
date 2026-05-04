@@ -141,16 +141,11 @@ class FlowMCConfig(BaseSamplerConfig):
     @model_validator(mode="after")
     def _warn_if_irrelevant_kernel_set(self) -> FlowMCConfig:
         active = self.local_kernel
-        _defaults: dict[str, BaseModel] = {
-            "MALA": MALAConfig(),
-            "HMC": HMCConfig(),
-            "GRW": GRWConfig(),
-        }
-        for name, default in _defaults.items():
+        for name in ("MALA", "HMC", "GRW"):
             if name == active:
                 continue
-            actual = getattr(self, name.lower())
-            if actual != default:
+            sub_config = getattr(self, name.lower())
+            if sub_config.model_fields_set:
                 warnings.warn(
                     f"FlowMCConfig: `{name.lower()}` sub-config has non-default "
                     f"values but `local_kernel='{active}'` — the `{name.lower()}` "
