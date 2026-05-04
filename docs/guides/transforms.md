@@ -4,8 +4,8 @@ Jim bridges three parameter spaces, and transforms are the connections between t
 
 ```mermaid
 flowchart LR
-    PS[Prior Space] ==> LT[Likelihood Transforms] ==> LS[Likelihood Space]
-    PS ==> ST[Sample Transforms] ==> SS[Sampling Space]
+    PS[Prior Space] --> LT[Likelihood Transforms] --> LS[Likelihood Space]
+    PS --> ST[Sample Transforms] --> SS[Sampling Space]
 ```
 
 - The **likelihood space** is fixed by your waveform model. For example, ripple waveforms expect `(M_c, eta, s1_z, s2_z, ...)`.
