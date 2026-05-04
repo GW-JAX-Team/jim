@@ -9,14 +9,14 @@ A Jim analysis is assembled from the following building blocks:
 ```mermaid
 flowchart LR
     WM[Waveform Model] & D[Data] --> L[Likelihood]
-    L -- 1 --> J((Jim))
-    L --> LT[Likelihood Transforms]
-    P[Prior] --> LT
-    LT -- 2 --> J
-    P -- 3 --> J
-    P --> ST[Sample Transforms]
-    ST -- 4 --> J
-    J <-- 5 --> S[Sampler]
+    L == 1 ==> J((Jim))
+    L --- LT[Likelihood Transforms]
+    P[Prior] --- LT
+    LT == 2 ==> J
+    P == 3 ==> J
+    P --- ST[Sample Transforms]
+    ST == 4 ==> J
+    J <== 5 ==> S[Sampler]
 ```
 
 ### Data
