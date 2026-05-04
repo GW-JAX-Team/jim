@@ -44,26 +44,27 @@ class ParallelTemperingConfig(BaseModel):
 class MALAConfig(BaseModel):
     """MALA local-kernel settings for the flowMC backend."""
 
-    model_config = {"extra": "forbid"}
+    model_config = {"extra": "forbid", "arbitrary_types_allowed": True}
 
-    step_size: float = 2e-3
+    step_size: Union[float, np.ndarray] = 2e-3
 
 
 class HMCConfig(BaseModel):
     """HMC local-kernel settings for the flowMC backend."""
 
-    model_config = {"extra": "forbid"}
+    model_config = {"extra": "forbid", "arbitrary_types_allowed": True}
 
     step_size: float = 2e-3
+    condition_matrix: Union[float, np.ndarray] = 1.0
     n_leapfrog_steps: int = 10
 
 
 class GRWConfig(BaseModel):
     """Gaussian random-walk local-kernel settings for the flowMC backend."""
 
-    model_config = {"extra": "forbid"}
+    model_config = {"extra": "forbid", "arbitrary_types_allowed": True}
 
-    step_size: float = 2e-3
+    step_size: Union[float, np.ndarray] = 2e-3
 
 
 class FlowMCConfig(BaseSamplerConfig):

@@ -160,6 +160,7 @@ class FlowMCSampler(Sampler):
         elif config.local_kernel == "HMC":
             common_kwargs["hmc_step_size"] = config.hmc.step_size
             common_kwargs["hmc_n_leapfrog"] = config.hmc.n_leapfrog_steps
+            common_kwargs["condition_matrix"] = config.hmc.condition_matrix
         elif config.local_kernel == "GRW":
             common_kwargs["grw_step_size"] = config.grw.step_size
 
