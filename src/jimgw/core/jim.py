@@ -53,6 +53,7 @@ class Jim:
         *,
         sample_transforms: Sequence[BijectiveTransform] = (),
         likelihood_transforms: Sequence[NtoMTransform] = (),
+        periodic: Optional[list[str] | dict[str, tuple[float, float]]] = None,
         seed: int = 0,
     ) -> None:
         """Initialise Jim and build the internal sampler.
@@ -66,6 +67,11 @@ class Jim:
                 space (reversed when retrieving posterior samples).
             likelihood_transforms: Transforms applied to reach the likelihood
                 parameter space from the prior parameter space.
+            periodic: Periodic sampling-space parameters.  For most samplers,
+                pass a ``dict`` mapping parameter name to ``(lo, hi)`` bounds
+                (e.g. ``{"phase_c": (0.0, 6.2832)}``).  For the BlackJAX
+                NS-AW sampler (unit-cube space), pass a ``list`` of parameter
+                names (bounds are implicit as ``[0, 1]``).
             seed: Integer random seed. The key for the sampling run is derived
                 from this seed at construction time, so `sample` is
                 reproducible regardless of any intermediate operations (sanity
@@ -74,17 +80,39 @@ class Jim:
         self._setup_problem(likelihood, prior, sample_transforms, likelihood_transforms)
         self._validate_normalized_prior(prior, sampler_config)
         root_key: Key = jax.random.key(seed)
+
         # Reserve _sampler_key immediately so sampling is reproducible even if
         # sanity checks or other internal splits consume _rng_key first.
         self._rng_key, self._sampler_key = jax.random.split(root_key)
         self._sampler_config = sampler_config
+
+        # Resolve periodic parameter names → dimension indices
+        if periodic is not None:
+            names = self.parameter_names
+
+            unknown = [n for n in periodic if n not in names]
+            if unknown:
+                raise ValueError(
+                    f"Periodic parameter(s) {unknown} not found in "
+                    f"sampling parameters {tuple(self.parameter_names)}."
+                )
+
+            if isinstance(periodic, list):
+                # NS-AW style: list[str] → list[int]
+                periodic_resolved = [names.index(n) for n in periodic]
+            elif isinstance(periodic, dict):
+                # dict[str, (lo, hi)] → dict[int, (lo, hi)]
+                periodic_resolved = {names.index(k): v for k, v in periodic.items()}
+        else:
+            periodic_resolved = None
+
         self.sampler = build_sampler(
             sampler_config,
             n_dims=len(self.parameter_names),
             log_prior_fn=self._log_prior_fn,
             log_likelihood_fn=self._log_likelihood_fn,
             log_posterior_fn=self._log_posterior_fn,
-            parameter_names=self.parameter_names,
+            periodic=periodic_resolved,
         )
         self._sanity_check_posterior()
 

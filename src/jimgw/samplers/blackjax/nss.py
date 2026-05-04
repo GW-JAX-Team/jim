@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Optional
 
 import jax
 import jax.numpy as jnp
@@ -33,6 +33,17 @@ class BlackJAXNSSSampler(Sampler):
     ``(n_dims,)``; the NSS kernel is pytree-generic.
 
     Configure via [`BlackJAXNSSConfig`][jimgw.samplers.config.BlackJAXNSSConfig].
+
+    Args:
+        n_dims: Dimension of the sampling space.
+        log_prior_fn: Log-prior callable ``(arr,) -> float``.
+        log_likelihood_fn: Log-likelihood callable ``(arr,) -> float``.
+        log_posterior_fn: Log-posterior callable ``(arr,) -> float``.
+        config: Optional :class:`BlackJAXNSSConfig`; defaults to all-default values.
+        periodic: Optional periodic-parameter spec in index space,
+            ``dict[int, (lo, hi)]`` where the key is the dimension index and
+            the value is the ``(lower, upper)`` period bounds.  ``None`` means
+            no periodic parameters.  Provided by Jim after resolving names.
     """
 
     _config: BlackJAXNSSConfig
@@ -49,7 +60,7 @@ class BlackJAXNSSSampler(Sampler):
         log_likelihood_fn: Callable,
         log_posterior_fn: Callable,
         config: Optional[BlackJAXNSSConfig] = None,
-        parameter_names: Sequence[str] = (),
+        periodic: Optional[dict[int, tuple[float, float]]] = None,
     ) -> None:
         if config is None:
             config = BlackJAXNSSConfig()
@@ -60,7 +71,7 @@ class BlackJAXNSSSampler(Sampler):
             log_posterior_fn=log_posterior_fn,
             config=config,
         )
-        self._stepper_fn = to_prior_space_stepper(config.periodic, parameter_names)
+        self._stepper_fn = to_prior_space_stepper(periodic, n_dims)
 
     def _sample(
         self,

@@ -93,16 +93,6 @@ def test_base_config_fields():
     assert cfg.verbose is True
 
 
-def test_periodic_field_none_by_default():
-    cfg = FlowMCConfig()
-    assert cfg.periodic is None
-
-
-def test_periodic_field_accepts_dict():
-    cfg = FlowMCConfig(periodic={"phase": (0.0, 6.283185307)})
-    assert "phase" in cfg.periodic  # type: ignore[operator]
-
-
 # ---------------------------------------------------------------------------
 # B1: FlowMC kernel/PT warning validator
 # ---------------------------------------------------------------------------
@@ -267,6 +257,75 @@ def test_smc_fraction_warns_with_fixed_ladder():
     assert any(
         "target_ess_fraction" in str(x.message) or "ESS" in str(x.message) for x in w
     )
+
+
+# ---------------------------------------------------------------------------
+# C: New kernel sub-config features (array step sizes, condition_matrix)
+# ---------------------------------------------------------------------------
+
+import numpy as np
+
+
+def test_mala_step_size_scalar():
+    cfg = MALAConfig(step_size=1e-2)
+    assert cfg.step_size == 1e-2
+
+
+def test_mala_step_size_array():
+    arr = np.array([1e-2, 2e-2, 3e-2])
+    cfg = MALAConfig(step_size=arr)
+    np.testing.assert_array_equal(cfg.step_size, arr)
+
+
+def test_grw_step_size_array():
+    arr = np.array([5e-3, 1e-2])
+    cfg = GRWConfig(step_size=arr)
+    np.testing.assert_array_equal(cfg.step_size, arr)
+
+
+def test_hmc_condition_matrix_scalar():
+    cfg = HMCConfig(condition_matrix=2.0)
+    assert cfg.condition_matrix == 2.0
+
+
+def test_hmc_condition_matrix_array():
+    arr = np.array([1.0, 2.0, 0.5])
+    cfg = HMCConfig(condition_matrix=arr)
+    np.testing.assert_array_equal(cfg.condition_matrix, arr)
+
+
+def test_hmc_defaults():
+    cfg = HMCConfig()
+    assert cfg.step_size == 2e-3
+    assert cfg.condition_matrix == 1.0
+    assert cfg.n_leapfrog_steps == 10
+
+
+# ---------------------------------------------------------------------------
+# D: Config classes no longer have a periodic field
+# ---------------------------------------------------------------------------
+
+
+def test_flowmc_config_has_no_periodic_field():
+    assert not hasattr(FlowMCConfig(), "periodic")
+
+
+def test_blackjax_ns_aw_config_has_no_periodic_field():
+    assert not hasattr(BlackJAXNSAWConfig(), "periodic")
+
+
+def test_blackjax_nss_config_has_no_periodic_field():
+    assert not hasattr(BlackJAXNSSConfig(), "periodic")
+
+
+def test_blackjax_smc_config_has_no_periodic_field():
+    assert not hasattr(BlackJAXSMCConfig(), "periodic")
+
+
+def test_flowmc_config_rejects_periodic_field():
+    with pytest.raises(ValidationError):
+        FlowMCConfig(periodic={"phase_c": (0.0, 6.28)})
+
 
 
 def test_smc_resolve_target_ess_fraction():

@@ -57,7 +57,6 @@ def test_build_sampler_returns_flowmc():
         log_prior_fn=lp,
         log_likelihood_fn=ll,
         log_posterior_fn=lpost,
-        parameter_names=prior.parameter_names,
     )
     assert isinstance(sampler, FlowMCSampler)
 

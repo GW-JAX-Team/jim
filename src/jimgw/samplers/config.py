@@ -8,7 +8,7 @@ Each sampler has its own ``*Config`` class discriminated by a ``type`` literal;
 from __future__ import annotations
 
 import warnings
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal, Optional
 
 import numpy as np
 from pydantic import BaseModel, Discriminator, Field, field_validator, model_validator
@@ -42,29 +42,45 @@ class ParallelTemperingConfig(BaseModel):
 
 
 class MALAConfig(BaseModel):
-    """MALA local-kernel settings for the flowMC backend."""
+    """MALA local-kernel settings for the flowMC backend.
+
+    ``step_size`` may be a scalar ``float`` (applied uniformly to all
+    dimensions) or a 1-D ``np.ndarray`` of length ``n_dims`` for
+    per-dimension step sizes.
+    """
 
     model_config = {"extra": "forbid", "arbitrary_types_allowed": True}
 
-    step_size: Union[float, np.ndarray] = 2e-3
+    step_size: float | np.ndarray = 2e-3
 
 
 class HMCConfig(BaseModel):
-    """HMC local-kernel settings for the flowMC backend."""
+    """HMC local-kernel settings for the flowMC backend.
+
+    ``step_size`` may be a scalar ``float`` (applied uniformly) or a 1-D
+    ``np.ndarray`` of length ``n_dims`` for per-dimension sizes.
+    ``condition_matrix`` may also be a scalar or 1-D array and is used
+    as the mass matrix / preconditioning for HMC leapfrog steps.
+    """
 
     model_config = {"extra": "forbid", "arbitrary_types_allowed": True}
 
     step_size: float = 2e-3
-    condition_matrix: Union[float, np.ndarray] = 1.0
+    condition_matrix: float | np.ndarray = 1.0
     n_leapfrog_steps: int = 10
 
 
 class GRWConfig(BaseModel):
-    """Gaussian random-walk local-kernel settings for the flowMC backend."""
+    """Gaussian random-walk local-kernel settings for the flowMC backend.
+
+    ``step_size`` may be a scalar ``float`` (applied uniformly to all
+    dimensions) or a 1-D ``np.ndarray`` of length ``n_dims`` for
+    per-dimension step sizes.
+    """
 
     model_config = {"extra": "forbid", "arbitrary_types_allowed": True}
 
-    step_size: Union[float, np.ndarray] = 2e-3
+    step_size: float | np.ndarray = 2e-3
 
 
 class FlowMCConfig(BaseSamplerConfig):
@@ -84,11 +100,14 @@ class FlowMCConfig(BaseSamplerConfig):
     !!! note
         Only the sub-config matching the active ``local_kernel`` is used.
         Non-default values in inactive sub-configs emit a `UserWarning`.
+
+    !!! note
+        Periodic parameters are **not** configured here.  Pass a ``periodic``
+        argument to [`Jim`][jimgw.core.jim.Jim] instead; Jim resolves
+        parameter names to dimension indices and passes them to the sampler.
     """
 
     type: Literal["flowmc"] = "flowmc"
-
-    periodic: Optional[dict[str, tuple[float, float]]] = None
 
     n_chains: int = 1000
     n_local_steps: int = 100
@@ -163,13 +182,15 @@ class BlackJAXNSAWConfig(BaseSamplerConfig):
         This sampler requires the sampling space to be the unit hypercube
         ``[0, 1]^n_dims``.  When using Jim, this means all
         ``sample_transforms`` must map the prior support onto the unit cube.
+
+    !!! note
+        Periodic parameters are **not** configured here.  Pass a
+        ``periodic`` argument to [`Jim`][jimgw.core.jim.Jim] instead.
+        For NS-AW, bounds are implicit as ``[0, 1]``; just list the
+        parameter names.
     """
 
     type: Literal["blackjax-ns-aw"] = "blackjax-ns-aw"
-
-    # NS-AW operates in [0, 1)^n_dims, so periodic params only need a list of
-    # names; bounds are implicit.
-    periodic: Optional[list[str]] = None
 
     n_live: int = 1000
     n_delete_frac: float = 0.5
@@ -200,11 +221,14 @@ class BlackJAXNSAWConfig(BaseSamplerConfig):
 
 
 class BlackJAXNSSConfig(BaseSamplerConfig):
-    """Configuration for the BlackJAX nested slice sampler."""
+    """Configuration for the BlackJAX nested slice sampler.
+
+    !!! note
+        Periodic parameters are **not** configured here.  Pass a ``periodic``
+        argument to [`Jim`][jimgw.core.jim.Jim] instead.
+    """
 
     type: Literal["blackjax-nss"] = "blackjax-nss"
-
-    periodic: Optional[dict[str, tuple[float, float]]] = None
 
     n_live: int = 1000
     n_delete_frac: float = 0.5
@@ -233,11 +257,14 @@ class BlackJAXNSSConfig(BaseSamplerConfig):
 
 
 class BlackJAXSMCConfig(BaseSamplerConfig):
-    """Configuration for the BlackJAX SMC sampler."""
+    """Configuration for the BlackJAX SMC sampler.
+
+    !!! note
+        Periodic parameters are **not** configured here.  Pass a ``periodic``
+        argument to [`Jim`][jimgw.core.jim.Jim] instead.
+    """
 
     type: Literal["blackjax-smc"] = "blackjax-smc"
-
-    periodic: Optional[dict[str, tuple[float, float]]] = None
 
     n_particles: int = 2000
     n_mcmc_steps_per_dim: int = 100
@@ -336,12 +363,7 @@ class BlackJAXSMCConfig(BaseSamplerConfig):
 
 
 SamplerConfig = Annotated[
-    Union[
-        FlowMCConfig,
-        BlackJAXNSAWConfig,
-        BlackJAXNSSConfig,
-        BlackJAXSMCConfig,
-    ],
+    FlowMCConfig | BlackJAXNSAWConfig | BlackJAXNSSConfig | BlackJAXSMCConfig,
     Discriminator("type"),
 ]
 """Discriminated union of every concrete sampler config."""

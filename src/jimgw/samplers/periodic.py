@@ -1,89 +1,47 @@
 """Adapters that translate Jim's periodic-parameter spec into the form each
 sampler backend expects.
 
-Jim stores periodic info as a dict keyed by sampling-space parameter name:
+    periodic_index = {1: (0.0, 2 * math.pi), ...}   # key = dimension index
 
-    periodic = {"phase_c": (0.0, 2 * math.pi), ...}
+Each backend wants a different shape: flowMC already accepts an index-keyed dict
+directly; BlackJAX NS-AW needs a stepper function on flat arrays; BlackJAX NSS
+needs a stepper returning a ``(position, accepted)`` tuple; BlackJAX SMC needs a
+displacement wrapper.  The adapters below handle those conversions.
 
-Each backend wants a different shape (flowMC: an index-keyed dict; BlackJAX
-NS-AW: a stepper function on flat arrays; BlackJAX NSS: a stepper returning
-a ``(position, accepted)`` tuple; BlackJAX SMC: a displacement wrapper).
-The adapters in this module do that conversion — validation of the parameter
-names themselves lives on [`Jim`][jimgw.core.jim.Jim], since it is a property
-of the problem, not of any particular sampler.
-
-All three BlackJAX adapters operate on flat JAX arrays of shape ``(n_dims,)``
-rather than named-parameter dicts.
+All adapters operate on flat JAX arrays of shape ``(n_dims,)``.
 """
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional
 
 import jax.numpy as jnp
 
 
-def to_index_dict(
-    periodic: Optional[dict[str, tuple[float, float]]],
-    parameter_names: Sequence[str],
-) -> Optional[dict[int, tuple[float, float]]]:
-    """Map parameter names to dimension indices for flowMC / MALA.
-
-    Returns ``None`` unchanged so callers can thread the value through without
-    branching.
-
-    Raises:
-        ValueError: If a name in ``periodic`` is not in ``parameter_names``.
-    """
-    if periodic is None:
-        return None
-    names = list(parameter_names)
-    result: dict[int, tuple[float, float]] = {}
-    for name, bounds in periodic.items():
-        if name not in names:
-            raise ValueError(
-                f"Periodic parameter {name!r} not found in sampling parameters "
-                f"{tuple(parameter_names)}."
-            )
-        result[names.index(name)] = bounds
-    return result
-
-
 def _build_masks_arrays(
-    periodic: Optional[dict[str, tuple[float, float]]],
-    parameter_names: Sequence[str],
+    periodic_index: Optional[dict[int, tuple[float, float]]],
+    n_dims: int,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Build index-based boolean mask, lower-bound, and period arrays.
+    """Build boolean mask, lower-bound, and period arrays from an index-keyed dict.
 
     Returns ``(mask, lower, period)`` as JAX arrays of shape ``(n_dims,)``.
-
-    Raises:
-        ValueError: If a name in ``periodic`` is not in ``parameter_names``.
     """
-    periodic = periodic or {}
-    names = list(parameter_names)
-    n = len(names)
+    periodic_index = periodic_index or {}
 
-    mask = jnp.zeros(n, dtype=bool)
-    lower = jnp.zeros(n)
-    period = jnp.ones(n)
+    mask = jnp.zeros(n_dims, dtype=bool)
+    lower = jnp.zeros(n_dims)
+    period = jnp.ones(n_dims)
 
-    for name, (lo, hi) in periodic.items():
-        if name not in names:
-            raise ValueError(
-                f"Periodic parameter {name!r} not found in sampling parameters "
-                f"{tuple(parameter_names)}."
-            )
+    for i, (lo, hi) in periodic_index.items():
         lo_f, hi_f = float(lo), float(hi)
         if not jnp.isfinite(lo_f) or not jnp.isfinite(hi_f):
             raise ValueError(
-                f"Periodic bounds for {name!r} must be finite, got ({lo_f}, {hi_f})."
+                f"Periodic bounds for dimension {i} must be finite, got ({lo_f}, {hi_f})."
             )
         if hi_f <= lo_f:
             raise ValueError(
-                f"Periodic bounds for {name!r} must satisfy hi > lo, got ({lo_f}, {hi_f})."
+                f"Periodic bounds for dimension {i} must satisfy hi > lo, got ({lo_f}, {hi_f})."
             )
-        i = names.index(name)
         mask = mask.at[i].set(True)
         lower = lower.at[i].set(lo_f)
         period = period.at[i].set(hi_f - lo_f)
@@ -92,28 +50,20 @@ def _build_masks_arrays(
 
 
 def to_unit_cube_stepper(
-    periodic: Optional[list[str]],
-    parameter_names: Sequence[str],
+    periodic_index: Optional[list[int]],
+    n_dims: int,
 ) -> Callable:
     """Stepper function for BlackJAX NS-AW (unit-cube space).
 
     Signature: ``stepper_fn(position, direction, step_size) -> new_position``
 
-    ``periodic`` is a list of parameter names to wrap; bounds are not accepted
-    because NS-AW always operates in ``[0, 1]^n_dims`` so wrapping is always
+    ``periodic_index`` is a list of dimension indices to wrap; bounds are implicit
+    because NS-AW always operates in ``[0, 1]^n_dims``, so wrapping is always
     ``mod(pos + step_size * dir, 1.0)``.
-
-    Raises:
-        ValueError: If a name in ``periodic`` is not in ``parameter_names``.
     """
-    names = list(parameter_names)
-    for name in periodic or []:
-        if name not in names:
-            raise ValueError(
-                f"Periodic parameter {name!r} not found in sampling parameters "
-                f"{tuple(parameter_names)}."
-            )
-    mask = jnp.array([name in (periodic or []) for name in names], dtype=bool)
+    mask = jnp.zeros(n_dims, dtype=bool)
+    for i in periodic_index or []:
+        mask = mask.at[i].set(True)
 
     def stepper(
         position: jnp.ndarray, direction: jnp.ndarray, step_size: float
@@ -125,8 +75,8 @@ def to_unit_cube_stepper(
 
 
 def to_prior_space_stepper(
-    periodic: Optional[dict[str, tuple[float, float]]],
-    parameter_names: Sequence[str],
+    periodic_index: Optional[dict[int, tuple[float, float]]],
+    n_dims: int,
 ) -> Callable:
     """Stepper function for BlackJAX NSS (prior space).
 
@@ -136,11 +86,8 @@ def to_prior_space_stepper(
     NSS requires the stepper to return a ``(position, bool)`` tuple.
     Periodic parameters are wrapped with
     ``lower + mod(pos + step_size * dir - lower, period)``.
-
-    Raises:
-        ValueError: If a name in ``periodic`` is not in ``parameter_names``.
     """
-    mask, lower, period = _build_masks_arrays(periodic, parameter_names)
+    mask, lower, period = _build_masks_arrays(periodic_index, n_dims)
 
     def stepper(
         position: jnp.ndarray, direction: jnp.ndarray, step_size: float
@@ -153,8 +100,8 @@ def to_prior_space_stepper(
 
 
 def to_displacement_wrapper(
-    periodic: Optional[dict[str, tuple[float, float]]],
-    parameter_names: Sequence[str],
+    periodic_index: Optional[dict[int, tuple[float, float]]],
+    n_dims: int,
 ) -> Callable:
     """Displacement wrapper for BlackJAX SMC (prior space).
 
@@ -166,11 +113,8 @@ def to_displacement_wrapper(
     within ``[lower, upper)``:
 
         wrapped_displacement = lower + mod(current + disp - lower, period) - current
-
-    Raises:
-        ValueError: If a name in ``periodic`` is not in ``parameter_names``.
     """
-    mask, lower, period = _build_masks_arrays(periodic, parameter_names)
+    mask, lower, period = _build_masks_arrays(periodic_index, n_dims)
 
     def wrapper(
         proposed_displacement: jnp.ndarray, current_position: jnp.ndarray

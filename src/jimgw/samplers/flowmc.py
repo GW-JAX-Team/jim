@@ -8,7 +8,7 @@ parallel tempering.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Optional, Sequence, Type
+from typing import Any, Callable, Optional, Type
 
 import jax
 import jax.numpy as jnp
@@ -24,7 +24,6 @@ from jaxtyping import Array, Float, Key
 
 from jimgw.samplers.base import Sampler
 from jimgw.samplers.config import FlowMCConfig
-from jimgw.samplers.periodic import to_index_dict
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +48,17 @@ class FlowMCSampler(Sampler):
     of the seed).
 
     Configured via [`FlowMCConfig`][jimgw.samplers.config.FlowMCConfig].
+
+    Args:
+        n_dims: Dimension of the sampling space.
+        log_prior_fn: Log-prior callable ``(arr,) -> float``.
+        log_likelihood_fn: Log-likelihood callable ``(arr,) -> float``.
+        log_posterior_fn: Log-posterior callable ``(arr,) -> float``.
+        config: Optional :class:`FlowMCConfig`; defaults to all-default values.
+        periodic: Optional periodic-parameter spec in index space,
+            ``dict[int, (lo, hi)]`` where the key is the dimension index.
+            ``None`` means no periodic parameters.  Provided by Jim after
+            resolving parameter names to indices.
     """
 
     _config: FlowMCConfig
@@ -63,7 +73,7 @@ class FlowMCSampler(Sampler):
         log_likelihood_fn: Callable,
         log_posterior_fn: Callable,
         config: Optional[FlowMCConfig] = None,
-        parameter_names: Sequence[str] = (),
+        periodic: Optional[dict[int, tuple[float, float]]] = None,
     ) -> None:
         if config is None:
             config = FlowMCConfig()
@@ -74,7 +84,7 @@ class FlowMCSampler(Sampler):
             log_posterior_fn=log_posterior_fn,
             config=config,
         )
-        self._periodic_index_dict = to_index_dict(config.periodic, parameter_names)
+        self._periodic_index_dict = periodic
         self._flowmc_sampler = None
 
         # Pre-compute strategy order for use before sampling.

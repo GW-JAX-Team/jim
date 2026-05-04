@@ -11,7 +11,7 @@ Supports four mode combinations selected by
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from typing import Any, Optional
 
 import jax
@@ -51,6 +51,17 @@ class BlackJAXSMCSampler(Sampler):
     selection the covariance is re-estimated at each step.
 
     Operates on flat ``(n_dims,)`` arrays.
+
+    Args:
+        n_dims: Dimension of the sampling space.
+        log_prior_fn: Log-prior callable ``(arr,) -> float``.
+        log_likelihood_fn: Log-likelihood callable ``(arr,) -> float``.
+        log_posterior_fn: Log-posterior callable ``(arr,) -> float``.
+        config: Optional :class:`BlackJAXSMCConfig`; defaults to all-default values.
+        periodic: Optional periodic-parameter spec in index space,
+            ``dict[int, (lo, hi)]`` where the key is the dimension index and
+            the value is the ``(lower, upper)`` period bounds.  ``None`` means
+            no periodic parameters.  Provided by Jim after resolving names.
     """
 
     _config: BlackJAXSMCConfig
@@ -77,7 +88,7 @@ class BlackJAXSMCSampler(Sampler):
         log_likelihood_fn: Callable,
         log_posterior_fn: Callable,
         config: Optional[BlackJAXSMCConfig] = None,
-        parameter_names: Sequence[str] = (),
+        periodic: Optional[dict[int, tuple[float, float]]] = None,
     ) -> None:
         if config is None:
             config = BlackJAXSMCConfig()
@@ -88,9 +99,7 @@ class BlackJAXSMCSampler(Sampler):
             log_posterior_fn=log_posterior_fn,
             config=config,
         )
-        self._displacement_wrapper = to_displacement_wrapper(
-            config.periodic, parameter_names
-        )
+        self._displacement_wrapper = to_displacement_wrapper(periodic, n_dims)
 
     # ------------------------------------------------------------------
     # Internal helpers

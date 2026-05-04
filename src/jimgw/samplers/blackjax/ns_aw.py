@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Optional
 
 import jax
 import jax.numpy as jnp
@@ -40,6 +40,16 @@ class BlackJAXNSAWSampler(Sampler):
     sampling kernel within blackjax-ns"*, arXiv:2509.04336 (Sep 2025).
 
     Configure via [`BlackJAXNSAWConfig`][jimgw.samplers.config.BlackJAXNSAWConfig].
+
+    Args:
+        n_dims: Dimension of the sampling space.
+        log_prior_fn: Log-prior callable ``(arr,) -> float``.
+        log_likelihood_fn: Log-likelihood callable ``(arr,) -> float``.
+        log_posterior_fn: Log-posterior callable ``(arr,) -> float``.
+        config: Optional :class:`BlackJAXNSAWConfig`; defaults to all-default values.
+        periodic: Optional list of dimension indices that are periodic in
+            ``[0, 1]`` (unit-cube space).  ``None`` means no periodic
+            parameters.  Provided by Jim after resolving parameter names.
     """
 
     _config: BlackJAXNSAWConfig
@@ -56,7 +66,7 @@ class BlackJAXNSAWSampler(Sampler):
         log_likelihood_fn: Callable,
         log_posterior_fn: Callable,
         config: Optional[BlackJAXNSAWConfig] = None,
-        parameter_names: Sequence[str] = (),
+        periodic: Optional[list[int]] = None,
     ) -> None:
         if config is None:
             config = BlackJAXNSAWConfig()
@@ -67,7 +77,7 @@ class BlackJAXNSAWSampler(Sampler):
             log_posterior_fn=log_posterior_fn,
             config=config,
         )
-        self._stepper_fn = to_unit_cube_stepper(config.periodic, parameter_names)
+        self._stepper_fn = to_unit_cube_stepper(periodic, n_dims)
         self._validate_unit_cube_prior(log_prior_fn)
 
     def _validate_unit_cube_prior(self, log_prior_fn: Callable) -> None:

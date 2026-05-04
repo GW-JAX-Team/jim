@@ -14,7 +14,8 @@ raised only when the caller actually asks for that backend via
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
+from typing import Optional
 
 from jimgw.samplers.base import Sampler
 from jimgw.samplers.config import (
@@ -61,7 +62,7 @@ def build_sampler(
     log_prior_fn: Callable,
     log_likelihood_fn: Callable,
     log_posterior_fn: Callable,
-    parameter_names: Sequence[str] = (),
+    periodic: Optional[list[int] | dict[int, tuple[float, float]]] = None,
 ) -> Sampler:
     """Instantiate the concrete [`Sampler`][jimgw.samplers.base.Sampler] identified by ``config.type``.
 
@@ -71,9 +72,9 @@ def build_sampler(
         log_prior_fn: Log-prior callable ``(arr,) -> float`` in sampling space.
         log_likelihood_fn: Log-likelihood callable ``(arr,) -> float``.
         log_posterior_fn: Log-posterior callable ``(arr,) -> float``.
-        parameter_names: Sampling-space parameter names.  Concrete backends
-            use this only to build periodic-parameter adapters (index lookup);
-            the ABC itself does not store or use names.
+        periodic: Periodic-parameter spec already resolved to dimension
+            indices by Jim.  For flowMC/NSS/SMC this is a
+            ``dict[int, (lo, hi)]``; for NS-AW it is a ``list[int]``.
 
     Raises:
         KeyError: If no sampler is registered for ``config.type``.
@@ -93,7 +94,7 @@ def build_sampler(
         log_likelihood_fn=log_likelihood_fn,
         log_posterior_fn=log_posterior_fn,
         config=config,
-        parameter_names=tuple(parameter_names),
+        periodic=periodic,
     )
 
 

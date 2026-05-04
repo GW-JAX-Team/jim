@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, Float
-from typing import Callable, Optional, Sequence, Union
+from typing import Callable, Optional, Sequence
 from abc import abstractmethod
 from scipy.interpolate import interp1d
 from evosax.algorithms import CMA_ES
@@ -192,9 +192,9 @@ class TransientLikelihoodFD(SingleEventLikelihood):
         f_min: float | dict[str, float] = 0.0,
         f_max: float | dict[str, float] = jnp.inf,
         trigger_time: Float = 0,
-        time_marginalization: Union[TimeMargConfig, dict, bool, None] = None,
-        phase_marginalization: Union[PhaseMargConfig, dict, bool, None] = None,
-        distance_marginalization: Union[DistanceMargConfig, dict, bool, None] = None,
+        time_marginalization: Optional[TimeMargConfig | dict | bool] = None,
+        phase_marginalization: Optional[PhaseMargConfig | dict | bool] = None,
+        distance_marginalization: Optional[DistanceMargConfig | dict | bool] = None,
     ) -> None:
         super().__init__(detectors, waveform, fixed_parameters)
 
@@ -580,7 +580,7 @@ class HeterodynedTransientLikelihoodFD(SingleEventLikelihood):
         reference_waveform: Optional[Waveform] = None,
         prior: Optional[Prior] = None,
         likelihood_transforms: Optional[list[NtoMTransform]] = None,
-        phase_marginalization: Union[PhaseMargConfig, dict, bool, None] = None,
+        phase_marginalization: Optional[PhaseMargConfig | dict | bool] = None,
     ):
         super().__init__(detectors, waveform, fixed_parameters)
 

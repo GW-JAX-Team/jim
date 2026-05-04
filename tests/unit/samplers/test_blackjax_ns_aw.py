@@ -66,7 +66,6 @@ def _make_sampler(n_live: int = 200) -> BlackJAXNSAWSampler:
         log_likelihood_fn=log_likelihood_fn,
         log_posterior_fn=log_posterior_fn,
         config=config,
-        parameter_names=parameter_names,
     )
 
 

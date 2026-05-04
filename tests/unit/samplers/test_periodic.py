@@ -5,63 +5,14 @@ import pytest
 
 from jimgw.samplers.periodic import (
     to_displacement_wrapper,
-    to_index_dict,
     to_prior_space_stepper,
     to_unit_cube_stepper,
 )
 
 
-PARAMS_3D = ("alpha", "phase_c", "psi")
-# phase_c in [0, 2π], psi in [0, π]
-PERIODIC_3D = {"phase_c": (0.0, 2 * math.pi), "psi": (0.0, math.pi)}
-
-
-# ---------------------------------------------------------------------------
-# to_index_dict
-# ---------------------------------------------------------------------------
-
-
-def test_to_index_dict_none_passthrough():
-    assert to_index_dict(None, PARAMS_3D) is None
-
-
-def test_to_index_dict_single_periodic():
-    result = to_index_dict({"phase_c": (0.0, 2 * math.pi)}, PARAMS_3D)
-    assert result == {1: (0.0, 2 * math.pi)}
-
-
-def test_to_index_dict_multiple_periodic():
-    periodic = {
-        "phase_c": (0.0, 2 * math.pi),
-        "psi": (0.0, math.pi),
-    }
-    result = to_index_dict(periodic, PARAMS_3D)
-    assert result == {1: (0.0, 2 * math.pi), 2: (0.0, math.pi)}
-
-
-def test_to_index_dict_first_param():
-    result = to_index_dict({"alpha": (-1.0, 1.0)}, PARAMS_3D)
-    assert result == {0: (-1.0, 1.0)}
-
-
-def test_to_index_dict_unknown_name_raises():
-    with pytest.raises(ValueError, match="not found in sampling parameters"):
-        to_index_dict({"unknown": (0.0, 1.0)}, PARAMS_3D)
-
-
-def test_to_index_dict_empty_periodic():
-    result = to_index_dict({}, PARAMS_3D)
-    assert result == {}
-
-
-def test_to_index_dict_all_params_periodic():
-    periodic = {
-        "alpha": (0.0, 1.0),
-        "phase_c": (0.0, 2 * math.pi),
-        "psi": (0.0, math.pi),
-    }
-    result = to_index_dict(periodic, PARAMS_3D)
-    assert result == {0: (0.0, 1.0), 1: (0.0, 2 * math.pi), 2: (0.0, math.pi)}
+# Index-based periodic specs matching PARAMS_3D = ("alpha", "phase_c", "psi")
+# phase_c → index 1, psi → index 2
+PERIODIC_3D = {1: (0.0, 2 * math.pi), 2: (0.0, math.pi)}
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +29,7 @@ def _dir(alpha=0.1, phase_c=0.7, psi=-0.5):
 
 
 def test_unit_cube_stepper_none_periodic():
-    stepper = to_unit_cube_stepper(None, PARAMS_3D)
+    stepper = to_unit_cube_stepper(None, 3)
     pos = _pos()
     direction = _dir()
     result = stepper(pos, direction, 1.0)
@@ -87,7 +38,7 @@ def test_unit_cube_stepper_none_periodic():
 
 
 def test_unit_cube_stepper_wraps_periodic():
-    stepper = to_unit_cube_stepper(["phase_c"], PARAMS_3D)
+    stepper = to_unit_cube_stepper([1], 3)  # index 1 = phase_c
     pos = jnp.array([0.3, 0.9, 0.1])
     direction = jnp.array([0.0, 0.5, 0.0])
     # phase_c (index 1): 0.9 + 0.5 = 1.4 → mod 1.0 = 0.4
@@ -99,16 +50,19 @@ def test_unit_cube_stepper_wraps_periodic():
 
 
 def test_unit_cube_stepper_no_wrapping_needed():
-    stepper = to_unit_cube_stepper(["phase_c"], PARAMS_3D)
+    stepper = to_unit_cube_stepper([1], 3)  # index 1 = phase_c
     pos = jnp.array([0.0, 0.1, 0.0])
     direction = jnp.array([0.0, 0.2, 0.0])
     result = stepper(pos, direction, 1.0)
     assert float(result[1]) == pytest.approx(0.3, abs=1e-6)
 
 
-def test_unit_cube_stepper_unknown_name_raises():
-    with pytest.raises(ValueError, match="not found in sampling parameters"):
-        to_unit_cube_stepper(["unknown"], PARAMS_3D)
+def test_unit_cube_stepper_empty_periodic():
+    stepper = to_unit_cube_stepper([], 3)
+    pos = _pos()
+    direction = _dir()
+    result = stepper(pos, direction, 1.0)
+    assert jnp.allclose(result, pos + direction)
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +71,7 @@ def test_unit_cube_stepper_unknown_name_raises():
 
 
 def test_prior_space_stepper_none_periodic():
-    stepper = to_prior_space_stepper(None, PARAMS_3D)
+    stepper = to_prior_space_stepper(None, 3)
     pos = _pos()
     direction = _dir()
     result, accepted = stepper(pos, direction, 1.0)
@@ -127,7 +81,7 @@ def test_prior_space_stepper_none_periodic():
 
 def test_prior_space_stepper_wraps_phase_c():
     two_pi = 2 * math.pi
-    stepper = to_prior_space_stepper({"phase_c": (0.0, two_pi)}, PARAMS_3D)
+    stepper = to_prior_space_stepper({1: (0.0, two_pi)}, 3)  # index 1 = phase_c
     pos = jnp.array([0.0, 6.0, 0.0])
     direction = jnp.array([0.0, 1.0, 0.0])
     result, accepted = stepper(pos, direction, 1.0)
@@ -138,14 +92,14 @@ def test_prior_space_stepper_wraps_phase_c():
 
 
 def test_prior_space_stepper_returns_accepted_bool():
-    stepper = to_prior_space_stepper({"phase_c": (0.0, 2 * math.pi)}, PARAMS_3D)
+    stepper = to_prior_space_stepper({1: (0.0, 2 * math.pi)}, 3)
     _, accepted = stepper(_pos(), _dir(), 0.1)
     assert accepted is True
 
 
-def test_prior_space_stepper_unknown_name_raises():
-    with pytest.raises(ValueError, match="not found in sampling parameters"):
-        to_prior_space_stepper({"unknown": (0.0, 1.0)}, PARAMS_3D)
+def test_prior_space_stepper_invalid_bounds_raises():
+    with pytest.raises(ValueError, match="hi > lo"):
+        to_prior_space_stepper({1: (1.0, 0.0)}, 3)
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +108,7 @@ def test_prior_space_stepper_unknown_name_raises():
 
 
 def test_displacement_wrapper_none_periodic():
-    wrapper = to_displacement_wrapper(None, PARAMS_3D)
+    wrapper = to_displacement_wrapper(None, 3)
     proposed = jnp.array([0.1, 0.5, -0.2])
     current = jnp.array([0.3, 2.0, 1.0])
     result = wrapper(proposed, current)
@@ -163,7 +117,7 @@ def test_displacement_wrapper_none_periodic():
 
 def test_displacement_wrapper_wraps_periodic():
     two_pi = 2 * math.pi
-    wrapper = to_displacement_wrapper({"phase_c": (0.0, two_pi)}, PARAMS_3D)
+    wrapper = to_displacement_wrapper({1: (0.0, two_pi)}, 3)  # index 1 = phase_c
     # current phase_c = 5.8, displacement = 1.0 → new = 6.8 → wrapped = mod(6.8, 2π) ≈ 0.517
     current_val = 5.8
     disp_val = 1.0
@@ -177,6 +131,6 @@ def test_displacement_wrapper_wraps_periodic():
     assert float(result[0]) == pytest.approx(0.0, abs=1e-6)
 
 
-def test_displacement_wrapper_unknown_name_raises():
-    with pytest.raises(ValueError, match="not found in sampling parameters"):
-        to_displacement_wrapper({"unknown": (0.0, 1.0)}, PARAMS_3D)
+def test_displacement_wrapper_invalid_bounds_raises():
+    with pytest.raises(ValueError, match="hi > lo"):
+        to_displacement_wrapper({1: (2.0, 1.0)}, 3)

@@ -68,7 +68,6 @@ def _make_sampler() -> FlowMCSampler:
         log_likelihood_fn=log_likelihood_fn,
         log_posterior_fn=log_posterior_fn,
         config=_make_tiny_config(),
-        parameter_names=parameter_names,
     )
 
 
