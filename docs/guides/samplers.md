@@ -291,6 +291,7 @@ diag["log_Z_error"]               # float — standard deviation from 100 bootst
 
 # SMC
 diag["acceptance_history"]        # np.ndarray — mean acceptance rate at each step
+diag["ess_history"]               # np.ndarray — ESS at each step (persistent ESS for ap/fp modes, Kish ESS for at/ft modes)
 # Adaptive temperature only:
 diag["n_iterations"]              # int        — number of temperature steps
 diag["tempering_schedule"]        # np.ndarray — temperature value at each step

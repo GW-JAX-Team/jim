@@ -238,15 +238,11 @@ def test_smc_fraction_above_one_in_tempered_raises():
 
 def test_smc_absolute_ess_above_n_particles_in_tempered_raises():
     with pytest.raises(ValidationError):
-        BlackJAXSMCConfig(
-            target_ess=5000, n_particles=2000, persistent_sampling=False
-        )
+        BlackJAXSMCConfig(target_ess=5000, n_particles=2000, persistent_sampling=False)
 
 
 def test_smc_absolute_ess_above_n_particles_in_persistent_ok():
-    cfg = BlackJAXSMCConfig(
-        target_ess=5000, n_particles=2000, persistent_sampling=True
-    )
+    cfg = BlackJAXSMCConfig(target_ess=5000, n_particles=2000, persistent_sampling=True)
     assert cfg.target_ess == 5000
 
 
@@ -323,7 +319,6 @@ def test_blackjax_smc_config_has_no_periodic_field():
 def test_flowmc_config_rejects_periodic_field():
     with pytest.raises(ValidationError):
         FlowMCConfig(periodic={"phase_c": (0.0, 6.28)})
-
 
 
 def test_smc_resolve_target_ess_fraction():

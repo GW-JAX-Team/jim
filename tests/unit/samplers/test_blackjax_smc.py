@@ -145,6 +145,12 @@ def test_smc_ap_diagnostics():
     assert "sampling_time" in diag
     assert diag["sampling_time"] >= 0.0
 
+    # ESS history (persistent ESS, one value per temperature step)
+    assert "ess_history" in diag
+    assert len(diag["ess_history"]) == diag["n_iterations"]
+    assert np.all(diag["ess_history"] > 0)
+    assert np.all(np.isfinite(diag["ess_history"]))
+
 
 def test_smc_n_evals_formula():
     """n_likelihood_evaluations == n_mcmc * n_iter * n_particles."""
@@ -157,3 +163,100 @@ def test_smc_n_evals_formula():
 
     expected = n_mcmc_per_dim * n_dims * diag["n_iterations"] * n_particles
     assert diag["n_likelihood_evaluations"] == expected
+
+
+def _make_sampler_at(n_particles: int = 200) -> BlackJAXSMCSampler:
+    """Non-persistent (adaptive tempered) mode."""
+    prior = CombinePrior(
+        [
+            UniformPrior(0.0, 1.0, parameter_names=["x"]),
+            UniformPrior(0.0, 1.0, parameter_names=["y"]),
+        ]
+    )
+    likelihood = _GaussianLikelihood()
+    config = BlackJAXSMCConfig(
+        n_particles=n_particles,
+        n_mcmc_steps_per_dim=5,
+        target_ess=50,
+        persistent_sampling=False,
+    )
+    parameter_names = prior.parameter_names
+
+    def log_prior_fn(arr):
+        named = dict(zip(parameter_names, arr, strict=True))
+        return prior.log_prob(named)
+
+    def log_likelihood_fn(arr):
+        named = dict(zip(parameter_names, arr, strict=True))
+        return likelihood.evaluate(named, {})
+
+    def log_posterior_fn(arr):
+        return log_prior_fn(arr) + log_likelihood_fn(arr)
+
+    return BlackJAXSMCSampler(
+        n_dims=len(parameter_names),
+        log_prior_fn=log_prior_fn,
+        log_likelihood_fn=log_likelihood_fn,
+        log_posterior_fn=log_posterior_fn,
+        config=config,
+    )
+
+
+def test_smc_at_diagnostics():
+    """AT mode: Kish ESS history returned alongside acceptance and tempering schedule."""
+    n_particles = 200
+    sampler = _make_sampler_at(n_particles=n_particles)
+    sampler.sample(jax.random.key(6), _init_pos(n_particles))
+    diag = sampler.get_diagnostics()
+
+    assert diag["n_iterations"] > 0
+    assert "ess_history" in diag
+    assert len(diag["ess_history"]) == diag["n_iterations"]
+    assert np.all(diag["ess_history"] > 0)
+    assert np.all(diag["ess_history"] <= n_particles)
+    assert np.all(np.isfinite(diag["ess_history"]))
+
+
+def test_smc_fp_diagnostics():
+    """FP mode: persistent ESS history returned for a fixed temperature ladder."""
+    prior = CombinePrior(
+        [
+            UniformPrior(0.0, 1.0, parameter_names=["x"]),
+            UniformPrior(0.0, 1.0, parameter_names=["y"]),
+        ]
+    )
+    likelihood = _GaussianLikelihood()
+    ladder = [0.0, 0.1, 0.3, 0.6, 1.0]
+    config = BlackJAXSMCConfig(
+        n_particles=200,
+        n_mcmc_steps_per_dim=5,
+        temperature_ladder=ladder,
+        persistent_sampling=True,
+    )
+    parameter_names = prior.parameter_names
+
+    def log_prior_fn(arr):
+        named = dict(zip(parameter_names, arr, strict=True))
+        return prior.log_prob(named)
+
+    def log_likelihood_fn(arr):
+        named = dict(zip(parameter_names, arr, strict=True))
+        return likelihood.evaluate(named, {})
+
+    def log_posterior_fn(arr):
+        return log_prior_fn(arr) + log_likelihood_fn(arr)
+
+    sampler = BlackJAXSMCSampler(
+        n_dims=len(parameter_names),
+        log_prior_fn=log_prior_fn,
+        log_likelihood_fn=log_likelihood_fn,
+        log_posterior_fn=log_posterior_fn,
+        config=config,
+    )
+    sampler.sample(jax.random.key(7), _init_pos(200))
+    diag = sampler.get_diagnostics()
+
+    assert "ess_history" in diag
+    assert len(diag["ess_history"]) == len(ladder) - 1
+    assert np.all(diag["ess_history"] > 0)
+    assert np.all(np.isfinite(diag["ess_history"]))

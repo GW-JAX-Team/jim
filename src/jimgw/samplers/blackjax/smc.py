@@ -32,6 +32,7 @@ from blackjax.smc import extend_params
 from blackjax.smc.inner_kernel_tuning import StateWithParameterOverride
 from blackjax.smc.persistent_sampling import (
     compute_log_persistent_weights,
+    compute_persistent_ess,
 )
 from blackjax.smc.resampling import systematic
 
@@ -78,6 +79,9 @@ class BlackJAXSMCSampler(Sampler):
         np.ndarray
     )  # persistent adaptive only: per-step covariance scale
     _tempering_schedule: np.ndarray  # adaptive tempered only: per-step temperature
+    _is_weights_history: (
+        np.ndarray
+    )  # tempered (non-persistent) modes: per-step IS weights
     _scan_infos: Any  # fixed ladder: stacked SMCInfo from jax.lax.scan
 
     def __init__(
@@ -221,7 +225,7 @@ class BlackJAXSMCSampler(Sampler):
             n_schedule=n_schedule,
             mcmc_step_fn=mcmc_step,
             mcmc_init_fn=rmh.init,
-            mcmc_parameters={"cov": cov0},
+            mcmc_parameters=extend_params({"cov": cov0}),  # type: ignore[arg-type]  # blackjax fork stubs: extend_params accepts dict
             resampling_fn=systematic,
             num_mcmc_steps=n_mcmc_steps,
         )
@@ -271,13 +275,14 @@ class BlackJAXSMCSampler(Sampler):
 
         accept_history = jnp.zeros(max_iterations)
         temp_history = jnp.zeros(max_iterations)
+        is_weights_history = jnp.zeros((max_iterations, initial_particles.shape[0]))
 
         def cond_fn(carry: tuple) -> Any:
             s = carry[0]
             return s.sampler_state.tempering_param < 1.0
 
         def body_fn(carry: tuple) -> tuple:
-            s, key, n_iter, accept_h, temp_h = carry
+            s, key, n_iter, accept_h, temp_h, is_weights_h = carry
             key, subkey = jax.random.split(key)
             s, info = smc_alg.step(subkey, s)
 
@@ -286,13 +291,21 @@ class BlackJAXSMCSampler(Sampler):
 
             accept_h = accept_h.at[n_iter].set(acceptance_rate)
             temp_h = temp_h.at[n_iter].set(tempering_param)
+            is_weights_h = is_weights_h.at[n_iter].set(s.sampler_state.weights)  # type: ignore[attr-defined]
 
-            return (s, key, n_iter + 1, accept_h, temp_h)
+            return (s, key, n_iter + 1, accept_h, temp_h, is_weights_h)
 
-        state, _, n_iter, accept_h, temp_h = jax.lax.while_loop(
+        state, _, n_iter, accept_h, temp_h, is_weights_h = jax.lax.while_loop(
             cond_fn,
             body_fn,
-            (state, rng_key, jnp.array(0), accept_history, temp_history),
+            (
+                state,
+                rng_key,
+                jnp.array(0),
+                accept_history,
+                temp_history,
+                is_weights_history,
+            ),
         )
 
         n_iter_int = int(n_iter)
@@ -301,6 +314,7 @@ class BlackJAXSMCSampler(Sampler):
         self._n_iterations = n_iter_int
         self._acceptance_history = np.asarray(accept_h[:n_iter_int])
         self._tempering_schedule = np.asarray(temp_h[:n_iter_int])
+        self._is_weights_history = np.asarray(is_weights_h[:n_iter_int])
 
     def _run_fixed_tempered(
         self, rng_key: Key, initial_particles, ladder: list[float]
@@ -318,7 +332,7 @@ class BlackJAXSMCSampler(Sampler):
             loglikelihood_fn=self._log_likelihood_fn,
             mcmc_step_fn=mcmc_step,
             mcmc_init_fn=rmh.init,
-            mcmc_parameters={"cov": cov0},
+            mcmc_parameters=extend_params({"cov": cov0}),  # type: ignore[arg-type]  # blackjax fork stubs: extend_params accepts dict
             resampling_fn=systematic,
             num_mcmc_steps=n_mcmc_steps,
         )
@@ -329,14 +343,17 @@ class BlackJAXSMCSampler(Sampler):
             s, key = carry
             key, subkey = jax.random.split(key)
             s, info = smc_alg.step(subkey, s, lmbda)  # type: ignore[call-arg]  # blackjax fork API: step accepts extra arg
-            return (s, key), info
+            return (s, key), (info, s.weights)
 
-        (state, _), scan_infos = jax.lax.scan(scan_body, (state, rng_key), lambdas)
+        (state, _), (scan_infos, is_weights_h) = jax.lax.scan(
+            scan_body, (state, rng_key), lambdas
+        )
 
         self._final_state = state
         self._mode = "ft"
         self._n_iterations = len(ladder) - 1
         self._scan_infos = scan_infos
+        self._is_weights_history = np.asarray(is_weights_h)
 
     # ------------------------------------------------------------------
     # Public API
@@ -462,6 +479,7 @@ class BlackJAXSMCSampler(Sampler):
         * ``"n_iterations"`` — total SMC iterations (adaptive modes only).
         * ``"tempering_schedule"`` — tempering schedule (adaptive modes only).
         * ``"cov_scale_history"`` — covariance scale per iteration (adaptive-persistent only).
+        * ``"ess_history"`` — ESS per iteration (all modes: persistent ESS for ap/fp, Kish ESS for at/ft).
         * ``"persistent_log_Z"`` — log-Z trajectory (persistent modes only).
         * ``"log_Z"`` — final log Bayesian evidence (persistent modes only).
         """
@@ -502,5 +520,27 @@ class BlackJAXSMCSampler(Sampler):
                 log_Z_traj = np.asarray(ps.persistent_log_Z[: n + 1])
                 result["persistent_log_Z"] = log_Z_traj
                 result["log_Z"] = float(log_Z_traj[-1])
+
+        if mode in ("ap", "fp"):
+            ps = self._final_state.sampler_state if mode == "ap" else self._final_state
+            n = int(ps.iteration)
+            ess_hist = np.zeros(n)
+            for t in range(1, n + 1):
+                log_w, _ = compute_log_persistent_weights(
+                    ps.persistent_log_likelihoods,  # type: ignore[attr-defined]
+                    ps.persistent_log_Z,  # type: ignore[attr-defined]
+                    ps.tempering_schedule,  # type: ignore[attr-defined]
+                    t,
+                    include_current=True,
+                )
+                ess_hist[t - 1] = float(
+                    compute_persistent_ess(log_w.reshape(-1), normalize_weights=True)
+                )
+            result["ess_history"] = ess_hist
+
+        if mode in ("at", "ft"):
+            # IS weights are already normalized; Kish ESS = 1/sum(w^2)
+            w = self._is_weights_history
+            result["ess_history"] = 1.0 / np.sum(w**2, axis=-1)
 
         return result

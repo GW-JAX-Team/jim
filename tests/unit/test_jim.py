@@ -639,4 +639,3 @@ class TestJimPeriodic:
             sampler_config=_tiny_flowmc_config(),
             periodic={},
         )
-
