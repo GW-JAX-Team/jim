@@ -291,12 +291,12 @@ diag["log_Z_error"]               # float — standard deviation from 100 bootst
 
 # SMC
 diag["acceptance_history"]        # np.ndarray — mean acceptance rate at each step
-diag["ess_history"]               # np.ndarray — ESS at each step (persistent ESS for ap/fp modes, Kish ESS for at/ft modes)
+diag["ess_history"]               # np.ndarray — ESS at each step
 # Adaptive temperature only:
 diag["n_iterations"]              # int        — number of temperature steps
-diag["tempering_schedule"]        # np.ndarray — temperature value at each step
+diag["tempering_schedule"]        # np.ndarray — inverse temperature at each step
 # Persistent sampling only:
-diag["persistent_log_Z"]          # np.ndarray — log Z trajectory
+diag["persistent_log_Z"]          # np.ndarray — cumulative log Z after each step
 diag["log_Z"]                     # float      — final log Bayesian evidence
 ```
 

@@ -475,12 +475,12 @@ class BlackJAXSMCSampler(Sampler):
         Returns a dict with the following keys (not all present for all modes):
 
         * ``"n_likelihood_evaluations"`` — total likelihood calls.
-        * ``"acceptance_history"`` — per-iteration mean acceptance rate.
+        * ``"acceptance_history"`` — per-iteration mean acceptance rate; length ``n_iterations``.
         * ``"n_iterations"`` — total SMC iterations (adaptive modes only).
-        * ``"tempering_schedule"`` — tempering schedule (adaptive modes only).
-        * ``"cov_scale_history"`` — covariance scale per iteration (adaptive-persistent only).
-        * ``"ess_history"`` — ESS per iteration (all modes: persistent ESS for ap/fp, Kish ESS for at/ft).
-        * ``"persistent_log_Z"`` — log-Z trajectory (persistent modes only).
+        * ``"tempering_schedule"`` — inverse temperature at each iteration; length ``n_iterations`` (adaptive modes only).
+        * ``"cov_scale_history"`` — covariance scale per iteration (adaptive-persistent only); length ``n_iterations``.
+        * ``"ess_history"`` — ESS per iteration (all modes: persistent ESS for ap/fp, Kish ESS for at/ft); length ``n_iterations``.
+        * ``"persistent_log_Z"`` — cumulative log-Z after each iteration; length ``n_iterations`` (persistent modes only).
         * ``"log_Z"`` — final log Bayesian evidence (persistent modes only).
         """
         if not self._sampled:
@@ -503,9 +503,9 @@ class BlackJAXSMCSampler(Sampler):
                 ps = self._final_state.sampler_state
                 n = int(ps.iteration)
                 result["tempering_schedule"] = np.asarray(
-                    ps.tempering_schedule[: n + 1]
+                    ps.tempering_schedule[1 : n + 1]
                 )
-                log_Z_traj = np.asarray(ps.persistent_log_Z[: n + 1])
+                log_Z_traj = np.asarray(ps.persistent_log_Z[1 : n + 1])
                 result["persistent_log_Z"] = log_Z_traj
                 result["log_Z"] = float(log_Z_traj[-1])
             else:  # mode == "at"
@@ -517,13 +517,13 @@ class BlackJAXSMCSampler(Sampler):
             if mode == "fp":
                 ps = self._final_state
                 n = int(ps.iteration)
-                log_Z_traj = np.asarray(ps.persistent_log_Z[: n + 1])
+                log_Z_traj = np.asarray(ps.persistent_log_Z[1 : n + 1])
                 result["persistent_log_Z"] = log_Z_traj
                 result["log_Z"] = float(log_Z_traj[-1])
 
         if mode in ("ap", "fp"):
             ps = self._final_state.sampler_state if mode == "ap" else self._final_state
-            n = int(ps.iteration)
+            n = self._n_iterations
             ess_hist = np.zeros(n)
             for t in range(1, n + 1):
                 log_w, _ = compute_log_persistent_weights(

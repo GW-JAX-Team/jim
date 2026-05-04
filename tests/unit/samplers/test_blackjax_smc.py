@@ -138,7 +138,8 @@ def test_smc_ap_diagnostics():
     # Persistent mode fields
     assert diag["tempering_schedule"] is not None
     assert diag["persistent_log_Z"] is not None
-    assert len(diag["tempering_schedule"]) == len(diag["persistent_log_Z"])
+    assert len(diag["tempering_schedule"]) == diag["n_iterations"]
+    assert len(diag["persistent_log_Z"]) == diag["n_iterations"]
     assert float(diag["tempering_schedule"][-1]) == pytest.approx(1.0, abs=1e-6)
     assert "log_Z" in diag
     assert np.isfinite(diag["log_Z"])
