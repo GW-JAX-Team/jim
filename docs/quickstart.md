@@ -16,7 +16,7 @@ flowchart LR
     P --> J
     P --- ST[Sample Transforms]
     ST --> J
-    J <-- S[Sampler]
+    J <--> S[Sampler]
 ```
 
 ### Data
