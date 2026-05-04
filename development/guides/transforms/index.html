@@ -2245,8 +2245,8 @@
 <h1 id="transforms">Transforms<a class="headerlink" href="#transforms" title="Permanent link">¤</a></h1>
 <p>Jim bridges three parameter spaces, and transforms are the connections between them:</p>
 <pre class="mermaid"><code>flowchart LR
-    PS[Prior Space] --&gt; LT[Likelihood Transforms] --&gt; LS[Likelihood Space]
-    PS --&gt; ST[Sample Transforms] --&gt; SS[Sampling Space]</code></pre>
+    PS[Prior Space] ==&gt; LT[Likelihood Transforms] ==&gt; LS[Likelihood Space]
+    PS ==&gt; ST[Sample Transforms] ==&gt; SS[Sampling Space]</code></pre>
 <ul>
 <li>The <strong>likelihood space</strong> is fixed by your waveform model. For example, ripple waveforms expect <code>(M_c, eta, s1_z, s2_z, ...)</code>.</li>
 <li>The <strong>prior space</strong> is where you define your priors. You are free to use whichever parameterisation is most natural.</li>
