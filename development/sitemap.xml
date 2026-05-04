@@ -16,16 +16,22 @@
         <loc>https://gw-jax-team.github.io/jim/development/tutorials/getting_started/</loc>
       </url>
       <url>
-        <loc>https://gw-jax-team.github.io/jim/development/tutorials/data/</loc>
+        <loc>https://gw-jax-team.github.io/jim/development/guides/</loc>
       </url>
       <url>
-        <loc>https://gw-jax-team.github.io/jim/development/tutorials/likelihood/</loc>
+        <loc>https://gw-jax-team.github.io/jim/development/guides/data/</loc>
       </url>
       <url>
-        <loc>https://gw-jax-team.github.io/jim/development/tutorials/prior/</loc>
+        <loc>https://gw-jax-team.github.io/jim/development/guides/likelihood/</loc>
       </url>
       <url>
-        <loc>https://gw-jax-team.github.io/jim/development/tutorials/transforms/</loc>
+        <loc>https://gw-jax-team.github.io/jim/development/guides/prior/</loc>
+      </url>
+      <url>
+        <loc>https://gw-jax-team.github.io/jim/development/guides/samplers/</loc>
+      </url>
+      <url>
+        <loc>https://gw-jax-team.github.io/jim/development/guides/transforms/</loc>
       </url>
       <url>
         <loc>https://gw-jax-team.github.io/jim/development/FAQ/</loc>
@@ -55,6 +61,9 @@
         <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/core/single_event/likelihood/</loc>
       </url>
       <url>
+        <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/core/single_event/marginalization_config/</loc>
+      </url>
+      <url>
         <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/core/single_event/polarization/</loc>
       </url>
       <url>
@@ -62,6 +71,9 @@
       </url>
       <url>
         <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/core/single_event/time_utils/</loc>
+      </url>
+      <url>
+        <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/core/single_event/transform_utils/</loc>
       </url>
       <url>
         <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/core/single_event/transforms/</loc>
@@ -77,5 +89,26 @@
       </url>
       <url>
         <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/core/utils/</loc>
+      </url>
+      <url>
+        <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/samplers/base/</loc>
+      </url>
+      <url>
+        <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/samplers/blackjax/ns_aw/</loc>
+      </url>
+      <url>
+        <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/samplers/blackjax/nss/</loc>
+      </url>
+      <url>
+        <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/samplers/blackjax/smc/</loc>
+      </url>
+      <url>
+        <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/samplers/config/</loc>
+      </url>
+      <url>
+        <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/samplers/flowmc/</loc>
+      </url>
+      <url>
+        <loc>https://gw-jax-team.github.io/jim/development/api/jimgw/samplers/periodic/</loc>
       </url>
 </urlset>
