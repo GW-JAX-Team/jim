@@ -2141,15 +2141,15 @@
 <p>This page gives you a bird's-eye view of Jim's main components and how they fit together. For deeper dives into each piece, see the <a href="../guides/">Guides</a>.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">¤</a></h2>
 <p>A Jim analysis is assembled from the following building blocks:</p>
-<div class="highlight"><pre><span></span><code>Waveform Model ─┐
-                ├── Likelihood ────────────────────────── 1 ──┐
-Data ───────────┘                           │                 │
-                                 Likelihood Transforms ── 2 ──│
-                                            │                 ├─→ Jim ←─ 5 ── Sampler
-                      Prior ────────────────┴──────────── 3 ──│
-                        │                                     │
-                        └───────── Sample Transforms ──── 4 ──┘
-</code></pre></div>
+<pre class="mermaid"><code>flowchart LR
+    WM[Waveform Model] &amp; D[Data] --&gt; L[Likelihood]
+    L -- 1 --&gt; J((Jim))
+    P[Prior] --&gt; LT[Likelihood Transforms]
+    LT -- 2 --&gt; J
+    P -- 3 --&gt; J
+    P --&gt; ST[Sample Transforms]
+    ST -- 4 --&gt; J
+    J &lt;-- 5 --&gt; S[Sampler]</code></pre>
 <h3 id="data">Data<a class="headerlink" href="#data" title="Permanent link">¤</a></h3>
 <p>Detector data lives in <code>Detector</code> objects. You can fetch public LIGO/Virgo strain from GWOSC, load local files, or inject a simulated signal:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">jimgw.core.single_event.detector</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_H1</span><span class="p">,</span> <span class="n">get_L1</span>
