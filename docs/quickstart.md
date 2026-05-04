@@ -17,6 +17,15 @@ flowchart LR
     P --- ST[Sample Transforms]
     ST --> J
     J <--> S[Sampler]
+
+    click WM "#waveform-model"
+    click D "#data"
+    click L "#likelihood"
+    click LT "#transforms"
+    click P "#prior"
+    click ST "#transforms"
+    click S "#sampler"
+    click J "#putting-it-together"
 ```
 
 ### Data
