@@ -10,7 +10,8 @@ A Jim analysis is assembled from the following building blocks:
 flowchart LR
     WM[Waveform Model] & D[Data] --> L[Likelihood]
     L -- 1 --> J((Jim))
-    P[Prior] --> LT[Likelihood Transforms]
+    L --> LT[Likelihood Transforms]
+    P[Prior] --> LT
     LT -- 2 --> J
     P -- 3 --> J
     P --> ST[Sample Transforms]
