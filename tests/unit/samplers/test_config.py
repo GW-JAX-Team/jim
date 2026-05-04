@@ -189,7 +189,7 @@ def test_smc_temperature_ladder_must_be_increasing():
 def test_smc_temperature_ladder_warns_ess():
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        BlackJAXSMCConfig(temperature_ladder=[0.0, 0.5, 1.0], absolute_target_ess=5000)
+        BlackJAXSMCConfig(temperature_ladder=[0.0, 0.5, 1.0], target_ess=5000)
     assert any("ESS" in str(x.message) for x in w)
 
 
@@ -201,24 +201,24 @@ def test_smc_temperature_ladder_warns_ess():
 def test_smc_default_ess_fraction():
     cfg = BlackJAXSMCConfig()
     assert cfg.target_ess_fraction == 0.9
-    assert cfg.absolute_target_ess is None
+    assert cfg.target_ess is None
 
 
 def test_smc_ess_fraction_set():
     cfg = BlackJAXSMCConfig(target_ess_fraction=0.3)
     assert cfg.target_ess_fraction == 0.3
-    assert cfg.absolute_target_ess is None
+    assert cfg.target_ess is None
 
 
 def test_smc_absolute_ess_set():
-    cfg = BlackJAXSMCConfig(absolute_target_ess=1000)
-    assert cfg.absolute_target_ess == 1000
+    cfg = BlackJAXSMCConfig(target_ess=1000)
+    assert cfg.target_ess == 1000
     assert cfg.target_ess_fraction is None
 
 
 def test_smc_both_ess_raises():
     with pytest.raises(ValidationError, match="exactly one"):
-        BlackJAXSMCConfig(target_ess_fraction=0.9, absolute_target_ess=1000)
+        BlackJAXSMCConfig(target_ess_fraction=0.9, target_ess=1000)
 
 
 def test_smc_fraction_zero_raises():
@@ -239,15 +239,15 @@ def test_smc_fraction_above_one_in_tempered_raises():
 def test_smc_absolute_ess_above_n_particles_in_tempered_raises():
     with pytest.raises(ValidationError):
         BlackJAXSMCConfig(
-            absolute_target_ess=5000, n_particles=2000, persistent_sampling=False
+            target_ess=5000, n_particles=2000, persistent_sampling=False
         )
 
 
 def test_smc_absolute_ess_above_n_particles_in_persistent_ok():
     cfg = BlackJAXSMCConfig(
-        absolute_target_ess=5000, n_particles=2000, persistent_sampling=True
+        target_ess=5000, n_particles=2000, persistent_sampling=True
     )
-    assert cfg.absolute_target_ess == 5000
+    assert cfg.target_ess == 5000
 
 
 def test_smc_fraction_warns_with_fixed_ladder():
@@ -332,5 +332,5 @@ def test_smc_resolve_target_ess_fraction():
     cfg = BlackJAXSMCConfig(target_ess_fraction=0.4)
     assert cfg._resolve_target_ess_fraction() == pytest.approx(0.4)
 
-    cfg2 = BlackJAXSMCConfig(absolute_target_ess=1000, n_particles=2000)
+    cfg2 = BlackJAXSMCConfig(target_ess=1000, n_particles=2000)
     assert cfg2._resolve_target_ess_fraction() == pytest.approx(0.5)

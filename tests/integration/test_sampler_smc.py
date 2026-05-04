@@ -28,7 +28,7 @@ def smc_jim(request):
     cfg = BlackJAXSMCConfig(
         n_particles=100,
         n_mcmc_steps_per_dim=5,
-        absolute_target_ess=50,
+        target_ess=50,
         persistent_sampling=request.param,
     )
     jim = make_gaussian_jim(cfg)

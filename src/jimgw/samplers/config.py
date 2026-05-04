@@ -268,7 +268,7 @@ class BlackJAXSMCConfig(BaseSamplerConfig):
 
     n_particles: int = 2000
     n_mcmc_steps_per_dim: int = 100
-    absolute_target_ess: Optional[int] = None
+    target_ess: Optional[int] = None
     target_ess_fraction: Optional[float] = None
     initial_cov_scale: float = 0.5
     target_acceptance_rate: float = 0.234
@@ -297,35 +297,27 @@ class BlackJAXSMCConfig(BaseSamplerConfig):
 
     @model_validator(mode="after")
     def _validate_ess_args(self) -> BlackJAXSMCConfig:
-        both_set = (
-            self.absolute_target_ess is not None
-            and self.target_ess_fraction is not None
-        )
+        both_set = self.target_ess is not None and self.target_ess_fraction is not None
         if both_set:
             raise ValueError(
-                "BlackJAXSMCConfig: set exactly one of `absolute_target_ess` or "
+                "BlackJAXSMCConfig: set exactly one of `target_ess` or "
                 "`target_ess_fraction`, not both."
             )
 
         # Apply default if neither was set.
-        if self.absolute_target_ess is None and self.target_ess_fraction is None:
+        if self.target_ess is None and self.target_ess_fraction is None:
             object.__setattr__(self, "target_ess_fraction", 0.9)
 
-        # Validate absolute_target_ess.
-        if self.absolute_target_ess is not None:
-            if self.absolute_target_ess <= 0:
+        # Validate target_ess.
+        if self.target_ess is not None:
+            if self.target_ess <= 0:
+                raise ValueError(f"target_ess must be > 0, got {self.target_ess}.")
+            if not self.persistent_sampling and self.target_ess > self.n_particles:
                 raise ValueError(
-                    f"absolute_target_ess must be > 0, got {self.absolute_target_ess}."
-                )
-            if (
-                not self.persistent_sampling
-                and self.absolute_target_ess > self.n_particles
-            ):
-                raise ValueError(
-                    f"absolute_target_ess ({self.absolute_target_ess}) > n_particles "
+                    f"target_ess ({self.target_ess}) > n_particles "
                     f"({self.n_particles}) is not valid when persistent_sampling=False; "
                     "the ESS cannot exceed the number of particles. "
-                    "Set persistent_sampling=True or lower absolute_target_ess."
+                    "Set persistent_sampling=True or lower target_ess."
                 )
 
         # Validate target_ess_fraction.
@@ -343,7 +335,7 @@ class BlackJAXSMCConfig(BaseSamplerConfig):
 
         # Warn if a fixed temperature ladder is given alongside an ESS target.
         if self.temperature_ladder is not None and (
-            "absolute_target_ess" in self.model_fields_set
+            "target_ess" in self.model_fields_set
             or "target_ess_fraction" in self.model_fields_set
         ):
             warnings.warn(
@@ -358,8 +350,8 @@ class BlackJAXSMCConfig(BaseSamplerConfig):
         """Return the ESS target as a fraction of n_particles."""
         if self.target_ess_fraction is not None:
             return self.target_ess_fraction
-        assert self.absolute_target_ess is not None
-        return self.absolute_target_ess / self.n_particles
+        assert self.target_ess is not None
+        return self.target_ess / self.n_particles
 
 
 SamplerConfig = Annotated[

@@ -106,7 +106,7 @@ jim = Jim(
     sampler_config=BlackJAXSMCConfig(
         n_particles=2000,
         n_mcmc_steps_per_dim=100,
-        absolute_target_ess=10_000,
+        target_ess=10_000,
         periodic={
             "phase_c": (0.0, 2 * float(jnp.pi)),
             "psi": (0.0, float(jnp.pi)),

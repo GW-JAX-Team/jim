@@ -97,9 +97,9 @@ Key parameters:
 - `n_particles` — particle ensemble size.
 - `n_mcmc_steps_per_dim` — MCMC steps per dimension at each temperature step.
 - `target_ess_fraction` — target ESS as a fraction of `n_particles` (default `0.9`). The algorithm advances the temperature when the fraction of effectively contributing particles hits this threshold.  Values in `(0, 1]` are valid when `persistent_sampling=False`; persistent sampling may exceed `1.0` because particles are recycled across steps.  Only used with adaptive temperature selection (no effect with a fixed `temperature_ladder`).
-- `absolute_target_ess` — target ESS as an absolute particle count. `target_ess_fraction` and `absolute_target_ess` are mutually exclusive; set one or the other, not both. When `persistent_sampling=False`, must be `<= n_particles`.
+- `target_ess` — target ESS as an absolute particle count. `target_ess_fraction` and `target_ess` are mutually exclusive; set one or the other, not both. When `persistent_sampling=False`, must be `<= n_particles`.
 - `persistent_sampling` — whether to retain particles from all temperature steps (default `True`).
-- `temperature_ladder` — explicit temperature schedule. If given, the sampler advances through this fixed ladder and ignores `target_ess_fraction` and `absolute_target_ess`.
+- `temperature_ladder` — explicit temperature schedule. If given, the sampler advances through this fixed ladder and ignores `target_ess_fraction` and `target_ess`.
 
 **Repository:** [blackjax-devs/blackjax](https://github.com/blackjax-devs/blackjax)
 
