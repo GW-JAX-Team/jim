@@ -6,15 +6,16 @@ This page gives you a bird's-eye view of Jim's main components and how they fit 
 
 A Jim analysis is assembled from the following building blocks:
 
-```text
-Waveform Model ─┐
-                ├── Likelihood ────────────────────────── 1 ──┐
-Data ───────────┘                           │                 │
-                                 Likelihood Transforms ── 2 ──│
-                                            │                 ├─→ Jim ←─ 5 ── Sampler
-                      Prior ────────────────┴──────────── 3 ──│
-                        │                                     │
-                        └───────── Sample Transforms ──── 4 ──┘
+```mermaid
+flowchart LR
+    WM[Waveform Model] & D[Data] --> L[Likelihood]
+    L -- 1 --> J((Jim))
+    P[Prior] --> LT[Likelihood Transforms]
+    LT -- 2 --> J
+    P -- 3 --> J
+    P --> ST[Sample Transforms]
+    ST -- 4 --> J
+    J <-- 5 --> S[Sampler]
 ```
 
 ### Data
