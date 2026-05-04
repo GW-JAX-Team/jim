@@ -316,7 +316,7 @@ class Jim:
 
     def add_name(self, x: Float[Array, " n_dims"]) -> dict[str, Float]:
         """Convert a flat sampling-space array to a named dict."""
-        return dict(zip(self.parameter_names, x))
+        return dict(zip(self.parameter_names, x, strict=True))
 
     def evaluate_prior(self, params: Float[Array, " n_dims"]) -> Float:
         """Log-prior in the sampling space (with Jacobian corrections from sample_transforms)."""

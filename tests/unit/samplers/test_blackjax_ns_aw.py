@@ -50,11 +50,11 @@ def _make_sampler(n_live: int = 200) -> BlackJAXNSAWSampler:
     parameter_names = prior.parameter_names  # ("x", "y")
 
     def log_prior_fn(arr):
-        named = dict(zip(parameter_names, arr))
+        named = dict(zip(parameter_names, arr, strict=True))
         return prior.log_prob(named)
 
     def log_likelihood_fn(arr):
-        named = dict(zip(parameter_names, arr))
+        named = dict(zip(parameter_names, arr, strict=True))
         return likelihood.evaluate(named, {})
 
     def log_posterior_fn(arr):

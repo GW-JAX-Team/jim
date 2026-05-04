@@ -333,7 +333,7 @@ class MySampler(Sampler):
 
     def __init__(self, *, n_dims, log_prior_fn, log_likelihood_fn,
                  log_posterior_fn, config: Optional[MyConfig] = None,
-                 parameter_names=()):
+                 parameter_names=(), periodic=None):
         if config is None:
             config = MyConfig()
         super().__init__(n_dims=n_dims, log_prior_fn=log_prior_fn,

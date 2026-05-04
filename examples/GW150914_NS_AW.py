@@ -238,7 +238,7 @@ parameter_labels = {
     "s2_z": r"$s_{2,z}$",
     "iota": r"$\iota$",
     "d_L": r"$d_L\,[\mathrm{Mpc}]$",
-    "t_c": r"$t_c\,[\mathrm{s}]$",
+    "t_det": r"$t_{\mathrm{det}}\,[\mathrm{s}]$",
     "phase_c": r"$\phi_c$",
     "psi": r"$\psi$",
     "ra": r"$\alpha$",

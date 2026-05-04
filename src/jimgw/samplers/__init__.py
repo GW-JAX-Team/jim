@@ -52,6 +52,11 @@ def register_sampler(type_str: str, lazy_loader: Callable[[], SamplerBuilder]) -
     dispatches to this type — this is how we defer BlackJAX imports until
     someone actually asks for a BlackJAX sampler.
     """
+    if type_str in _REGISTRY:
+        raise ValueError(
+            f"Sampler type {type_str!r} is already registered. "
+            "Use a unique type string or remove the existing registration."
+        )
     _REGISTRY[type_str] = lazy_loader
 
 

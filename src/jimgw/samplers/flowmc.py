@@ -236,15 +236,15 @@ class FlowMCSampler(Sampler):
             )
         resources = self._flowmc_sampler.resources
 
-        prod_positions = resources["positions_production"].data  # type: ignore[union-attr]  # flowMC stubs
-        prod_positions = np.array(prod_positions.reshape(-1, self.n_dims))
-        pos_jnp = jnp.array(prod_positions)
+        pos_raw = resources["positions_production"].data  # type: ignore[union-attr]  # flowMC stubs
+        pos_jnp = jnp.array(pos_raw).reshape(-1, self.n_dims)
 
         log_posterior = np.array(
             resources["log_prob_production"].data  # type: ignore[union-attr]  # flowMC stubs
         ).reshape(-1)
         log_prior = np.array(jax.vmap(self._log_prior_fn)(pos_jnp))
         log_likelihood = log_posterior - log_prior
+        prod_positions = np.array(pos_jnp)
 
         return {"samples": prod_positions, "log_likelihood": log_likelihood}
 

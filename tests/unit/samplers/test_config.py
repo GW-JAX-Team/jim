@@ -1,10 +1,10 @@
 import warnings
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
 from jimgw.samplers.config import (
-    BaseSamplerConfig,
     BlackJAXNSAWConfig,
     BlackJAXNSSConfig,
     BlackJAXSMCConfig,
@@ -262,8 +262,6 @@ def test_smc_fraction_warns_with_fixed_ladder():
 # ---------------------------------------------------------------------------
 # C: New kernel sub-config features (array step sizes, condition_matrix)
 # ---------------------------------------------------------------------------
-
-import numpy as np
 
 
 def test_mala_step_size_scalar():

@@ -588,20 +588,19 @@ class TestJimPeriodic:
         assert jim.sampler._periodic_index_dict == {1: (0.0, 6.2832)}
 
     def test_periodic_list_valid_names_constructs(self):
-        """Jim(periodic=list) resolves known names to indices (NS-AW style list→int)."""
+        """Jim(periodic=dict) with FlowMCSampler stores a dict-shaped periodic config."""
         from jimgw.samplers.flowmc import FlowMCSampler
 
         jim = Jim(
             likelihood=self._make_likelihood(),
             prior=self._make_prior(),
             sampler_config=_tiny_flowmc_config(),
-            periodic=["phase"],
+            periodic={"phase": (0.0, 6.2832)},
         )
-        # FlowMC gets a dict; an index-list periodic would have been for NS-AW.
-        # Here Jim converts list→list[int]; FlowMCSampler stores it directly.
-        # Since FlowMC expects a dict, passing a list is technically a mismatch —
-        # Jim correctly resolves names → indices. Just assert construction succeeds.
+        # FlowMCSampler requires dict[int, (lo, hi)]; phase is index 1.
         assert isinstance(jim.sampler, FlowMCSampler)
+        assert isinstance(jim.sampler._periodic_index_dict, dict)
+        assert jim.sampler._periodic_index_dict == {1: (0.0, 6.2832)}
 
     def test_periodic_dict_unknown_name_raises(self):
         """Jim(periodic=dict) with unknown name raises ValueError."""
