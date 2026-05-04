@@ -37,7 +37,6 @@ class BlackJAXNSSSampler(Sampler):
 
     _config: BlackJAXNSSConfig
     _stepper_fn: Callable
-    _sampled: bool
     _final_state: Any
     _nested_samples: NestedSamples
     _n_iterations: int
@@ -61,11 +60,9 @@ class BlackJAXNSSSampler(Sampler):
             log_posterior_fn=log_posterior_fn,
             config=config,
         )
-        self._config = config
         self._stepper_fn = to_prior_space_stepper(config.periodic, parameter_names)
-        self._sampled = False
 
-    def sample(
+    def _sample(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n_live n_dims"],
@@ -133,7 +130,6 @@ class BlackJAXNSSSampler(Sampler):
             logzero=np.nan,
             dtype=np.float64,
         )
-        self._sampled = True
 
     def get_samples(self) -> dict[str, np.ndarray]:
         """Return equally-weighted posterior samples via anesthetic's ``posterior_points``.
@@ -153,7 +149,7 @@ class BlackJAXNSSSampler(Sampler):
         log_L = np.asarray(posterior["logL"])
         return {"samples": samples, "log_likelihood": log_L}
 
-    def get_diagnostics(self) -> dict[str, Any]:
+    def _get_diagnostics(self) -> dict[str, Any]:
         """Return NSS run diagnostics.
 
         Returns a dict with the following keys:

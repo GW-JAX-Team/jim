@@ -143,6 +143,8 @@ def test_smc_ap_diagnostics():
     assert float(diag["tempering_schedule"][-1]) == pytest.approx(1.0, abs=1e-6)
     assert "log_Z" in diag
     assert np.isfinite(diag["log_Z"])
+    assert "sampling_time" in diag
+    assert diag["sampling_time"] >= 0.0
 
 
 def test_smc_n_evals_formula():

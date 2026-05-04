@@ -55,7 +55,6 @@ class BlackJAXSMCSampler(Sampler):
 
     _config: BlackJAXSMCConfig
     _displacement_wrapper: Callable
-    _sampled: bool
     _final_state: Any
     # Mode tag set in sample() so get_samples() / get_diagnostics() know which path was taken.
     _mode: str  # "ap" | "fp" | "at" | "ft"
@@ -89,11 +88,9 @@ class BlackJAXSMCSampler(Sampler):
             log_posterior_fn=log_posterior_fn,
             config=config,
         )
-        self._config = config
         self._displacement_wrapper = to_displacement_wrapper(
             config.periodic, parameter_names
         )
-        self._sampled = False
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -336,7 +333,7 @@ class BlackJAXSMCSampler(Sampler):
     # Public API
     # ------------------------------------------------------------------
 
-    def sample(
+    def _sample(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n_particles n_dims"],
@@ -374,8 +371,6 @@ class BlackJAXSMCSampler(Sampler):
         else:
             assert ladder is not None
             self._run_fixed_tempered(rng_key, initial_particles, ladder)
-
-        self._sampled = True
 
     def get_samples(self) -> dict[str, np.ndarray]:
         """Return posterior samples.
@@ -448,7 +443,7 @@ class BlackJAXSMCSampler(Sampler):
             )
             return {"samples": final_particles, "log_likelihood": log_likelihoods}
 
-    def get_diagnostics(self) -> dict[str, Any]:
+    def _get_diagnostics(self) -> dict[str, Any]:
         """Return SMC run diagnostics.
 
         Returns a dict with the following keys (not all present for all modes):

@@ -54,7 +54,6 @@ class FlowMCSampler(Sampler):
     _config: FlowMCConfig
     _periodic_index_dict: Optional[dict]
     _flowmc_sampler: Optional[FlowMCSamplerBackend]
-    _sampled: bool
 
     def __init__(
         self,
@@ -63,9 +62,11 @@ class FlowMCSampler(Sampler):
         log_prior_fn: Callable,
         log_likelihood_fn: Callable,
         log_posterior_fn: Callable,
-        config: FlowMCConfig = FlowMCConfig(),
+        config: Optional[FlowMCConfig] = None,
         parameter_names: Sequence[str] = (),
     ) -> None:
+        if config is None:
+            config = FlowMCConfig()
         super().__init__(
             n_dims=n_dims,
             log_prior_fn=log_prior_fn,
@@ -73,10 +74,8 @@ class FlowMCSampler(Sampler):
             log_posterior_fn=log_posterior_fn,
             config=config,
         )
-        self._config = config
         self._periodic_index_dict = to_index_dict(config.periodic, parameter_names)
         self._flowmc_sampler = None
-        self._sampled = False
 
         # Pre-compute strategy order for use before sampling.
         order = ["local_sampler", "normalizing_flow"]
@@ -100,7 +99,7 @@ class FlowMCSampler(Sampler):
                 return order
         return self._strategy_order_from_config
 
-    def sample(
+    def _sample(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n_chains n_dims"],
@@ -206,7 +205,6 @@ class FlowMCSampler(Sampler):
 
         self._flowmc_sampler.rng_key = rng_key
         self._flowmc_sampler.sample(initial_position, {})
-        self._sampled = True
 
     def get_samples(self) -> dict[str, np.ndarray]:
         """Return all production samples with their log-likelihoods.
@@ -239,7 +237,7 @@ class FlowMCSampler(Sampler):
 
         return {"samples": prod_positions, "log_likelihood": log_likelihood}
 
-    def get_diagnostics(self) -> dict[str, Any]:
+    def _get_diagnostics(self) -> dict[str, Any]:
         """Return flowMC run diagnostics.
 
         Returns a dict with the following keys:

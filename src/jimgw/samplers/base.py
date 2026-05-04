@@ -13,6 +13,7 @@ named prior-space dict via [`Jim.get_samples`][jimgw.core.jim.Jim.get_samples].
 
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
@@ -38,6 +39,8 @@ class Sampler(ABC):
     """
 
     n_dims: int
+    _sampled: bool
+    _sampling_time: float
 
     def __init__(
         self,
@@ -52,14 +55,16 @@ class Sampler(ABC):
         self._log_prior_fn = log_prior_fn
         self._log_likelihood_fn = log_likelihood_fn
         self._log_posterior_fn = log_posterior_fn
+        self._config = config
+        self._sampled = False
+        self._sampling_time = 0.0
 
-    @abstractmethod
     def sample(
         self,
         rng_key: Key,
         initial_position: Float[Array, "n n_dims"],
     ) -> None:
-        """Run the sampler.
+        """Run the sampler and record wall-clock sampling time.
 
         Args:
             rng_key: JAX PRNG key.
@@ -68,6 +73,18 @@ class Sampler(ABC):
                 backend (``n_chains`` for flowMC, ``n_live`` for NS,
                 ``n_particles`` for SMC).
         """
+        t0 = time.perf_counter()
+        self._sample(rng_key, initial_position)
+        self._sampling_time = time.perf_counter() - t0
+        self._sampled = True
+
+    @abstractmethod
+    def _sample(
+        self,
+        rng_key: Key,
+        initial_position: Float[Array, "n n_dims"],
+    ) -> None:
+        """Backend-specific sampling implementation."""
 
     @abstractmethod
     def get_samples(self) -> dict[str, np.ndarray]:
@@ -87,9 +104,17 @@ class Sampler(ABC):
         Only valid after `sample` has been called.
         """
 
-    @abstractmethod
     def get_diagnostics(self) -> dict[str, Any]:
         """Return run-level diagnostics.
 
         Only valid after `sample` has been called.
         """
+        if not self._sampled:
+            raise RuntimeError("get_diagnostics() called before sample()")
+        result = self._get_diagnostics()
+        result["sampling_time"] = self._sampling_time
+        return result
+
+    @abstractmethod
+    def _get_diagnostics(self) -> dict[str, Any]:
+        """Backend-specific diagnostics implementation."""

@@ -33,7 +33,7 @@ def _make_callables(n_dims: int = 1):
 class _TrivialSampler(Sampler):
     """Minimal concrete Sampler for ABC contract tests."""
 
-    def sample(self, rng_key, initial_position) -> None:  # noqa: ARG002
+    def _sample(self, rng_key, initial_position) -> None:  # noqa: ARG002
         self._ran = True
 
     def get_samples(self) -> dict[str, np.ndarray]:
@@ -42,7 +42,7 @@ class _TrivialSampler(Sampler):
             "log_likelihood": np.zeros(3),
         }
 
-    def get_diagnostics(self) -> dict[str, Any]:
+    def _get_diagnostics(self) -> dict[str, Any]:
         return {"n_likelihood_evaluations": 0}
 
 
@@ -85,9 +85,39 @@ def test_trivial_sampler_get_diagnostics_returns_dict():
         log_posterior_fn=lpost,
         config=BaseSamplerConfig(),
     )
+    s.sample(jax.random.key(0), jnp.zeros((3, 1)))
     diag = s.get_diagnostics()
     assert isinstance(diag, dict)
     assert "n_likelihood_evaluations" in diag
+    assert "sampling_time" in diag
+    assert diag["sampling_time"] >= 0.0
+
+
+def test_get_diagnostics_before_sample_raises():
+    lp, ll, lpost = _make_callables(n_dims=1)
+    s = _TrivialSampler(
+        n_dims=1,
+        log_prior_fn=lp,
+        log_likelihood_fn=ll,
+        log_posterior_fn=lpost,
+        config=BaseSamplerConfig(),
+    )
+    with pytest.raises(RuntimeError, match="before sample"):
+        s.get_diagnostics()
+
+
+def test_sampling_time_is_non_negative():
+    lp, ll, lpost = _make_callables(n_dims=2)
+    s = _TrivialSampler(
+        n_dims=2,
+        log_prior_fn=lp,
+        log_likelihood_fn=ll,
+        log_posterior_fn=lpost,
+        config=BaseSamplerConfig(),
+    )
+    s.sample(jax.random.key(0), jnp.zeros((3, 2)))
+    diag = s.get_diagnostics()
+    assert diag["sampling_time"] >= 0.0
 
 
 # --- Callable injection ---

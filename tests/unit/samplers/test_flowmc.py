@@ -132,3 +132,5 @@ def test_flowmc_diagnostics():
     assert diag["acceptance_training_global"] is not None
     assert diag["acceptance_production_local"] is not None
     assert diag["acceptance_production_global"] is not None
+    assert "sampling_time" in diag
+    assert diag["sampling_time"] >= 0.0

@@ -149,3 +149,5 @@ def test_ns_aw_diagnostics():
     assert "log_Z" in diag
     assert "log_Z_error" in diag
     assert np.isfinite(diag["log_Z"])
+    assert "sampling_time" in diag
+    assert diag["sampling_time"] >= 0.0

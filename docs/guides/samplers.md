@@ -269,7 +269,8 @@ samples = jim.get_samples(n_samples=2000)
 ```python
 diag = jim.get_diagnostics()
 
-diag["n_likelihood_evaluations"]  # int — total number of likelihood calls
+diag["n_likelihood_evaluations"]  # int   — total number of likelihood calls
+diag["sampling_time"]             # float — wall-clock sampling time in seconds
 ```
 
 Backend-specific keys:
@@ -308,12 +309,14 @@ diag["log_Z"]                     # float      — final log Bayesian evidence
 
 Subclass `Sampler`, implement three methods, and register it:
 
-- `sample(rng_key, initial_position)` — run the sampler and store results.
+- `_sample(rng_key, initial_position)` — run the sampler and store results. The
+  base class wraps this in `sample()`, which also records `sampling_time`.
 - `get_samples()` — return a dict with `"samples"` and `"log_likelihood"` keys.
-- `get_diagnostics()` — return a plain dict with diagnostic information.
+- `_get_diagnostics()` — return a plain dict with diagnostic information.
+  The base class wraps this in `get_diagnostics()`, which injects `sampling_time`.
 
 ```python
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 import numpy as np
 from jimgw.samplers import register_sampler
 from jimgw.samplers.base import Sampler
@@ -326,15 +329,19 @@ class MyConfig(BaseSamplerConfig):
 
 
 class MySampler(Sampler):
+    _config: MyConfig
+
     def __init__(self, *, n_dims, log_prior_fn, log_likelihood_fn,
-                 log_posterior_fn, config=MyConfig(), parameter_names=()):
+                 log_posterior_fn, config: Optional[MyConfig] = None,
+                 parameter_names=()):
+        if config is None:
+            config = MyConfig()
         super().__init__(n_dims=n_dims, log_prior_fn=log_prior_fn,
                          log_likelihood_fn=log_likelihood_fn,
                          log_posterior_fn=log_posterior_fn, config=config)
-        self._config = config
         self._result = None
 
-    def sample(self, rng_key, initial_position) -> None:
+    def _sample(self, rng_key, initial_position) -> None:
         # initial_position: shape (n_chains, n_dims), drawn from the prior by Jim.
         # ... run your sampler for self._config.n_steps steps ...
         self._result = np.asarray(initial_position)
@@ -347,7 +354,7 @@ class MySampler(Sampler):
             "log_likelihood": np.zeros(self._result.shape[0]),
         }
 
-    def get_diagnostics(self) -> dict[str, Any]:
+    def _get_diagnostics(self) -> dict[str, Any]:
         if self._result is None:
             raise RuntimeError("call sample() first")
         return {
