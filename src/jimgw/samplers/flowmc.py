@@ -94,10 +94,10 @@ class FlowMCSampler(Sampler):
         self._strategy_order_from_config: list[str] = order
 
     # flowMC expects callables with signature (params, data) -> Float.
-    def _logpdf_flowmc(self, params: Float[Array, " n_dims"], _data: dict) -> Float:
+    def _logpdf_flowmc(self, params: Float[Array, " n_dims"], _data: dict) -> Float:  # noqa: F722
         return self._log_posterior_fn(params)
 
-    def _logprior_flowmc(self, params: Float[Array, " n_dims"], _data: dict) -> Float:
+    def _logprior_flowmc(self, params: Float[Array, " n_dims"], _data: dict) -> Float:  # noqa: F722
         return self._log_prior_fn(params)
 
     @property

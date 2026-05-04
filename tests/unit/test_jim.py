@@ -202,7 +202,7 @@ class TestGetSamples:
         assert "q" in samples
         assert "M_c_unbounded" not in samples
         assert "log_likelihood" in samples
-        for key, val in samples.items():
+        for val in samples.values():
             assert isinstance(val, np.ndarray)
             assert_all_finite(val)
 
@@ -587,20 +587,15 @@ class TestJimPeriodic:
         # FlowMCSampler stores the index-keyed dict; phase is index 1.
         assert jim.sampler._periodic_index_dict == {1: (0.0, 6.2832)}
 
-    def test_periodic_list_valid_names_constructs(self):
-        """Jim(periodic=dict) with FlowMCSampler stores a dict-shaped periodic config."""
-        from jimgw.samplers.flowmc import FlowMCSampler
-
-        jim = Jim(
-            likelihood=self._make_likelihood(),
-            prior=self._make_prior(),
-            sampler_config=_tiny_flowmc_config(),
-            periodic={"phase": (0.0, 6.2832)},
-        )
-        # FlowMCSampler requires dict[int, (lo, hi)]; phase is index 1.
-        assert isinstance(jim.sampler, FlowMCSampler)
-        assert isinstance(jim.sampler._periodic_index_dict, dict)
-        assert jim.sampler._periodic_index_dict == {1: (0.0, 6.2832)}
+    def test_periodic_list_raises_for_non_nsaw(self):
+        """Jim(periodic=list) with a FlowMCSampler raises because list-form has no bounds."""
+        with pytest.raises(ValueError, match="List-form periodic"):
+            Jim(
+                likelihood=self._make_likelihood(),
+                prior=self._make_prior(),
+                sampler_config=_tiny_flowmc_config(),
+                periodic=["phase"],
+            )
 
     def test_periodic_dict_unknown_name_raises(self):
         """Jim(periodic=dict) with unknown name raises ValueError."""

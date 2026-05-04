@@ -33,6 +33,14 @@ def _build_masks_arrays(
     period = jnp.ones(n_dims)
 
     for i, (lo, hi) in periodic_index.items():
+        if not isinstance(i, int):
+            raise TypeError(
+                f"periodic_index keys must be integers, got {type(i).__name__!r} for key {i!r}."
+            )
+        if i < 0 or i >= n_dims:
+            raise ValueError(
+                f"periodic_index key {i} is out of bounds for n_dims={n_dims}."
+            )
         lo_f, hi_f = float(lo), float(hi)
         if not jnp.isfinite(lo_f) or not jnp.isfinite(hi_f):
             raise ValueError(
@@ -63,6 +71,14 @@ def to_unit_cube_stepper(
     """
     mask = jnp.zeros(n_dims, dtype=bool)
     for i in periodic_index or []:
+        if not isinstance(i, int):
+            raise TypeError(
+                f"periodic_index entries must be integers, got {type(i).__name__!r} for {i!r}."
+            )
+        if i < 0 or i >= n_dims:
+            raise ValueError(
+                f"periodic_index entry {i} is out of bounds for n_dims={n_dims}."
+            )
         mask = mask.at[i].set(True)
 
     def stepper(

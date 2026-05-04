@@ -98,7 +98,14 @@ class Jim:
                 )
 
             if isinstance(periodic, list):
-                # NS-AW style: list[str] → list[int]
+                # NS-AW style: list[str] → list[int].
+                if periodic and sampler_config.type != "blackjax-ns-aw":
+                    raise ValueError(
+                        "List-form periodic (names without bounds) is only supported for "
+                        "the 'blackjax-ns-aw' sampler. For other samplers pass a dict "
+                        "mapping parameter names to (lo, hi) bounds, e.g. "
+                        '{"phase_c": (0.0, 6.2832)}.'
+                    )
                 periodic_resolved = [names.index(n) for n in periodic]
             elif isinstance(periodic, dict):
                 # dict[str, (lo, hi)] → dict[int, (lo, hi)]

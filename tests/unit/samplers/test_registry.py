@@ -26,7 +26,7 @@ def _make_callables(prior):
     names = prior.parameter_names
 
     def log_prior_fn(arr):
-        named = dict(zip(names, arr))
+        named = dict(zip(names, arr, strict=True))
         return prior.log_prob(named)
 
     def log_likelihood_fn(arr):
