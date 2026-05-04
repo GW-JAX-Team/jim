@@ -67,14 +67,25 @@ All transforms are importable from `jimgw.core.single_event.transforms`.
 
 ### Mass transforms
 
+Transforms marked *pre-instantiated* are ready-to-use objects exported directly
+from the module — use them **without parentheses** in your transform lists:
+
+```python
+# Correct:
+likelihood_transforms = [MassRatioToSymmetricMassRatioTransform]
+
+# Wrong — do not call it:
+likelihood_transforms = [MassRatioToSymmetricMassRatioTransform()]  # TypeError
+```
+
 | Transform | Mapping | Notes |
 | --- | --- | --- |
-| `MassRatioToSymmetricMassRatioTransform` | `q → eta` | Module-level instance |
-| `SymmetricMassRatioToMassRatioTransform` | `eta → q` | Module-level instance |
-| `ComponentMassesToChirpMassMassRatioTransform` | `(m1, m2) → (M_c, q)` | Module-level instance |
-| `ComponentMassesToChirpMassSymmetricMassRatioTransform` | `(m1, m2) → (M_c, eta)` | Module-level instance |
-| `ChirpMassMassRatioToComponentMassesTransform` | `(M_c, q) → (m1, m2)` | Module-level instance |
-| `ChirpMassSymmetricMassRatioToComponentMassesTransform` | `(M_c, eta) → (m1, m2)` | Module-level instance |
+| `MassRatioToSymmetricMassRatioTransform` | `q → eta` | Pre-instantiated |
+| `SymmetricMassRatioToMassRatioTransform` | `eta → q` | Pre-instantiated |
+| `ComponentMassesToChirpMassMassRatioTransform` | `(m1, m2) → (M_c, q)` | Pre-instantiated |
+| `ComponentMassesToChirpMassSymmetricMassRatioTransform` | `(m1, m2) → (M_c, eta)` | Pre-instantiated |
+| `ChirpMassMassRatioToComponentMassesTransform` | `(M_c, q) → (m1, m2)` | Pre-instantiated |
+| `ChirpMassSymmetricMassRatioToComponentMassesTransform` | `(M_c, eta) → (m1, m2)` | Pre-instantiated |
 
 ### Spin transforms
 
@@ -92,19 +103,107 @@ All transforms are importable from `jimgw.core.single_event.transforms`.
 | `GeocentricArrivalPhaseToDetectorArrivalPhaseTransform(trigger_time, ifo)` | `phase_c → phase_det` | Conditional on ra, dec, psi, iota. Assumes dominant quadrupolar mode only ([arXiv:2207.03508](https://arxiv.org/abs/2207.03508)); **not valid** for waveforms with higher harmonics or precession. |
 | `DistanceToSNRWeightedDistanceTransform` | `d_L → d_hat` | SNR-weighted distance parameterisation ([arXiv:2207.03508](https://arxiv.org/abs/2207.03508)). Assumes dominant quadrupolar mode only; **not valid** for waveforms with higher harmonics or precession. |
 
+## Mapping a prior to the unit cube (for NS-AW)
+
+The [BlackJAX NS-AW sampler](samplers.md#blackjax-ns-aw) requires the
+**sampling space** to be the unit hypercube `[0, 1]^n_dims`, with a uniform
+prior in the original parameter space.  The `sample_transforms` must map every
+parameter from its physical support into `[0, 1]`.
+
+The key tool is `BoundToBound`, which linearly maps `[a, b] → [c, d]`:
+
+```python
+from jimgw.core.transforms import BoundToBound
+
+# Map chirp mass M_c ∈ [20, 80] to [0, 1]:
+BoundToBound(
+    name_mapping=(["M_c"], ["M_c_unit"]),
+    original_lower_bound=20.0,
+    original_upper_bound=80.0,
+    target_lower_bound=0.0,
+    target_upper_bound=1.0,
+)
+```
+
+### Parameters with bounded physical range
+
+Apply `BoundToBound` directly from the prior support to `[0, 1]`:
+
+```python
+sample_transforms = [
+    BoundToBound(name_mapping=(["M_c"], ["M_c_unit"]), original_lower_bound=M_c_min, original_upper_bound=M_c_max, target_lower_bound=0.0, target_upper_bound=1.0),
+    BoundToBound(name_mapping=(["q"], ["q_unit"]),     original_lower_bound=q_min,   original_upper_bound=q_max,   target_lower_bound=0.0, target_upper_bound=1.0),
+    # ... repeat for each bounded parameter
+]
+```
+
+### Angular parameters (sine / cosine priors)
+
+Angular parameters must be trigonometrically transformed first:
+
+```python
+from jimgw.core.transforms import CosineTransform, SineTransform
+
+sample_transforms += [
+    CosineTransform(name_mapping=(["iota"], ["cos_iota"])),
+    BoundToBound(name_mapping=(["cos_iota"], ["cos_iota_unit"]), original_lower_bound=-1.0, original_upper_bound=1.0, target_lower_bound=0.0, target_upper_bound=1.0),
+
+    SineTransform(name_mapping=(["dec"], ["sin_dec"])),
+    BoundToBound(name_mapping=(["sin_dec"], ["sin_dec_unit"]), original_lower_bound=-1.0, original_upper_bound=1.0, target_lower_bound=0.0, target_upper_bound=1.0),
+]
+```
+
+### Power-law priors (e.g. luminosity distance)
+
+For parameters with a power-law prior (not uniform), use the reversed
+`PowerLawTransform` so the sampling space is uniform on `[0, 1]`:
+
+```python
+from jimgw.core.transforms import PowerLawTransform, reverse_bijective_transform
+
+sample_transforms += [
+    reverse_bijective_transform(
+        PowerLawTransform(
+            name_mapping=(["d_L_unit"], ["d_L"]),
+            xmin=d_L_min,
+            xmax=d_L_max,
+            alpha=2.0,
+        )
+    ),
+]
+```
+
+This maps `d_L_unit ∈ [0, 1]` (where the sampler works) back to
+`d_L ∈ [d_L_min, d_L_max]` with a `d_L^2` prior, which is the volume-element
+prior for a uniformly distributed source population.
+
+### Periodic parameters
+
+NS-AW wraps the `periodic` list of parameter names in the unit cube:
+
+```python
+from jimgw.samplers.config import BlackJAXNSAWConfig
+
+config = BlackJAXNSAWConfig(
+    n_live=1000,
+    periodic=["ra_unit", "phase_c_unit"],  # names in sampling space
+)
+```
+
 ## Passing Transforms to Jim
 
 Both lists are passed to the `Jim` constructor:
 
 ```python
 from jimgw.core.jim import Jim
+from jimgw.samplers.config import FlowMCConfig
 
 jim = Jim(
     likelihood=likelihood,
     prior=prior,
+    sampler_config=FlowMCConfig(),
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    ...
 )
 ```
 

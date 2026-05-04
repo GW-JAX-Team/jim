@@ -1,9 +1,12 @@
 import jax
 import jax.numpy as jnp
+import pytest
 import scipy.stats as stats
 
+from jimgw.core.jim import Jim
 from jimgw.core.prior import (
     LogisticDistribution,
+    Prior,
     StandardNormalDistribution,
     UniformDistribution,
     UniformPrior,
@@ -16,6 +19,7 @@ from jimgw.core.prior import (
     BoundedMixin,
     SequentialTransformPrior,
 )
+from jimgw.samplers.config import BlackJAXNSSConfig, BlackJAXSMCConfig
 from tests.utils import assert_all_finite, assert_all_in_range
 
 jax.config.update("jax_enable_x64", True)
@@ -356,3 +360,39 @@ class TestOther:
         logp = jax.vmap(p.log_prob)(x)
         jitted_logp = jax.jit(jax.vmap(p.log_prob))(x)
         assert jnp.allclose(logp, jitted_logp)
+
+        assert p.is_normalized is False
+
+    def test_custom_prior_is_normalized_defaults_to_false(self):
+        """A custom Prior subclass without is_normalized override returns False."""
+
+        class MyPrior(Prior):
+            def log_prob(self, z):  # noqa: ARG002
+                return jnp.array(0.0)
+
+            def sample(self, rng_key, n_samples):  # noqa: ARG002
+                return {"x": jnp.zeros(n_samples)}
+
+        assert MyPrior(("x",)).is_normalized is False
+
+    def test_unnormalized_prior_raises_for_evidence_samplers(self):
+        """Jim raises ValueError at construction when an unnormalized prior is paired with NSS or SMC."""
+
+        class MyPrior(Prior):
+            def log_prob(self, z):  # noqa: ARG002
+                return jnp.array(0.0)
+
+            def sample(self, rng_key, n_samples):  # noqa: ARG002
+                return {"x": jnp.zeros(n_samples)}
+
+        class MockLikelihood:
+            def evaluate(self, params, data):  # noqa: ARG002
+                return jnp.array(0.0)
+
+        prior = MyPrior(("x",))
+        lh = MockLikelihood()
+
+        with pytest.raises(ValueError, match="normalized prior"):
+            Jim(likelihood=lh, prior=prior, sampler_config=BlackJAXNSSConfig())  # type: ignore[arg-type]
+        with pytest.raises(ValueError, match="normalized prior"):
+            Jim(likelihood=lh, prior=prior, sampler_config=BlackJAXSMCConfig())  # type: ignore[arg-type]

@@ -1,19 +1,20 @@
 # Quick Start
 
-This page gives you a bird's-eye view of Jim's main components and how they fit together. For deeper dives into each piece, see the [Tutorials](tutorials/index.md).
+This page gives you a bird's-eye view of Jim's main components and how they fit together. For deeper dives into each piece, see the [Guides](guides/index.md).
 
 ## Overview
 
 A Jim analysis is assembled from the following building blocks:
 
 ```text
-Waveform Model ── Likelihood ───────────────┬──────────── 1 ──┐
-                      │                     │                 │
-Data ─────────────────┘          Likelihood Transforms ── 2 ──│
-                                            │                 ├─→ Jim 
-                    Prior ──────────────────┴──────────── 3 ──│
-                      │                                       │
-                      └─────────── Sample Transforms ──── 4 ──┘
+Waveform Model ─┐
+                ├── Likelihood ────────────────────────── 1 ──┐
+Data ───────────┘                           │                 │
+                                 Likelihood Transforms ── 2 ──│
+                                            │                 ├─→ Jim ←─ 5 ── Sampler
+                      Prior ────────────────┴──────────── 3 ──│
+                        │                                     │
+                        └───────── Sample Transforms ──── 4 ──┘
 ```
 
 ### Data
@@ -92,24 +93,44 @@ Prior Space
 
 - **Sample transforms** — map from the prior space to the sampling space. This lets the sampler explore a different parameterisation than the one your prior is defined in, typically one where correlations between parameters are reduced (e.g. sampling in detector-frame sky coordinates instead of equatorial coordinates).
 
+### Sampler
+
+Jim's sampler is selected by passing a typed config object.  Four backends are available:
+
+| Backend | Config class | Evidence | Extra install |
+| --- | --- | --- | --- |
+| **flowMC** | `FlowMCConfig` | No | No |
+| **BlackJAX NS-AW** | `BlackJAXNSAWConfig` | Yes | Yes — `uv sync --group nested-sampling` |
+| **BlackJAX NSS** | `BlackJAXNSSConfig` | Yes | Yes — `uv sync --group nested-sampling` |
+| **BlackJAX SMC** | `BlackJAXSMCConfig` | Yes | No |
+
+flowMC is a normalizing-flow-enhanced MCMC sampler.
+BlackJAX NS-AW and NSS are nested samplers with different sampling algorithms.
+BlackJAX SMC uses a particle population tempered from prior to posterior.
+
+See the [Samplers guide](guides/samplers.md) for configuration details and per-backend requirements.
+
 ### Putting It Together
 
 ```python
 from jimgw.core.jim import Jim
+from jimgw.samplers.config import FlowMCConfig
 
 jim = Jim(
     likelihood=likelihood,
     prior=prior,
+    sampler_config=FlowMCConfig(
+        n_chains=500,
+        n_training_loops=20,
+        n_production_loops=10,
+        # See the Samplers guide (guides/samplers) for the full parameter reference.
+    ),
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    n_chains=500,
-    n_training_loops=20,
-    n_production_loops=10,
-    # ... other hyperparameters
 )
 
 jim.sample()
 samples = jim.get_samples()
 ```
 
-For a full worked example, see the [Getting Started tutorial](tutorials/getting_started). For production-grade scripts, browse the [`example/` directory on GitHub](https://github.com/kazewong/jim/tree/main/example).
+For a full worked example, see the [Getting Started tutorial](tutorials/getting_started). For production-grade scripts, browse the [`examples/` directory on GitHub](https://github.com/GW-JAX-Team/jim/tree/main/examples).

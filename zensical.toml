@@ -18,10 +18,14 @@ nav = [
     {"Tutorials" = [
         "tutorials/index.md",
         {"Getting Started" = "tutorials/getting_started.md"},
-        {"Data" = "tutorials/data.md"},
-        {"Likelihood" = "tutorials/likelihood.md"},
-        {"Prior" = "tutorials/prior.md"},
-        {"Transforms" = "tutorials/transforms.md"},
+    ]},
+    {"Guides" = [
+        "guides/index.md",
+        {"Data" = "guides/data.md"},
+        {"Likelihood" = "guides/likelihood.md"},
+        {"Prior" = "guides/prior.md"},
+        {"Samplers" = "guides/samplers.md"},
+        {"Transforms" = "guides/transforms.md"},
     ]},
     {"FAQ" = "FAQ.md"},
     {"Contributing" = "contributing.md"},

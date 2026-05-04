@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 
 # TODO: Need to expand this list. Currently it is only O3.
 asd_file_dict = {
-    "H1": "https://dcc.ligo.org/public/0169/P2000251/001/O3-H1-C01_CLEAN_SUB60HZ-1251752040.0_sensitivity_strain_asd.txt",  # noqa: E501
-    "L1": "https://dcc.ligo.org/public/0169/P2000251/001/O3-L1-C01_CLEAN_SUB60HZ-1240573680.0_sensitivity_strain_asd.txt",  # noqa: E501
-    "V1": "https://dcc.ligo.org/public/0169/P2000251/001/O3-V1_sensitivity_strain_asd.txt",  # noqa: E501
+    "H1": "https://dcc.ligo.org/public/0169/P2000251/001/O3-H1-C01_CLEAN_SUB60HZ-1251752040.0_sensitivity_strain_asd.txt",
+    "L1": "https://dcc.ligo.org/public/0169/P2000251/001/O3-L1-C01_CLEAN_SUB60HZ-1240573680.0_sensitivity_strain_asd.txt",
+    "V1": "https://dcc.ligo.org/public/0169/P2000251/001/O3-V1_sensitivity_strain_asd.txt",
 }
 
 
@@ -238,7 +238,7 @@ class Data(ABC):
         if not self.has_fd:
             self.fft()
         freq, psd = welch(self.td, fs=self.sampling_frequency, **kws)
-        return PowerSpectrum(psd, freq, self.name)  # type: ignore
+        return PowerSpectrum(jnp.asarray(psd), jnp.asarray(freq), self.name)
 
     @classmethod
     def from_gwosc(
@@ -270,7 +270,7 @@ class Data(ABC):
         data_td = TimeSeries.fetch_open_data(
             ifo, gps_start_time, gps_end_time, cache=cache, **kws
         )
-        return cls(data_td.value, data_td.dt.value, data_td.epoch.value, ifo)  # type: ignore # noqa: E501
+        return cls(data_td.value, data_td.dt.value, data_td.epoch.value, ifo)  # type: ignore[union-attr]
 
     @classmethod
     def from_fd(
@@ -507,7 +507,7 @@ class PowerSpectrum(ABC):
             self.frequencies,
             self.values,
             kind=kind,
-            fill_value=(self.values[0], self.values[-1]),  # type: ignore
+            fill_value=(self.values[0], self.values[-1]),  # type: ignore[arg-type]  # scipy stubs
             bounds_error=False,
             **kws,
         )
