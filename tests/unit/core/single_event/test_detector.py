@@ -12,7 +12,7 @@ from jimgw.core.constants import EARTH_SEMI_MAJOR_AXIS, EARTH_SEMI_MINOR_AXIS
 from jimgw.core.single_event.waveform import RippleIMRPhenomD
 from tests.utils import assert_all_in_range
 
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parent.parent.parent.parent / "fixtures"
 
 # ---------------------------------------------------------------------------
 # Shared helpers

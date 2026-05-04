@@ -20,7 +20,7 @@ from jimgw.core.single_event.time_utils import (
 from jimgw.core.prior import CombinePrior, PowerLawPrior, UniformPrior
 from tests.utils import assert_all_finite, common_keys_allclose
 
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parent.parent.parent.parent / "fixtures"
 
 
 @pytest.fixture
