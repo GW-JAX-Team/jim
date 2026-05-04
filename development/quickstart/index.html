@@ -2144,7 +2144,8 @@
 <pre class="mermaid"><code>flowchart LR
     WM[Waveform Model] &amp; D[Data] --&gt; L[Likelihood]
     L -- 1 --&gt; J((Jim))
-    P[Prior] --&gt; LT[Likelihood Transforms]
+    L --&gt; LT[Likelihood Transforms]
+    P[Prior] --&gt; LT
     LT -- 2 --&gt; J
     P -- 3 --&gt; J
     P --&gt; ST[Sample Transforms]
