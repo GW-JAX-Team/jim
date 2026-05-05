@@ -8,7 +8,7 @@ Each sampler has its own ``*Config`` class discriminated by a ``type`` literal;
 from __future__ import annotations
 
 import warnings
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal, Optional, Union
 
 import numpy as np
 from pydantic import BaseModel, Discriminator, Field, field_validator, model_validator
@@ -355,7 +355,7 @@ class BlackJAXSMCConfig(BaseSamplerConfig):
 
 
 SamplerConfig = Annotated[
-    FlowMCConfig | BlackJAXNSAWConfig | BlackJAXNSSConfig | BlackJAXSMCConfig,
+    Union[FlowMCConfig, BlackJAXNSAWConfig, BlackJAXNSSConfig, BlackJAXSMCConfig],
     Discriminator("type"),
 ]
 """Discriminated union of every concrete sampler config."""
