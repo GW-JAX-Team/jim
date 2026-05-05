@@ -464,6 +464,38 @@ class TestJimPriorLikelihoodConsistencyChecks:
         with pytest.raises(ValueError, match="not consumed by the likelihood"):
             Jim(likelihood=lh, prior=prior, sampler_config=_tiny_flowmc_config())
 
+    def test_likelihood_requires_missing_parameter_raises(self):
+        prior = CombinePrior(
+            [
+                UniformPrior(10.0, 80.0, parameter_names=["M_c"]),
+                UniformPrior(0.0, 3.14, parameter_names=["ra"]),
+                UniformPrior(-1.57, 1.57, parameter_names=["dec"]),
+                UniformPrior(0.0, 3.14, parameter_names=["psi"]),
+                # t_c intentionally omitted
+            ]
+        )
+        lh = self._make_mock_single_event_likelihood(
+            waveform_parameter_names=("M_c", "ra", "dec", "psi", "t_c"),
+        )
+        with pytest.raises(ValueError, match="not provided by the prior or fixed_parameters"):
+            Jim(likelihood=lh, prior=prior, sampler_config=_tiny_flowmc_config())
+
+    def test_missing_parameter_covered_by_fixed_no_error(self):
+        prior = CombinePrior(
+            [
+                UniformPrior(10.0, 80.0, parameter_names=["M_c"]),
+                UniformPrior(0.0, 3.14, parameter_names=["ra"]),
+                UniformPrior(-1.57, 1.57, parameter_names=["dec"]),
+                UniformPrior(0.0, 3.14, parameter_names=["psi"]),
+                # t_c provided via fixed_parameters instead
+            ]
+        )
+        lh = self._make_mock_single_event_likelihood(
+            waveform_parameter_names=("M_c", "ra", "dec", "psi", "t_c"),
+            fixed_parameters={"t_c": 0.0},
+        )
+        Jim(likelihood=lh, prior=prior, sampler_config=_tiny_flowmc_config())
+
     def test_prior_all_consumed_no_error(self):
         prior = CombinePrior(
             [

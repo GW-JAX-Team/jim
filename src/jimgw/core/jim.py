@@ -19,7 +19,7 @@ from jimgw.samplers import Sampler, SamplerConfig, build_sampler
 
 logger = logging.getLogger(__name__)
 
-# Number of prior draws used to sanity-check the posterior at construction time.
+# Number of prior draws used to verify the posterior at construction time.
 # More than half returning NaN is treated as a hard error; any non-zero count
 # triggers a warning.
 _NAN_TEST_POINTS = 10
@@ -77,6 +77,7 @@ class Jim:
                 reproducible regardless of any intermediate operations (sanity
                 checks, initial-position draws, etc.).
         """
+        self._validate_problem(likelihood, prior, likelihood_transforms)
         self._setup_problem(likelihood, prior, sample_transforms, likelihood_transforms)
         self._validate_normalized_prior(prior, sampler_config)
         root_key: Key = jax.random.key(seed)
@@ -121,11 +122,82 @@ class Jim:
             log_posterior_fn=self._log_posterior_fn,
             periodic=periodic_resolved,
         )
-        self._sanity_check_posterior()
+        self._verify_posterior()
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _validate_problem(
+        self,
+        likelihood: LikelihoodBase,
+        prior: Prior,
+        likelihood_transforms: Sequence[NtoMTransform],
+    ) -> None:
+        """Validate that the prior and likelihood parameter spaces are compatible.
+
+        Args:
+            likelihood: The likelihood to evaluate.
+            prior: The prior distribution.
+            likelihood_transforms: Transforms from prior space to likelihood space.
+
+        Raises:
+            ValueError: If prior parameters overlap with fixed parameters, if prior
+                parameters are not consumed by the likelihood, or if the likelihood
+                requires parameters not provided by the prior or fixed_parameters.
+        """
+        if not isinstance(likelihood, SingleEventLikelihood):
+            return
+
+        lh_space_names: tuple[str, ...] = prior.parameter_names
+        for transform in likelihood_transforms:
+            lh_space_names = transform.propagate_name(lh_space_names)
+
+        if likelihood.fixed_parameters:
+            overlap = set(lh_space_names) & set(likelihood.fixed_parameters.keys())
+            if overlap:
+                raise ValueError(
+                    f"Prior defines parameter(s) {sorted(overlap)} that are "
+                    "also in fixed_parameters. Either remove them from the prior "
+                    "or from fixed_parameters."
+                )
+
+        # Waveforms that publish a `parameter_names` attribute can be
+        # cross-checked against the prior.
+        wf_param_names = getattr(likelihood.waveform, "parameter_names", None)
+        if not (
+            isinstance(likelihood.waveform, Waveform) and wf_param_names is not None
+        ):
+            return
+
+        consumed: set[str] = set(wf_param_names)
+        consumed |= {"ra", "dec", "psi", "t_c"}
+        if isinstance(likelihood, TransientLikelihoodFD):
+            if likelihood.time_marginalization:
+                consumed.discard("t_c")
+            if likelihood.phase_marginalization:
+                consumed.discard("phase_c")
+            if likelihood.distance_marginalization:
+                consumed.discard("d_L")
+
+        provided = set(lh_space_names)
+        if likelihood.fixed_parameters:
+            provided |= set(likelihood.fixed_parameters.keys())
+
+        unused = provided - consumed
+        if unused:
+            raise ValueError(
+                f"Prior defines parameter(s) {sorted(unused)} that are not "
+                "consumed by the likelihood. Remove them from the prior or "
+                "add appropriate likelihood_transforms."
+            )
+        missing = consumed - provided
+        if missing:
+            raise ValueError(
+                f"Likelihood requires parameter(s) {sorted(missing)} that are "
+                "not provided by the prior or fixed_parameters. Add them to "
+                "the prior or to fixed_parameters."
+            )
 
     def _setup_problem(
         self,
@@ -136,19 +208,16 @@ class Jim:
     ) -> None:
         """Wire together likelihood, prior, and transforms; build sampling-space callables.
 
-        Validates that the prior and likelihood parameter spaces are compatible,
-        then constructs ``_log_prior_fn``, ``_log_likelihood_fn``, and
+        Constructs ``_log_prior_fn``, ``_log_likelihood_fn``, and
         ``_log_posterior_fn`` — flat-array callables injected into the sampler.
+        Validation is performed separately by :meth:`_validate_problem` before
+        this method is called.
 
         Args:
             likelihood: The likelihood to evaluate.
             prior: The prior distribution.
             sample_transforms: Bijective transforms from prior space to sampling space.
             likelihood_transforms: Transforms from prior space to likelihood space.
-
-        Raises:
-            ValueError: If prior parameters overlap with fixed parameters, or if
-                prior parameters are not consumed by the likelihood.
         """
         self.likelihood = likelihood
         self.prior = prior
@@ -158,7 +227,7 @@ class Jim:
         self.parameter_names = prior.parameter_names
         if not sample_transforms:
             logger.info(
-                "No sample transforms provided — using prior parameters as sampling parameters."
+                "No sample transforms provided. Using prior parameters as sampling parameters."
             )
         else:
             logger.info("Using sample transforms.")
@@ -167,43 +236,8 @@ class Jim:
 
         if not likelihood_transforms:
             logger.info(
-                "No likelihood transforms provided — using prior parameters as likelihood parameters."
+                "No likelihood transforms provided. Using prior parameters as likelihood parameters."
             )
-
-        if isinstance(likelihood, SingleEventLikelihood):
-            lh_space_names: tuple[str, ...] = prior.parameter_names
-            for transform in likelihood_transforms:
-                lh_space_names = transform.propagate_name(lh_space_names)
-
-            if likelihood.fixed_parameters:
-                overlap = set(lh_space_names) & set(likelihood.fixed_parameters.keys())
-                if overlap:
-                    raise ValueError(
-                        f"Prior defines parameter(s) {sorted(overlap)} that are "
-                        "also in fixed_parameters. Either remove them from the prior "
-                        "or from fixed_parameters."
-                    )
-
-            # Waveforms that publish a `parameter_names` attribute can be
-            # cross-checked against the prior.
-            wf_param_names = getattr(likelihood.waveform, "parameter_names", None)
-            if isinstance(likelihood.waveform, Waveform) and wf_param_names is not None:
-                consumed: set[str] = set(wf_param_names)
-                consumed |= {"ra", "dec", "psi", "t_c"}
-                if isinstance(likelihood, TransientLikelihoodFD):
-                    if likelihood.time_marginalization:
-                        consumed.discard("t_c")
-                    if likelihood.phase_marginalization:
-                        consumed.discard("phase_c")
-                    if likelihood.distance_marginalization:
-                        consumed.discard("d_L")
-                unused = set(lh_space_names) - consumed
-                if unused:
-                    raise ValueError(
-                        f"Prior defines parameter(s) {sorted(unused)} that are not "
-                        "consumed by the likelihood. Remove them from the prior or "
-                        "add appropriate likelihood_transforms."
-                    )
 
         # Build sampling-space callables. These operate on flat arrays of shape
         # (n_dims,) and are injected into the sampler.
@@ -240,7 +274,7 @@ class Jim:
         self._log_likelihood_fn = _log_likelihood_fn
         self._log_posterior_fn = _log_posterior_fn
 
-    def _sanity_check_posterior(self) -> None:
+    def _verify_posterior(self) -> None:
         """Draw test points from the prior and verify the posterior is not mostly NaN.
 
         Raises:
@@ -360,7 +394,7 @@ class Jim:
 
         The sampling key is pre-reserved at construction time from ``seed``,
         so results are reproducible regardless of any calls made before this
-        method (e.g. the construction-time sanity check).
+        method (e.g. the construction-time posterior verification).
 
         Args:
             initial_position: Starting positions in sampling space, or
