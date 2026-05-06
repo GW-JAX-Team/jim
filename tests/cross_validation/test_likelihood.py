@@ -1,6 +1,6 @@
 """Cross-validation tests comparing jimgw likelihood classes against bilby.
 
-All seven likelihood classes are tested:
+All likelihood classes are tested:
 
     Jim class                                              bilby equivalent
     ─────────────────────────────────────────────────────  ────────────────────────────────────────────────────────────
@@ -12,6 +12,7 @@ All seven likelihood classes are tested:
     TransientLikelihoodFD(time+phase marg)                 GravitationalWaveTransient (time+phase marginalization)
     HeterodynedTransientLikelihoodFD                       RelativeBinningGravitationalWaveTransient
     HeterodynedTransientLikelihoodFD(phase_marg=True)      RelativeBinningGravitationalWaveTransient (phase_marg=True)
+    MultibandedTransientLikelihoodFD                       MBGravitationalWaveTransient
 
 Uses IMRPhenomPv2 with GW150914 data fixtures.
 
@@ -232,10 +233,15 @@ def ripple_pv2_bilby_source(
     # bilby's relative-binning likelihood sets waveform_arguments['fiducial']:
     #   1 → computing the fiducial waveform  → return full frequency grid array
     #   0 → likelihood evaluation            → return bin-edge array
-    # For non-relative-binning calls (fiducial key absent) we always use the
-    # full frequency_array.
+    # bilby's MB likelihood sets waveform_arguments['frequencies'] to the unique
+    # MB frequencies so the waveform is only evaluated at those points.
+    # For non-relative-binning, non-MB calls we always use the full frequency_array.
     fiducial = kwargs.get("fiducial", 1)
-    if fiducial == 1:
+    mb_frequencies = kwargs.get("frequencies", None)
+    if mb_frequencies is not None and fiducial != 0:
+        # MB likelihood: evaluate only at the unique MB frequency points
+        eval_freqs = mb_frequencies
+    elif fiducial == 1:
         # Full-grid evaluation (fiducial setup, or standard likelihoods)
         eval_freqs = frequency_array
     else:
@@ -778,5 +784,51 @@ class TestHeterodynedPhaseMarginalizedLikelihood:
         )
         assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
             f"HeterodynedTransientLikelihoodFD(marginalize_phase) mismatch: jim={float(jim_ll):.6f}, "
+            f"bilby={float(bilby_ll):.6f}"
+        )
+
+
+class TestMultibandedLikelihood:
+    """MultibandedTransientLikelihoodFD vs MBGravitationalWaveTransient.
+
+    Both use reference_chirp_mass=20.0 M_sun, accuracy_factor=5, time_offset=2.12,
+    delta_f_end=53.0.  Band structure and all precomputed coefficients are identical
+    by construction.
+
+    Note: ripple_pv2_bilby_source must use kwargs['frequencies'] (the unique MB
+    frequency points set by MBGravitationalWaveTransient._setup_waveform_frequency_points)
+    rather than the full frequency_array, so that the waveform is evaluated at the
+    correct MB frequencies before being remapped to banded points.
+    """
+
+    def test_log_likelihood_ratio(self, setup):
+        from jimgw.core.single_event.likelihood import MultibandedTransientLikelihoodFD
+
+        REFERENCE_CHIRP_MASS = 20.0  # M_sun
+
+        jim_ll = MultibandedTransientLikelihoodFD(
+            detectors=setup["jim_ifos"],
+            waveform=setup["waveform"],
+            reference_chirp_mass=REFERENCE_CHIRP_MASS,
+            f_min=F_MIN,
+            f_max=F_MAX,
+            trigger_time=GPS,
+            accuracy_factor=5.0,
+            time_offset=2.12,
+            delta_f_end=53.0,
+        ).evaluate(setup["jim_params"].copy(), {})
+
+        bilby_ll = bilby.gw.likelihood.MBGravitationalWaveTransient(
+            interferometers=setup["bilby_ifos"],
+            waveform_generator=setup["wfg"],
+            reference_chirp_mass=REFERENCE_CHIRP_MASS,
+            accuracy_factor=5.0,
+            time_offset=2.12,
+            delta_f_end=53.0,
+        ).log_likelihood_ratio(setup["bilby_params"].copy())
+
+        print(f"\n[Multibanded] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}")
+        assert jnp.isclose(jim_ll, bilby_ll, rtol=CROSS_VAL_RTOL), (
+            f"MultibandedTransientLikelihoodFD mismatch: jim={float(jim_ll):.6f}, "
             f"bilby={float(bilby_ll):.6f}"
         )
