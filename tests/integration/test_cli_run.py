@@ -11,7 +11,7 @@ from jimgw.cli import app
 
 pytestmark = pytest.mark.integration
 
-_CONFIG = Path("tests/configs/GW150914_file.toml")
+_CONFIG = Path("tests/fixtures/GW150914_test.toml")
 _RUNNER = CliRunner()
 
 
@@ -36,24 +36,27 @@ def patched_config(tmp_output, tmp_path):
     return cfg_path
 
 
+@pytest.fixture()
+def full_run_result(patched_config):
+    """Run the CLI once and cache the result for multiple tests."""
+    result = _RUNNER.invoke(app, [str(patched_config)])
+    assert result.exit_code == 0, result.output
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Full run + output files
 # ---------------------------------------------------------------------------
 
 
-def test_full_run_output_files(patched_config, tmp_output):
-    result = _RUNNER.invoke(app, [str(patched_config)])
-    assert result.exit_code == 0, result.output
-
+def test_full_run_output_files(full_run_result, tmp_output):
     assert (tmp_output / "samples.npz").exists()
     assert (tmp_output / "config.final.toml").exists()
 
 
-def test_full_run_samples_shape(patched_config, tmp_output):
+def test_full_run_samples_shape(full_run_result, tmp_output):
     import numpy as np
 
-    result = _RUNNER.invoke(app, [str(patched_config)])
-    assert result.exit_code == 0, result.output
     data = np.load(tmp_output / "samples.npz")
     expected_params = {
         "M_c",
@@ -105,11 +108,7 @@ def test_no_args_exits_with_code_2():
     assert result.exit_code == 2
 
 
-def test_overwrite_false_raises(patched_config, tmp_output):
-    # First run succeeds
-    result = _RUNNER.invoke(app, [str(patched_config)])
-    assert result.exit_code == 0
-
+def test_overwrite_false_raises(patched_config, full_run_result, tmp_output):
     # Second run with overwrite=false should fail
     with open(patched_config, "rb") as f:
         raw = tomllib.load(f)

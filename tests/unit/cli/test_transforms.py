@@ -17,7 +17,10 @@ TRIGGER_TIME = 1126259462.4
 
 def _infer(prior_params, sky_frame="detector", time_frame="detector"):
 
-    from jimgw.cli._transforms import infer_likelihood_transforms, infer_sample_transforms
+    from jimgw.cli._transforms import (
+        infer_likelihood_transforms,
+        infer_sample_transforms,
+    )
 
     ifos = _make_ifos()
     cfg = SamplingConfig(sky_frame=sky_frame, time_frame=time_frame)  # type: ignore[arg-type]

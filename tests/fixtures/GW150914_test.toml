@@ -32,16 +32,18 @@ dec     = { type = "cosine" }
 
 [likelihood]
 f_min = 20.0
-f_max = 1024.0
+f_max = 512.0
 
 [sampler]
 type = "flowmc"
-n_chains = 10
-n_local_steps = 5
-n_global_steps = 5
+n_chains = 2
+n_local_steps = 2
+n_global_steps = 2
 n_training_loops = 2
 n_production_loops = 1
+global_thinning=1
+n_epochs=1
 
 [output]
-dir = "/tmp/jim_test_output"
+dir = "tests/fixtures/jim_test_output"
 overwrite = true
