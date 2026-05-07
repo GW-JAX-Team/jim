@@ -114,6 +114,11 @@ jim = Jim(
     prior,
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
+    periodic={
+        "phase_c": (0.0, 2 * float(jnp.pi)),
+        "psi": (0.0, float(jnp.pi)),
+        "azimuth": (0.0, 2 * float(jnp.pi)),
+    },
     sampler_config=FlowMCConfig(
         n_chains=1000,
         n_local_steps=100,
@@ -122,11 +127,6 @@ jim = Jim(
         n_production_loops=10,
         n_NFproposal_batch_size=100,
         global_thinning=100,
-        periodic={
-            "phase_c": (0.0, 2 * float(jnp.pi)),
-            "psi": (0.0, float(jnp.pi)),
-            "azimuth": (0.0, 2 * float(jnp.pi)),
-        },
         verbose=True,
     ),
 )

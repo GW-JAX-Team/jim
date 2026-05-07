@@ -210,11 +210,11 @@ jim = Jim(
     prior,
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
+    periodic=["phase_c_unit", "psi_unit", "azimuth_unit"],
     sampler_config=BlackJAXNSAWConfig(
         n_live=1000,
         n_delete_frac=0.5,
         n_target=60,
-        periodic=["phase_c_unit", "psi_unit", "azimuth_unit"],
     ),
 )
 

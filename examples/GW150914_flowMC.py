@@ -102,6 +102,11 @@ jim = Jim(
     prior,
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
+    periodic={
+        "phase_c": (0.0, 2 * float(jnp.pi)),
+        "psi": (0.0, float(jnp.pi)),
+        "azimuth": (0.0, 2 * float(jnp.pi)),
+    },
     sampler_config=FlowMCConfig(
         n_chains=1000,
         n_local_steps=100,
@@ -110,43 +115,52 @@ jim = Jim(
         n_production_loops=10,
         n_NFproposal_batch_size=100,
         global_thinning=100,
-        periodic={
-            "phase_c": (0.0, 2 * float(jnp.pi)),
-            "psi": (0.0, float(jnp.pi)),
-            "azimuth": (0.0, 2 * float(jnp.pi)),
-        },
         verbose=True,
     ),
 )
 
-start_time = time.time()
-jim.sample()
-end_time = time.time()
-print(f"Sampling time: {(end_time - start_time) / 60:.2f} minutes")
+initial = jim.prior.sample(key, n)
+for transform in jim.sample_transforms:
+    initial = jax.vmap(transform.forward)(initial)
 
-# --- Results ---
+import matplotlib.pyplot as plt
 
-diagnostics = jim.get_diagnostics()
-print(f"Likelihood evaluations: {diagnostics['n_likelihood_evaluations']:,}")
+# Plot the histogram for t_det before sampling
+t_det_samples = initial["t_det"]
+plt.hist(t_det_samples, bins=50, density=True)
+plt.xlabel("t_det")
+plt.ylabel("Density")
+plt.savefig(Path(__file__).parent / "t_det_histogram_before.png")
+plt.clf()
 
-chains = jim.get_samples()
+# start_time = time.time()
+# jim.sample()
+# end_time = time.time()
+# print(f"Sampling time: {(end_time - start_time) / 60:.2f} minutes")
 
-parameter_labels = {
-    "M_c": r"$\mathcal{M}_c\,[M_\odot]$",
-    "q": r"$q$",
-    "s1_z": r"$s_{1,z}$",
-    "s2_z": r"$s_{2,z}$",
-    "iota": r"$\iota$",
-    "d_L": r"$d_L\,[\mathrm{Mpc}]$",
-    "t_c": r"$t_c\,[\mathrm{s}]$",
-    "phase_c": r"$\phi_c$",
-    "psi": r"$\psi$",
-    "ra": r"$\alpha$",
-    "dec": r"$\delta$",
-}
+# # --- Results ---
 
-fig = corner.corner(
-    np.stack([chains[key] for key in jim.prior.parameter_names]).T[::10],
-    labels=[parameter_labels.get(k, k) for k in jim.prior.parameter_names],
-)
-fig.savefig(Path(__file__).parent / "GW150914_flowMC.png")
+# diagnostics = jim.get_diagnostics()
+# print(f"Likelihood evaluations: {diagnostics['n_likelihood_evaluations']:,}")
+
+# chains = jim.get_samples()
+
+# parameter_labels = {
+#     "M_c": r"$\mathcal{M}_c\,[M_\odot]$",
+#     "q": r"$q$",
+#     "s1_z": r"$s_{1,z}$",
+#     "s2_z": r"$s_{2,z}$",
+#     "iota": r"$\iota$",
+#     "d_L": r"$d_L\,[\mathrm{Mpc}]$",
+#     "t_c": r"$t_c\,[\mathrm{s}]$",
+#     "phase_c": r"$\phi_c$",
+#     "psi": r"$\psi$",
+#     "ra": r"$\alpha$",
+#     "dec": r"$\delta$",
+# }
+
+# fig = corner.corner(
+#     np.stack([chains[key] for key in jim.prior.parameter_names]).T[::10],
+#     labels=[parameter_labels.get(k, k) for k in jim.prior.parameter_names],
+# )
+# fig.savefig(Path(__file__).parent / "GW150914_flowMC.png")

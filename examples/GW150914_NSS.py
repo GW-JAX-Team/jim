@@ -104,16 +104,16 @@ jim = Jim(
     prior,
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
+    periodic={
+        "phase_c": (0.0, 2 * float(jnp.pi)),
+        "psi": (0.0, float(jnp.pi)),
+        "azimuth": (0.0, 2 * float(jnp.pi)),
+    },
     sampler_config=BlackJAXNSSConfig(
         n_live=1000,
         n_delete_frac=0.5,
         num_inner_steps_per_dim=20,
         termination_dlogz=0.1,
-        periodic={
-            "phase_c": (0.0, 2 * float(jnp.pi)),
-            "psi": (0.0, float(jnp.pi)),
-            "azimuth": (0.0, 2 * float(jnp.pi)),
-        },
     ),
 )
 
