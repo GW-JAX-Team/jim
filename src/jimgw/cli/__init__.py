@@ -89,8 +89,12 @@ def run(
                 f"Error: {init} already exists. Choose a different path.", err=True
             )
             raise typer.Exit(code=2)
-        init.parent.mkdir(parents=True, exist_ok=True)
-        init.write_text(_INIT_TEMPLATE)
+        try:
+            init.parent.mkdir(parents=True, exist_ok=True)
+            init.write_text(_INIT_TEMPLATE)
+        except OSError as exc:
+            typer.echo(f"Error: could not write template to {init}: {exc}", err=True)
+            raise typer.Exit(code=2)
         typer.echo(f"Template config written to {init}")
         raise typer.Exit()
 
