@@ -149,9 +149,7 @@ def run(
     # Must run before build_prior so the built prior and
     # prior_params already reflect the substitution.
     if cfg.sampler.type == "blackjax-ns-aw":
-        modified_prior = adapt_prior_for_ns_time(
-            cfg.prior, trigger_time, ifos, cfg.sampling
-        )
+        modified_prior = adapt_prior_for_ns_time(cfg.prior, cfg.sampling)
         if modified_prior is not None:
             cfg.prior = modified_prior
 

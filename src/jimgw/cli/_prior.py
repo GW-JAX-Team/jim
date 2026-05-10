@@ -1,7 +1,5 @@
 import logging
 
-import numpy as np
-
 from jimgw.cli._config import (
     CosineSpec,
     GaussianSpec,
@@ -23,8 +21,6 @@ from jimgw.core.prior import (
     UniformPrior,
     UniformSpherePrior,
 )
-from jimgw.core.constants import C_SI
-from jimgw.core.single_event.detector import GroundBased2G
 
 logger = logging.getLogger(__name__)
 
@@ -59,39 +55,30 @@ def build_prior(cfg: PriorConfig):
     return prior
 
 
-def _max_ifo_delay(ifos: list[GroundBased2G]) -> float:
-    """Maximum light travel time from geocenter to any IFO in the network."""
-    return max(float(np.linalg.norm(ifo.vertex)) / C_SI for ifo in ifos)
-
-
 def adapt_prior_for_ns_time(
     prior_cfg: PriorConfig,
-    trigger_time: float,
-    ifos: list[GroundBased2G],
     sampling_cfg: SamplingConfig,
 ) -> PriorConfig | None:
-    """For NS-AW: adjust time parameters so the unit-cube bounds are exact.
+    """For NS-AW: replace the time parameter so the unit-cube bounds are exact.
+
+    Both ``t_c`` and ``t_det`` are treated as offsets from ``trigger_time``
+    (e.g. ``min = -0.1``, ``max = 0.1``).  Because the ``t_c → t_det``
+    transform shifts by a sky-position-dependent delay, the unit-cube bounds
+    for the *output* parameter cannot be exact — the same bounds are used for
+    both.
 
     NS-AW requires every sampling-space parameter to lie in [0, 1].
     Two cases require adaptation:
 
-    1. **t_c in prior, time_frame != "geocentric"**: the ``t_c → t_det`` sample
-       transform shifts by a sky-dependent delay, so the unit-cube bounds for
-       ``t_det`` cannot be exact.  Fix: replace ``t_c`` with ``t_det`` using
-       widened absolute GPS bounds:
+    1. **t_c in prior, time_frame != "geocentric"**: replace ``t_c`` with
+       ``t_det`` using the same relative bounds:
 
-           t_det ∈ [trigger + t_c.min - max_delay, trigger + t_c.max + max_delay]
+           t_det ∈ [t_c.min, t_c.max]
 
-    2. **t_det in prior, time_frame = "geocentric"**: the user wants to sample in
-       ``t_c`` but the prior is on ``t_det`` (absolute GPS).  The reverse shift
-       is also sky-dependent.  Fix: replace ``t_det`` with ``t_c`` using widened
-       bounds:
+    2. **t_det in prior, time_frame = "geocentric"**: replace ``t_det`` with
+       ``t_c`` using the same relative bounds:
 
-           t_c ∈ [t_det.min - max_delay, t_det.max + max_delay]
-
-    In both cases ``max_delay`` is the maximum light travel time to any IFO in
-    the network, and the reverse time transform is added as a likelihood
-    transform so the likelihood still receives the correct parameter.
+           t_c ∈ [t_det.min, t_det.max]
 
     Returns the modified :class:`PriorConfig`, or ``None`` if no adaptation is
     needed.
@@ -106,25 +93,19 @@ def adapt_prior_for_ns_time(
             raise ValueError(
                 "NS-AW sampler: the 't_det' prior must be 'uniform' for automatic "
                 "conversion to 't_c'. Either use a uniform t_det prior or replace "
-                "'t_det' with 't_c' in [prior] with relative bounds."
+                "'t_det' with 't_c' in [prior] with relative-offset bounds."
             )
-        max_delay = _max_ifo_delay(ifos)
-        lo = t_det_spec.min - max_delay
-        hi = t_det_spec.max + max_delay
         logger.warning(
-            "NS-AW sampler: replacing t_det ~ Uniform(%.6f, %.6f) in [prior] with "
-            "t_c ~ Uniform(%.6f, %.6f) (max IFO light-travel delay = %.2f ms).",
+            "NS-AW sampler: replacing t_det ~ Uniform(%.4f, %.4f) in [prior] with "
+            "t_c ~ Uniform(%.4f, %.4f) (same relative-offset bounds). "
+            "To sample t_det directly instead, remove [sampling] time_frame = 'geocentric'.",
             t_det_spec.min,
             t_det_spec.max,
-            lo,
-            hi,
-            max_delay * 1e3,
+            t_det_spec.min,
+            t_det_spec.max,
         )
         new_root = {
-            ("t_c" if k == "t_det" else k): (
-                UniformSpec(min=lo, max=hi) if k == "t_det" else v
-            )
-            for k, v in prior_cfg.root.items()
+            ("t_c" if k == "t_det" else k): v for k, v in prior_cfg.root.items()
         }
         return PriorConfig.model_validate(new_root)
 
@@ -139,29 +120,19 @@ def adapt_prior_for_ns_time(
             "NS-AW sampler: the 't_c' prior must be 'uniform' for automatic "
             "conversion to 't_det'. Either use a uniform t_c prior, set "
             "[sampling] time_frame = 'geocentric' to sample t_c directly, or "
-            "replace 't_c' with 't_det' in [prior] and provide absolute GPS bounds."
+            "replace 't_c' with 't_det' in [prior] with relative-offset bounds."
         )
-
-    max_delay = _max_ifo_delay(ifos)
-    lo = trigger_time + t_c_spec.min - max_delay
-    hi = trigger_time + t_c_spec.max + max_delay
 
     logger.warning(
         "NS-AW sampler: replacing t_c ~ Uniform(%.4f, %.4f) in [prior] with "
-        "t_det ~ Uniform(%.6f, %.6f) (max IFO light-travel delay = %.2f ms). "
+        "t_det ~ Uniform(%.4f, %.4f) (same relative-offset bounds). "
         "To sample t_c directly instead, set [sampling] time_frame = 'geocentric'.",
         t_c_spec.min,
         t_c_spec.max,
-        lo,
-        hi,
-        max_delay * 1e3,
+        t_c_spec.min,
+        t_c_spec.max,
     )
 
     # Rebuild the prior dict, preserving insertion order, substituting t_c → t_det.
-    new_root = {
-        ("t_det" if k == "t_c" else k): (
-            UniformSpec(min=lo, max=hi) if k == "t_c" else v
-        )
-        for k, v in prior_cfg.root.items()
-    }
+    new_root = {("t_det" if k == "t_c" else k): v for k, v in prior_cfg.root.items()}
     return PriorConfig.model_validate(new_root)
