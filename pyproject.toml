@@ -61,7 +61,7 @@ cross-validation = [
     "bilby[gw]>=2.8.0",
 ]
 doc = [
-    "jupytext",
+    "nbconvert",
     "mkdocstrings[python]",
     "pymdown-extensions",
     "zensical",
