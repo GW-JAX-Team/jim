@@ -2529,7 +2529,7 @@ checks, initial-position draws, etc.).</p>
 
 
 <h5 id="jimgw.core.jim.Jim._validate_problem" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">_validate_problem</span><span class="p">(</span><span class="n">likelihood</span><span class="p">:</span> <span class="n">LikelihoodBase</span><span class="p">,</span> <span class="n">prior</span><span class="p">:</span> <span class="n">Prior</span><span class="p">,</span> <span class="n">likelihood_transforms</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">NtoMTransform</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+            <code class="highlight language-python"><span class="n">_validate_problem</span><span class="p">(</span><span class="n">likelihood</span><span class="p">:</span> <span class="n">LikelihoodBase</span><span class="p">,</span> <span class="n">prior</span><span class="p">:</span> <span class="n">Prior</span><span class="p">,</span> <span class="n">sample_transforms</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">BijectiveTransform</span><span class="p">],</span> <span class="n">likelihood_transforms</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">NtoMTransform</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
 
 <a href="#jimgw.core.jim.Jim._validate_problem" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -2584,6 +2584,22 @@ checks, initial-position draws, etc.).</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>sample_transforms</code>
+            </td>
+            <td>
+                  <code><span title="collections.abc.Sequence">Sequence</span>[<a class="autorefs autorefs-internal" href="../transforms/#jimgw.core.transforms.BijectiveTransform">BijectiveTransform</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Bijective transforms from prior space to sampling space.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>likelihood_transforms</code>
             </td>
             <td>
@@ -2617,9 +2633,12 @@ checks, initial-position draws, etc.).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If prior parameters overlap with fixed parameters, if prior
-parameters are not consumed by the likelihood, or if the likelihood
-requires parameters not provided by the prior or fixed_parameters.</p>
+                <p>If any transform (sample or likelihood) produces a parameter
+that already exists in the current parameter space but is not consumed
+by that same transform; if prior parameters overlap with fixed
+parameters; if prior parameters are not consumed by the likelihood; or
+if the likelihood requires parameters not provided by the prior or
+fixed_parameters.</p>
               </div>
             </td>
           </tr>
