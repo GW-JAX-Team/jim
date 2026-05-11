@@ -52,6 +52,7 @@ from jimgw.core.transforms import (
     CosineTransform,
     NtoMTransform,
     PowerLawTransform,
+    RayleighTransform,
     SineTransform,
     reverse_bijective_transform,
 )
@@ -365,10 +366,21 @@ def _unit_cube_for_spec(name: str, spec) -> list:
                 )
             )
         ]
-    assert not isinstance(spec, (GaussianSpec, RayleighSpec)), (
-        f"Prior type '{type(spec).__name__}' for parameter '{name}' has infinite "
+    if isinstance(spec, RayleighSpec):
+        # RayleighPrior is built as UniformPrior(0,1) ∘ RayleighTransform (the CDF map
+        # u → scale*sqrt(-2*log(u))).  The inverse CDF maps x → exp(-(x/scale)²/2) ∈ [0,1].
+        return [
+            reverse_bijective_transform(
+                RayleighTransform(
+                    name_mapping=([f"{name}_unit"], [name]),
+                    sigma=spec.scale,
+                )
+            )
+        ]
+    assert not isinstance(spec, GaussianSpec), (
+        f"Prior type 'GaussianSpec' for parameter '{name}' has infinite "
         "support and cannot be automatically mapped to [0, 1] for NS-AW. "
-        "Use a bounded prior (uniform, sine, cosine, power_law) instead."
+        "Use a bounded prior (uniform, sine, cosine, power_law, rayleigh) instead."
     )
     assert False, f"Unknown prior spec type for '{name}': {type(spec)}"
 
