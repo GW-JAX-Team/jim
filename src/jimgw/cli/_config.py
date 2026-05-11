@@ -24,7 +24,7 @@ from pydantic import (
 from jimgw.samplers.config import SamplerConfig
 
 
-from jimgw.cli._params import (
+from jimgw.cli._utils import (
     CARTESIAN_SPIN_PARAMS as _CARTESIAN_SPIN_PARAMS,
     DETECTOR_SKY_PARAMS as _DETECTOR_SKY_PARAMS,
     EQUATORIAL_SKY_PARAMS as _EQUATORIAL_SKY_PARAMS,
@@ -54,6 +54,14 @@ class _DataBase(BaseModel):
                 f"Unknown detector name(s): {unknown}. "
                 f"Supported: {sorted(_SUPPORTED_DETECTORS)}"
             )
+        if len(v) != len(set(v)):
+            seen: set[str] = set()
+            duplicates: list[str] = []
+            for d in v:
+                if d in seen:
+                    duplicates.append(d)
+                seen.add(d)
+            raise ValueError(f"Duplicate detector name(s): {duplicates}")
         return v
 
 
@@ -143,12 +151,28 @@ class UniformSpec(BaseModel):
     min: float
     max: float
 
+    @model_validator(mode="after")
+    def _check_bounds(self) -> "UniformSpec":
+        if self.min >= self.max:
+            raise ValueError(
+                f"uniform prior requires min < max, got min={self.min}, max={self.max}"
+            )
+        return self
+
 
 class GaussianSpec(BaseModel):
     model_config = {"extra": "forbid"}
     type: Literal["gaussian"] = "gaussian"
     loc: float
     scale: float
+
+    @model_validator(mode="after")
+    def _check_scale(self) -> "GaussianSpec":
+        if self.scale <= 0:
+            raise ValueError(
+                f"gaussian prior requires scale > 0, got scale={self.scale}"
+            )
+        return self
 
 
 class SineSpec(BaseModel):
@@ -168,11 +192,27 @@ class PowerLawSpec(BaseModel):
     max: float
     alpha: float
 
+    @model_validator(mode="after")
+    def _check_bounds(self) -> "PowerLawSpec":
+        if self.min >= self.max:
+            raise ValueError(
+                f"power_law prior requires min < max, got min={self.min}, max={self.max}"
+            )
+        return self
+
 
 class RayleighSpec(BaseModel):
     model_config = {"extra": "forbid"}
     type: Literal["rayleigh"] = "rayleigh"
     scale: float
+
+    @model_validator(mode="after")
+    def _check_scale(self) -> "RayleighSpec":
+        if self.scale <= 0:
+            raise ValueError(
+                f"rayleigh prior requires scale > 0, got scale={self.scale}"
+            )
+        return self
 
 
 class UniformSphereSpec(BaseModel):
@@ -446,8 +486,23 @@ class PipelineConfig(BaseModel):
     def _validate_sky_time_parametrization(self) -> "PipelineConfig":
         prior_keys = frozenset(self.prior.root.keys())
 
-        has_equatorial_sky = bool(prior_keys & _EQUATORIAL_SKY_PARAMS)
-        has_detector_sky = bool(prior_keys & _DETECTOR_SKY_PARAMS)
+        equatorial_present = prior_keys & _EQUATORIAL_SKY_PARAMS
+        if equatorial_present and not (_EQUATORIAL_SKY_PARAMS <= prior_keys):
+            missing = _EQUATORIAL_SKY_PARAMS - prior_keys
+            raise ValueError(
+                f"[prior] must contain both 'ra' and 'dec' together; "
+                f"missing: {sorted(missing)}"
+            )
+        detector_present = prior_keys & _DETECTOR_SKY_PARAMS
+        if detector_present and not (_DETECTOR_SKY_PARAMS <= prior_keys):
+            missing = _DETECTOR_SKY_PARAMS - prior_keys
+            raise ValueError(
+                f"[prior] must contain both 'azimuth' and 'zenith' together; "
+                f"missing: {sorted(missing)}"
+            )
+
+        has_equatorial_sky = bool(equatorial_present)
+        has_detector_sky = bool(detector_present)
         if has_equatorial_sky and has_detector_sky:
             raise ValueError(
                 "Sky parametrizations are mutually exclusive: "

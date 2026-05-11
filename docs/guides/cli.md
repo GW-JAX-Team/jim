@@ -51,7 +51,7 @@ Injects a waveform into simulated design-sensitivity Gaussian noise.
 | `trigger_time` | float | — | GPS trigger time |
 | `duration` | float | — | Segment length (seconds) |
 | `sampling_frequency` | float | — | Sample rate in Hz (e.g. `2048.0`) |
-| `injection_parameters` | dict[str, float] | — | True parameter values in the **likelihood** parameter space |
+| `injection_parameters` | dict[str, float] | — | Signal parameters to inject |
 | `zero_noise` | bool | `false` | If `true`, inject into zero noise (noiseless matched-filter test) |
 
 Example:

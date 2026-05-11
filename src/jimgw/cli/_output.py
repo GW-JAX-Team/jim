@@ -9,6 +9,8 @@ import tomli_w
 import jax.numpy as jnp
 
 from jimgw.cli._transforms import to_likelihood_space
+from jimgw.core.single_event.detector import GroundBased2G
+from jimgw.core.transforms import NtoMTransform
 
 logger = logging.getLogger(__name__)
 
@@ -83,11 +85,11 @@ def write_outputs(jim, cfg) -> None:
 
 def _injection_truths_in_prior_space(
     injection_parameters: dict[str, float],
-    likelihood_transforms,
+    likelihood_transforms: list[NtoMTransform],
     waveform_f_ref: float,
-    trigger_time: Optional[float] = None,
-    ifos=None,
-    time_frame: str = "detector",
+    trigger_time: float,
+    ifos: list[GroundBased2G],
+    time_frame: str,
 ) -> Optional[dict[str, float]]:
     """Convert injection parameters to prior space for corner plot truth markers.
 
@@ -109,7 +111,7 @@ def _injection_truths_in_prior_space(
         # All currently supported likelihood transforms have a backward method
         # but this may not always be the case.
         if hasattr(transform, "backward"):
-            p = transform.backward(p)
+            p = transform.backward(p)  # type: ignore[attr-defined]
         else:
             logger.warning(
                 "Likelihood transform %s does not have a backward method — "
@@ -134,16 +136,12 @@ def _save_corner(
         logger.warning("corner or matplotlib not available — skipping corner plot")
         return
 
+    labels = list(samples.keys())
     if param_names:
-        labels = [p for p in param_names if p in samples]
-        if labels:
-            data = np.column_stack([np.asarray(samples[p]) for p in labels])
-        else:
-            labels = list(samples.keys())
-            data = np.column_stack([np.asarray(samples[p]) for p in labels])
-    else:
-        labels = list(samples.keys())
-        data = np.column_stack([np.asarray(samples[p]) for p in labels])
+        filtered = [p for p in param_names if p in samples]
+        if filtered:
+            labels = filtered
+    data = np.column_stack([np.asarray(samples[p]) for p in labels])
 
     truth_values = [truths.get(p) for p in labels] if truths else None
 

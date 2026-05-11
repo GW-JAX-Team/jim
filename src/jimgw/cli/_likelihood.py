@@ -8,7 +8,6 @@ from jimgw.cli._config import (
     CLIOptimizerRefParams,
     CLIProvidedRefParams,
     DataConfig,
-    InjectionDataConfig,
     LikelihoodConfig,
 )
 from jimgw.cli._transforms import to_likelihood_space
@@ -35,10 +34,10 @@ def build_likelihood(
     waveform: Waveform,
     trigger_time: float,
     waveform_f_ref: float,
-    prior: Optional[CombinePrior] = None,
-    likelihood_transforms: Optional[list[NtoMTransform]] = None,
-    data_cfg: Optional[DataConfig] = None,
-    time_frame: Optional[str] = None,
+    time_frame: str,
+    prior: CombinePrior,
+    likelihood_transforms: list[NtoMTransform],
+    data_cfg: DataConfig,
 ) -> Union[TransientLikelihoodFD, HeterodynedTransientLikelihoodFD]:
     """Build a likelihood from the validated likelihood config.
 
@@ -57,10 +56,6 @@ def build_likelihood(
     fixed_params = cfg.fixed_parameters if cfg.fixed_parameters else None
 
     if cfg.heterodyne is not None:
-        assert prior is not None, (
-            "heterodyne likelihood requires the prior — pass prior= to build_likelihood"
-        )
-
         ref_cfg = cfg.heterodyne.reference_parameters
         reference_params: Optional[dict] = None
         optimizer_popsize = 500
@@ -72,12 +67,8 @@ def build_likelihood(
         elif isinstance(ref_cfg, CLIProvidedRefParams):
             reference_params = ref_cfg.values
         elif isinstance(ref_cfg, CLIInjectionRefParams):
-            assert isinstance(data_cfg, InjectionDataConfig), (
-                "heterodyne.reference_parameters.type = 'injection' requires "
-                "data.type = 'injection'"
-            )
             reference_params = to_likelihood_space(
-                data_cfg.injection_parameters,
+                data_cfg.injection_parameters,  # type: ignore[attr-defined]
                 waveform_f_ref=waveform_f_ref,
                 trigger_time=trigger_time,
                 ifos=ifos,
@@ -99,7 +90,7 @@ def build_likelihood(
             optimizer_popsize=optimizer_popsize,
             optimizer_n_steps=optimizer_n_steps,
             prior=prior,
-            likelihood_transforms=likelihood_transforms or [],
+            likelihood_transforms=likelihood_transforms,
             phase_marginalization=phase_marg,
             reference_parameters=reference_params,
         )
@@ -118,9 +109,6 @@ def build_likelihood(
     dist_marg = None
     if cfg.distance_marginalization is not None:
         dist_combined = build_prior(cfg.distance_marginalization.distance_prior)
-        assert len(dist_combined.base_prior) == 1, (
-            "distance_marginalization.distance_prior must contain exactly one parameter"
-        )
         dist_marg = DistanceMargConfig(
             distance_prior=dist_combined.base_prior[0],
             n_dist_points=cfg.distance_marginalization.n_dist_points,

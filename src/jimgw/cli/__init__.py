@@ -183,7 +183,7 @@ def run(
         ifos,
         cfg.sampling,
         unit_cube=ns_aw,
-        prior_cfg=cfg.prior if ns_aw else None,
+        prior_cfg=cfg.prior,
     )
     likelihood_transforms = infer_likelihood_transforms(
         prior_params,

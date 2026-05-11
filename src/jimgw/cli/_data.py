@@ -27,11 +27,6 @@ def build_data(
     """
     preset = get_detector_preset()
 
-    unknown = [d for d in data_cfg.detectors if d not in preset]
-    assert unknown == [], (
-        f"Unknown detector name(s): {unknown}. Supported: {sorted(preset.keys())}"
-    )
-
     ifos: list[GroundBased2G] = []
     for name in data_cfg.detectors:
         val = preset[name]
@@ -91,10 +86,6 @@ def _load_injection(
     f_max: float,
     time_frame: str = "detector",
 ) -> None:
-    assert waveform is not None, (
-        "waveform is required for injection data — build it before calling build_data."
-    )
-
     parameters = to_likelihood_space(
         cfg.injection_parameters,
         waveform_f_ref=waveform.f_ref,
@@ -122,11 +113,8 @@ def _load_injection(
 
 def _load_files(ifos: list[GroundBased2G], cfg: FileDataConfig) -> None:
     for ifo in ifos:
-        strain_path = cfg.strain_files.get(ifo.name)
-        psd_path = cfg.psd_files.get(ifo.name)
-
-        assert strain_path is not None, f"No strain file specified for {ifo.name}"
-        assert psd_path is not None, f"No PSD file specified for {ifo.name}"
+        strain_path = cfg.strain_files[ifo.name]
+        psd_path = cfg.psd_files[ifo.name]
 
         logger.info("Loading %s strain from %s", ifo.name, strain_path)
         ifo.set_data(Data.from_file(str(strain_path)))

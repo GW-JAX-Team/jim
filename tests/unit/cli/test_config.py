@@ -241,3 +241,93 @@ def test_file_data_config_missing_psd_rejected():
                 },
             }
         )
+
+
+# ---------------------------------------------------------------------------
+# Prior spec validators
+# ---------------------------------------------------------------------------
+
+
+def test_uniform_spec_inverted_bounds_rejected():
+    with pytest.raises(ValidationError, match="min < max"):
+        PriorConfig.model_validate({"x": {"type": "uniform", "min": 5.0, "max": 1.0}})
+
+
+def test_uniform_spec_equal_bounds_rejected():
+    with pytest.raises(ValidationError, match="min < max"):
+        PriorConfig.model_validate({"x": {"type": "uniform", "min": 3.0, "max": 3.0}})
+
+
+def test_power_law_spec_inverted_bounds_rejected():
+    with pytest.raises(ValidationError, match="min < max"):
+        PriorConfig.model_validate(
+            {"d_L": {"type": "power_law", "min": 2000.0, "max": 1.0, "alpha": 2.0}}
+        )
+
+
+def test_gaussian_spec_zero_scale_rejected():
+    with pytest.raises(ValidationError, match="scale > 0"):
+        PriorConfig.model_validate({"x": {"type": "gaussian", "loc": 0.0, "scale": 0.0}})
+
+
+def test_gaussian_spec_negative_scale_rejected():
+    with pytest.raises(ValidationError, match="scale > 0"):
+        PriorConfig.model_validate({"x": {"type": "gaussian", "loc": 0.0, "scale": -1.0}})
+
+
+def test_rayleigh_spec_zero_scale_rejected():
+    with pytest.raises(ValidationError, match="scale > 0"):
+        PriorConfig.model_validate({"sigma": {"type": "rayleigh", "scale": 0.0}})
+
+
+def test_rayleigh_spec_negative_scale_rejected():
+    with pytest.raises(ValidationError, match="scale > 0"):
+        PriorConfig.model_validate({"sigma": {"type": "rayleigh", "scale": -0.5}})
+
+
+# ---------------------------------------------------------------------------
+# Detector list validators
+# ---------------------------------------------------------------------------
+
+
+def test_duplicate_detectors_rejected():
+    with pytest.raises(ValidationError, match="Duplicate"):
+        PipelineConfig.model_validate(
+            {**_MINIMAL_RAW, "data": {**_MINIMAL_RAW["data"], "detectors": ["H1", "H1"]}}
+        )
+
+
+# ---------------------------------------------------------------------------
+# Sky parametrization completeness
+# ---------------------------------------------------------------------------
+
+
+def test_incomplete_equatorial_sky_rejected():
+    with pytest.raises(ValidationError, match="both 'ra' and 'dec'"):
+        PipelineConfig.model_validate(
+            {
+                **_MINIMAL_RAW,
+                "prior": {
+                    "M_c": {"type": "uniform", "min": 10.0, "max": 80.0},
+                    "q": {"type": "uniform", "min": 0.125, "max": 1.0},
+                    "ra": {"type": "uniform", "min": 0.0, "max": 6.283},
+                    # dec missing
+                },
+            }
+        )
+
+
+def test_incomplete_detector_sky_rejected():
+    with pytest.raises(ValidationError, match="both 'azimuth' and 'zenith'"):
+        PipelineConfig.model_validate(
+            {
+                **_MINIMAL_RAW,
+                "prior": {
+                    "M_c": {"type": "uniform", "min": 10.0, "max": 80.0},
+                    "q": {"type": "uniform", "min": 0.125, "max": 1.0},
+                    "azimuth": {"type": "uniform", "min": 0.0, "max": 6.283},
+                    # zenith missing
+                },
+                "sampling": {"sky_frame": "detector"},
+            }
+        )

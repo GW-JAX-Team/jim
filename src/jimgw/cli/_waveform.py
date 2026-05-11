@@ -30,9 +30,6 @@ _REGISTRY = {
 
 def build_waveform(cfg: WaveformConfig):
     """Instantiate the ripple waveform specified by *cfg*."""
-    assert cfg.approximant in _REGISTRY, (
-        f"Unknown approximant '{cfg.approximant}'. Supported: {sorted(_REGISTRY)}"
-    )
     cls = _REGISTRY[cfg.approximant]
     waveform = cls(f_ref=cfg.f_ref)
     logger.info("Built waveform: %s(f_ref=%.1f)", type(waveform).__name__, cfg.f_ref)
