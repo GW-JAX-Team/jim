@@ -20,9 +20,9 @@ s2_z    = { type = "uniform",   min = -0.99, max = 0.99  }
 iota    = { type = "sine" }
 d_L     = { type = "power_law", min = 1.0,   max = 2000.0, alpha = 2.0 }
 t_c     = { type = "uniform",   min = -0.1,  max = 0.1   }
-phase_c = { type = "uniform",   min = 0.0,   max = 6.283185307179586 }  # 2π
-psi     = { type = "uniform",   min = 0.0,   max = 3.141592653589793 }  # π
-ra      = { type = "uniform",   min = 0.0,   max = 6.283185307179586 }  # 2π
+phase_c = { type = "uniform",   min = 0.0,   max = 6.283185307179586 }
+psi     = { type = "uniform",   min = 0.0,   max = 3.141592653589793 }
+ra      = { type = "uniform",   min = 0.0,   max = 6.283185307179586 }
 dec     = { type = "cosine" }
 
 [likelihood]
