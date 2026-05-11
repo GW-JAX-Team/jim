@@ -15,7 +15,6 @@ from jimgw.cli._config import (
     PriorConfig,
     RayleighSpec,
     SineSpec,
-    UniformSpec,
     WaveformConfig,
 )
 
