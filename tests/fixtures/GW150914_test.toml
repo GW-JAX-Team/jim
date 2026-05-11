@@ -2,7 +2,7 @@ seed = 0
 
 [data]
 type = "file"
-ifos = ["H1", "L1"]
+detectors = ["H1", "L1"]
 trigger_time = 1126259462.4
 
 [data.strain_files]

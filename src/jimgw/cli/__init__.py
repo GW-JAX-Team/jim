@@ -21,7 +21,7 @@ seed = 0
 
 [data]
 type = "gwosc"
-ifos = ["H1", "L1"]
+detectors = ["H1", "L1"]
 trigger_time = 1126259462.4
 duration = 4.0
 post_trigger_duration = 2.0
@@ -223,9 +223,9 @@ def run(
 def _log_config_summary(cfg: PipelineConfig) -> None:
     logger.info("seed: %d", cfg.seed)
     logger.info(
-        "data: type=%s, ifos=%s",
+        "data: type=%s, detectors=%s",
         cfg.data.type,
-        cfg.data.ifos,
+        cfg.data.detectors,
     )
     logger.info(
         "waveform: %s (f_ref=%.1f Hz)", cfg.waveform.approximant, cfg.waveform.f_ref

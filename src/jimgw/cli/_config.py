@@ -51,13 +51,13 @@ class FileDataConfig(_DataBase):
     """Load pre-saved strain and PSD from .npz files (useful for CI/offline use)."""
 
     type: Literal["file"] = "file"
-    strain_files: dict[str, Path]  # ifo_name -> .npz with 'strain', 'times'
-    psd_files: dict[str, Path]  # ifo_name -> .npz with 'psd', 'freqs'
+    strain_files: dict[str, Path]  # detector_name -> .npz with 'strain', 'times'
+    psd_files: dict[str, Path]  # detector_name -> .npz with 'psd', 'freqs'
 
     @model_validator(mode="after")
-    def _check_all_ifos_have_files(self) -> "FileDataConfig":
-        missing_strain = [ifo for ifo in self.ifos if ifo not in self.strain_files]
-        missing_psd = [ifo for ifo in self.ifos if ifo not in self.psd_files]
+    def _check_all_detectors_have_files(self) -> "FileDataConfig":
+        missing_strain = [d for d in self.detectors if d not in self.strain_files]
+        missing_psd = [d for d in self.detectors if d not in self.psd_files]
         if missing_strain:
             raise ValueError(f"strain_files missing for: {missing_strain}")
         if missing_psd:
@@ -190,8 +190,8 @@ class SamplingConfig(BaseModel):
     model_config = {"extra": "forbid"}
 
     time_frame: str = "detector"
-    """IFO name to sample arrival time in (e.g. "H1"). Special values:
-    - ``"detector"`` (default): use the first entry in data.ifos.
+    """Detector name to sample arrival time in (e.g. "H1"). Special values:
+    - ``"detector"`` (default): use the first entry in data.detectors.
     - ``"geocentric"``: sample t_c directly without a time sample transform.
     Only used when ``t_c`` is in the prior."""
 

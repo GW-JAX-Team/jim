@@ -35,7 +35,7 @@ Fetches public LIGO/Virgo/KAGRA strain and PSD from the Gravitational-Wave Open 
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `ifos` | list[str] | — | Detector identifiers, e.g. `["H1", "L1", "V1"]` |
+| `detectors` | list[str] | — | Detector identifiers, e.g. `["H1", "L1", "V1"]` |
 | `trigger_time` | float | — | GPS trigger time (seconds) |
 | `duration` | float | — | Analysis segment length (seconds) |
 | `post_trigger_duration` | float | `2.0` | Seconds after the trigger kept in the window |
@@ -47,7 +47,7 @@ Injects a waveform into simulated design-sensitivity Gaussian noise.
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `ifos` | list[str] | — | Detector identifiers |
+| `detectors` | list[str] | — | Detector identifiers |
 | `trigger_time` | float | — | GPS trigger time |
 | `duration` | float | — | Segment length (seconds) |
 | `sampling_frequency` | float | — | Sample rate in Hz (e.g. `2048.0`) |
@@ -59,7 +59,7 @@ Example:
 ```toml
 [data]
 type = "injection"
-ifos = ["H1", "L1"]
+detectors = ["H1", "L1"]
 trigger_time = 1126259462.4
 duration = 4.0
 sampling_frequency = 2048.0
@@ -84,10 +84,10 @@ Loads strain and PSD from local files. Useful for offline or CI use.
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `ifos` | list[str] | — | Detector identifiers |
+| `detectors` | list[str] | — | Detector identifiers |
 | `trigger_time` | float | — | GPS trigger time |
-| `strain_files` | dict[str, path] | — | Map from IFO name to `.npz` file containing `strain` and `times` arrays |
-| `psd_files` | dict[str, path] | — | Map from IFO name to `.npz` file containing `psd` and `freqs` arrays |
+| `strain_files` | dict[str, path] | — | Map from detector name to `.npz` file containing `strain` and `times` arrays |
+| `psd_files` | dict[str, path] | — | Map from detector name to `.npz` file containing `psd` and `freqs` arrays |
 
 ---
 

@@ -19,7 +19,7 @@ seed = 0
 
 [data]
 type = "gwosc"
-ifos = ["H1", "L1"]
+detectors = ["H1", "L1"]
 trigger_time = 1126259462.4
 duration = 4.0
 post_trigger_duration = 2.0
@@ -83,7 +83,7 @@ Add `-v` for debug-level logging. Progress is written to stdout:
 ```text
 INFO | jimgw.cli | Loaded config from gw150914.toml
 INFO | jimgw.cli | seed: 0
-INFO | jimgw.cli | data: type=gwosc, ifos=['H1', 'L1']
+INFO | jimgw.cli | data: type=gwosc, detectors=['H1', 'L1']
 INFO | jimgw.cli | waveform: IMRPhenomXAS (f_ref=20.0 Hz)
 INFO | jimgw.cli | prior: 11 parameter(s): ['M_c', 'q', ...]
 INFO | jimgw.cli | sampler: type=flowmc

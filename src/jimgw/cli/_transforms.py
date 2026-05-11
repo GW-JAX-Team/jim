@@ -116,7 +116,7 @@ def infer_sample_transforms(
             )
         )
         logger.debug(
-            "Added GeocentricArrivalTimeToDetectorArrivalTimeTransform(ifo=%s)",
+            "Added GeocentricArrivalTimeToDetectorArrivalTimeTransform(detector=%s)",
             ifo_name,
         )
     elif has_geocentric_time:
