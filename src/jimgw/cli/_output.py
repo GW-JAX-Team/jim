@@ -85,7 +85,7 @@ def _injection_truths_in_prior_space(
     injection_parameters: dict[str, float],
     likelihood_transforms,
     waveform_f_ref: float,
-    trigger_time: float | None = None,
+    trigger_time: Optional[float] = None,
     ifos=None,
     time_frame: str = "detector",
 ) -> Optional[dict[str, float]]:
@@ -124,7 +124,7 @@ def _injection_truths_in_prior_space(
 def _save_corner(
     out_dir: Path,
     samples: dict,
-    param_names: list[str] | None,
+    param_names: Optional[list[str]] = None,
     truths: Optional[dict[str, float]] = None,
 ) -> None:
     try:

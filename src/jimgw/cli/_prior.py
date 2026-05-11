@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from jimgw.cli._config import (
     CosineSpec,
@@ -58,7 +59,7 @@ def build_prior(cfg: PriorConfig):
 def adapt_prior_for_ns_time(
     prior_cfg: PriorConfig,
     sampling_cfg: SamplingConfig,
-) -> PriorConfig | None:
+) -> Optional[PriorConfig]:
     """For NS-AW: replace the time parameter so the unit-cube bounds are exact.
 
     Both ``t_c`` and ``t_det`` are treated as offsets from ``trigger_time``
