@@ -176,8 +176,8 @@ Optional section that controls the coordinate system the sampler explores. The C
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `time_frame` | str | `"detector"` | IFO name to sample arrival time in (e.g. `"H1"`), or `"geocentric"` to sample `t_c` directly |
-| `sky_frame` | str | `"detector"` | `"detector"` samples azimuth/zenith; `"geocentric"` samples ra/dec directly |
+| `time_frame` | str | `"detector"` | Controls the sampling parameter space of signal arrival times. `"detector"` (default): sample detector time rather than geocentric. Set to an explicit detector name (e.g. `"H1"`) to use a specific detector. `"geocentric"`: sample geocentric time directly. |
+| `sky_frame` | str | `"detector"` | Controls the sampling parameter space of sky position. `"detector"` (default): sample `azimuth`/`zenith` relative to the detector baseline (requires ≥ 2 detectors). `"geocentric"`: sample `ra`/`dec` directly. |
 
 ---
 
