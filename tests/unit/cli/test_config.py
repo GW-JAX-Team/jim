@@ -21,7 +21,7 @@ from jimgw.cli._config import (
 _MINIMAL_RAW = {
     "data": {
         "type": "gwosc",
-        "ifos": ["H1", "L1"],
+        "detectors": ["H1", "L1"],
         "trigger_time": 1126259462.4,
         "duration": 4.0,
         "psd_duration": 1024.0,
@@ -40,7 +40,7 @@ _MINIMAL_RAW = {
 def test_pipeline_config_minimal():
     cfg = PipelineConfig.model_validate(_MINIMAL_RAW)
     assert isinstance(cfg.data, GWOSCDataConfig)
-    assert cfg.data.ifos == ["H1", "L1"]
+    assert cfg.data.detectors == ["H1", "L1"]
     assert cfg.waveform.approximant == "IMRPhenomXAS"
     assert cfg.waveform.f_ref == 20.0  # default
     assert cfg.seed == 0  # default
@@ -51,7 +51,7 @@ def test_pipeline_config_file_data():
         **_MINIMAL_RAW,
         "data": {
             "type": "file",
-            "ifos": ["H1"],
+            "detectors": ["H1"],
             "trigger_time": 1126259462.4,
             "strain_files": {"H1": "tests/fixtures/GW150914_strain_H1.npz"},
             "psd_files": {"H1": "tests/fixtures/GW150914_psd_H1.npz"},
@@ -66,7 +66,7 @@ def test_pipeline_config_injection_data():
         **_MINIMAL_RAW,
         "data": {
             "type": "injection",
-            "ifos": ["H1"],
+            "detectors": ["H1"],
             "trigger_time": 1126259462.4,
             "duration": 4.0,
             "sampling_frequency": 2048.0,
