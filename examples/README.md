@@ -2,15 +2,15 @@
 
 This directory contains two kinds of examples.
 
-## CLI configs (`configs/`)
+## CLI configs (`cli/`)
 
 TOML config files for `jim-run` — the recommended way to run an analysis:
 
 ```bash
-jim-run configs/GW150914_flowmc.toml
+jim-run cli/GW150914_flowmc.toml
 ```
 
-See [`configs/README.md`](configs/README.md) for details.
+See [`cli/README.md`](cli/README.md) for details.
 
 ## Python scripts
 
