@@ -11,10 +11,7 @@ from ripplegw.interfaces import Waveform
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.prior import Prior
 from jimgw.core.transforms import BijectiveTransform, NtoMTransform
-from jimgw.core.single_event.likelihood import (
-    SingleEventLikelihood,
-    TransientLikelihoodFD,
-)
+from jimgw.core.single_event.likelihood import SingleEventLikelihood
 from jimgw.samplers import Sampler, SamplerConfig, build_sampler
 
 logger = logging.getLogger(__name__)
@@ -205,13 +202,12 @@ class Jim:
 
         consumed: set[str] = set(wf_param_names)
         consumed |= {"ra", "dec", "psi", "t_c"}
-        if isinstance(likelihood, TransientLikelihoodFD):
-            if likelihood.time_marginalization:
-                consumed.discard("t_c")
-            if likelihood.phase_marginalization:
-                consumed.discard("phase_c")
-            if likelihood.distance_marginalization:
-                consumed.discard("d_L")
+        if getattr(likelihood, "time_marginalization", False):
+            consumed.discard("t_c")
+        if getattr(likelihood, "phase_marginalization", False):
+            consumed.discard("phase_c")
+        if getattr(likelihood, "distance_marginalization", False):
+            consumed.discard("d_L")
 
         provided = set(likelihood_names)
         if likelihood.fixed_parameters:
