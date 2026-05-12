@@ -493,5 +493,3 @@ def test_adapt_ns_time_t_det_geocentric():
     assert isinstance(spec, UniformSpec)
     assert spec.min == lo
     assert spec.max == hi
-
-

@@ -93,7 +93,9 @@ def test_pipeline_config_injection_data():
 
 
 def test_prior_spec_uniform():
-    cfg = PriorConfig.model_validate({"M_c": {"type": "uniform", "min": 10.0, "max": 80.0}})
+    cfg = PriorConfig.model_validate(
+        {"M_c": {"type": "uniform", "min": 10.0, "max": 80.0}}
+    )
     spec = cfg.root["M_c"]
     assert isinstance(spec, UniformSpec)
     assert spec.min == 10.0
@@ -108,7 +110,9 @@ def test_prior_spec_rayleigh():
 
 
 def test_prior_spec_gaussian():
-    cfg = PriorConfig.model_validate({"x": {"type": "gaussian", "loc": 2.0, "scale": 0.5}})
+    cfg = PriorConfig.model_validate(
+        {"x": {"type": "gaussian", "loc": 2.0, "scale": 0.5}}
+    )
     spec = cfg.root["x"]
     assert isinstance(spec, GaussianSpec)
     assert spec.loc == 2.0
@@ -267,12 +271,16 @@ def test_power_law_spec_inverted_bounds_rejected():
 
 def test_gaussian_spec_zero_scale_rejected():
     with pytest.raises(ValidationError, match="scale > 0"):
-        PriorConfig.model_validate({"x": {"type": "gaussian", "loc": 0.0, "scale": 0.0}})
+        PriorConfig.model_validate(
+            {"x": {"type": "gaussian", "loc": 0.0, "scale": 0.0}}
+        )
 
 
 def test_gaussian_spec_negative_scale_rejected():
     with pytest.raises(ValidationError, match="scale > 0"):
-        PriorConfig.model_validate({"x": {"type": "gaussian", "loc": 0.0, "scale": -1.0}})
+        PriorConfig.model_validate(
+            {"x": {"type": "gaussian", "loc": 0.0, "scale": -1.0}}
+        )
 
 
 def test_rayleigh_spec_zero_scale_rejected():
@@ -293,7 +301,10 @@ def test_rayleigh_spec_negative_scale_rejected():
 def test_duplicate_detectors_rejected():
     with pytest.raises(ValidationError, match="Duplicate"):
         PipelineConfig.model_validate(
-            {**_MINIMAL_RAW, "data": {**_MINIMAL_RAW["data"], "detectors": ["H1", "H1"]}}
+            {
+                **_MINIMAL_RAW,
+                "data": {**_MINIMAL_RAW["data"], "detectors": ["H1", "H1"]},
+            }
         )
 
 
@@ -366,4 +377,3 @@ def test_ns_aw_non_uniform_t_det_rejected():
                 "sampler": {"type": "blackjax-ns-aw"},
             }
         )
-
