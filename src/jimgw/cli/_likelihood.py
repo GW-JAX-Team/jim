@@ -1,6 +1,7 @@
 import logging
 from typing import Optional, Union
 
+import jax.numpy as jnp
 from ripplegw.interfaces import Waveform
 
 from jimgw.cli._config import (
@@ -12,7 +13,7 @@ from jimgw.cli._config import (
 )
 from jimgw.cli._transforms import to_likelihood_space
 from jimgw.cli._prior import build_prior
-from jimgw.core.prior import CombinePrior
+from jimgw.core.prior import CombinePrior, UniformPrior
 from jimgw.core.single_event.detector import GroundBased2G
 from jimgw.core.single_event.likelihood import (
     HeterodynedTransientLikelihoodFD,
@@ -64,6 +65,20 @@ def build_likelihood(
         if isinstance(ref_cfg, CLIOptimizerRefParams):
             optimizer_popsize = ref_cfg.popsize
             optimizer_n_steps = ref_cfg.n_steps
+            # Phase-marginalised heterodyned likelihood with the optimizer: the
+            # optimizer needs phase_c in the prior to search over it, but the
+            # user should not have to (and must not) include it themselves since
+            # it is a marginalised parameter.  Add a default Uniform(0, 2π)
+            # component here; the caller's `prior` (without phase_c) is still
+            # passed to Jim.__init__ unchanged.
+            if cfg.phase_marginalization and "phase_c" not in prior.parameter_names:
+                prior = CombinePrior(
+                    list(prior.base_prior)
+                    + [UniformPrior(0.0, 2 * jnp.pi, ["phase_c"])]
+                )
+                logger.info(
+                    "Added Uniform(0, 2π) prior on phase_c for optimizer reference parameter search"
+                )
         elif isinstance(ref_cfg, CLIProvidedRefParams):
             reference_params = ref_cfg.values
         elif isinstance(ref_cfg, CLIInjectionRefParams):
