@@ -39,10 +39,10 @@ waveform = RippleIMRPhenomXAS(f_ref=20)
 gps = time.time() - 1000
 random_samples = jax.random.uniform(jax.random.key(0), (3,), maxval=jnp.pi)
 
-# Injection parameters in likelihood space.
+# Injection parameters in likelihood space
 injection_parameters = {
     "M_c": 30.0,
-    "eta": 0.24,
+    "eta": 0.249,
     "s1_z": 0.3,
     "s2_z": -0.2,
     "ra": random_samples[0] * 2.0,
@@ -91,7 +91,6 @@ prior = CombinePrior(
         SinePrior(parameter_names=["iota"]),
         PowerLawPrior(1.0, 2000.0, 2.0, parameter_names=["d_L"]),
         UniformPrior(-0.1, 0.1, parameter_names=["t_c"]),
-        UniformPrior(0.0, 2 * jnp.pi, parameter_names=["phase_c"]),
         UniformPrior(0.0, jnp.pi, parameter_names=["psi"]),
         UniformPrior(0.0, 2 * jnp.pi, parameter_names=["ra"]),
         CosinePrior(parameter_names=["dec"]),
@@ -117,6 +116,7 @@ likelihood = TransientLikelihoodFD(
     trigger_time=gps,
     f_min=f_min,
     f_max=f_max,
+    phase_marginalization=True,
 )
 
 # --- Sample ---
@@ -127,7 +127,6 @@ jim = Jim(
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
     periodic={
-        "phase_c": (0.0, 2 * float(jnp.pi)),
         "psi": (0.0, float(jnp.pi)),
         "azimuth": (0.0, 2 * float(jnp.pi)),
     },
@@ -163,7 +162,6 @@ parameter_labels = {
     "iota": r"$\iota$",
     "d_L": r"$d_L\,[\mathrm{Mpc}]$",
     "t_c": r"$t_c\,[\mathrm{s}]$",
-    "phase_c": r"$\phi_c$",
     "psi": r"$\psi$",
     "ra": r"$\alpha$",
     "dec": r"$\delta$",
