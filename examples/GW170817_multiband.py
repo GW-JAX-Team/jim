@@ -56,7 +56,7 @@ for ifo in ifos:
     ifo.set_data(strain_data)
     psd_data = Data.from_gwosc(ifo.name, psd_start, psd_end)
     ifo.set_psd(
-        psd_data.to_psd(nperseg=strain_data.duration * strain_data.sampling_frequency)
+        psd_data.to_psd(nperseg=int(strain_data.duration * strain_data.sampling_frequency))
     )
 
 # --- Waveform model ---
@@ -116,6 +116,7 @@ jim = Jim(
     likelihood_transforms=likelihood_transforms,
     periodic={
         "psi": (0.0, float(jnp.pi)),
+        "phase_c": (0.0, 2 * float(jnp.pi)),
         "azimuth": (0.0, 2 * float(jnp.pi)),
     },
     sampler_config=FlowMCConfig(

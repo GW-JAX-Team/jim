@@ -56,7 +56,7 @@ for ifo in ifos:
     ifo.set_data(strain_data)
     psd_data = Data.from_gwosc(ifo.name, psd_start, psd_end)
     ifo.set_psd(
-        psd_data.to_psd(nperseg=strain_data.duration * strain_data.sampling_frequency)
+        psd_data.to_psd(nperseg=int(strain_data.duration * strain_data.sampling_frequency))
     )
 
 # --- Waveform model ---
