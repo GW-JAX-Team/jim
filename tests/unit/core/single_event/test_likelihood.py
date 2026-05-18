@@ -139,7 +139,7 @@ class TestTransientLikelihoodFD:
                 str(FIXTURES_DIR / f"GW150914_psd_{extra.name}.npz")
             )
         )
-        with pytest.raises(ValueError, match="H1.*does not have initialized data"):
+        with pytest.raises(ValueError, match=r"H1.*does not have initialized data"):
             TransientLikelihoodFD(
                 detectors=ifos + [extra],
                 waveform=waveform,
