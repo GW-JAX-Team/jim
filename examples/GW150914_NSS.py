@@ -62,14 +62,13 @@ waveform = RippleIMRPhenomXAS(f_ref=20)
 
 prior = CombinePrior(
     [
-        UniformPrior(10.0, 80.0, parameter_names=["M_c"]),
+        UniformPrior(20.0, 40.0, parameter_names=["M_c"]),
         UniformPrior(0.125, 1.0, parameter_names=["q"]),
         UniformPrior(-0.99, 0.99, parameter_names=["s1_z"]),
         UniformPrior(-0.99, 0.99, parameter_names=["s2_z"]),
         SinePrior(parameter_names=["iota"]),
         PowerLawPrior(1.0, 2000.0, 2.0, parameter_names=["d_L"]),
         UniformPrior(-0.1, 0.1, parameter_names=["t_c"]),
-        UniformPrior(0.0, 2 * jnp.pi, parameter_names=["phase_c"]),
         UniformPrior(0.0, jnp.pi, parameter_names=["psi"]),
         UniformPrior(0.0, 2 * jnp.pi, parameter_names=["ra"]),
         CosinePrior(parameter_names=["dec"]),
@@ -95,6 +94,7 @@ likelihood = TransientLikelihoodFD(
     trigger_time=gps,
     f_min=fmin,
     f_max=fmax,
+    phase_marginalization=True,
 )
 
 # --- Sample ---
@@ -105,12 +105,11 @@ jim = Jim(
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
     periodic={
-        "phase_c": (0.0, 2 * float(jnp.pi)),
         "psi": (0.0, float(jnp.pi)),
         "azimuth": (0.0, 2 * float(jnp.pi)),
     },
     sampler_config=BlackJAXNSSConfig(
-        n_live=1000,
+        n_live=2000,
         n_delete_frac=0.5,
         num_inner_steps_per_dim=20,
         termination_dlogz=0.1,
@@ -138,7 +137,6 @@ parameter_labels = {
     "iota": r"$\iota$",
     "d_L": r"$d_L\,[\mathrm{Mpc}]$",
     "t_c": r"$t_c\,[\mathrm{s}]$",
-    "phase_c": r"$\phi_c$",
     "psi": r"$\psi$",
     "ra": r"$\alpha$",
     "dec": r"$\delta$",

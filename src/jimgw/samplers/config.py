@@ -230,9 +230,9 @@ class BlackJAXNSSConfig(BaseSamplerConfig):
 
     type: Literal["blackjax-nss"] = "blackjax-nss"
 
-    n_live: int = 1000
+    n_live: int = 2000
     n_delete_frac: float = 0.5
-    num_inner_steps_per_dim: int = 10
+    num_inner_steps_per_dim: int = 20
     termination_dlogz: float = 0.1
 
     @field_validator("n_delete_frac")
@@ -266,7 +266,7 @@ class BlackJAXSMCConfig(BaseSamplerConfig):
 
     type: Literal["blackjax-smc"] = "blackjax-smc"
 
-    n_particles: int = 2000
+    n_particles: int = 5000
     n_mcmc_steps_per_dim: int = 100
     target_ess: Optional[int] = None
     target_ess_fraction: Optional[float] = None

@@ -11,10 +11,7 @@ from ripplegw.interfaces import Waveform
 from jimgw.core.base import LikelihoodBase
 from jimgw.core.prior import Prior
 from jimgw.core.transforms import BijectiveTransform, NtoMTransform
-from jimgw.core.single_event.likelihood import (
-    SingleEventLikelihood,
-    TransientLikelihoodFD,
-)
+from jimgw.core.single_event.likelihood import SingleEventLikelihood
 from jimgw.samplers import Sampler, SamplerConfig, build_sampler
 
 logger = logging.getLogger(__name__)
@@ -77,7 +74,9 @@ class Jim:
                 reproducible regardless of any intermediate operations (sanity
                 checks, initial-position draws, etc.).
         """
-        self._validate_problem(likelihood, prior, likelihood_transforms)
+        self._validate_problem(
+            likelihood, prior, sample_transforms, likelihood_transforms
+        )
         self._setup_problem(likelihood, prior, sample_transforms, likelihood_transforms)
         self._validate_normalized_prior(prior, sampler_config)
         root_key: Key = jax.random.key(seed)
@@ -132,6 +131,7 @@ class Jim:
         self,
         likelihood: LikelihoodBase,
         prior: Prior,
+        sample_transforms: Sequence[BijectiveTransform],
         likelihood_transforms: Sequence[NtoMTransform],
     ) -> None:
         """Validate that the prior and likelihood parameter spaces are compatible.
@@ -139,22 +139,52 @@ class Jim:
         Args:
             likelihood: The likelihood to evaluate.
             prior: The prior distribution.
+            sample_transforms: Bijective transforms from prior space to sampling space.
             likelihood_transforms: Transforms from prior space to likelihood space.
 
         Raises:
-            ValueError: If prior parameters overlap with fixed parameters, if prior
-                parameters are not consumed by the likelihood, or if the likelihood
-                requires parameters not provided by the prior or fixed_parameters.
+            ValueError: If any transform (sample or likelihood) produces a parameter
+                that already exists in the current parameter space but is not consumed
+                by that same transform; if prior parameters overlap with fixed
+                parameters; if prior parameters are not consumed by the likelihood; or
+                if the likelihood requires parameters not provided by the prior or
+                fixed_parameters.
         """
         if not isinstance(likelihood, SingleEventLikelihood):
             return
 
-        lh_space_names: tuple[str, ...] = prior.parameter_names
+        prior_names: tuple[str, ...] = prior.parameter_names
+
+        sample_names: tuple[str, ...] = prior_names
+        for transform in sample_transforms:
+            consumed = set(transform.name_mapping[0])
+            produced = set(transform.name_mapping[1])
+            overwritten = (produced & set(sample_names)) - consumed
+            if overwritten:
+                raise ValueError(
+                    f"Sample transform {transform!r} produces parameter(s) "
+                    f"{sorted(overwritten)} that already exist in the parameter "
+                    "space but are not consumed by this transform. Remove the "
+                    "prior on these parameters or remove the conflicting transform."
+                )
+            sample_names = transform.propagate_name(sample_names)
+
+        likelihood_names: tuple[str, ...] = prior_names
         for transform in likelihood_transforms:
-            lh_space_names = transform.propagate_name(lh_space_names)
+            consumed = set(transform.name_mapping[0])
+            produced = set(transform.name_mapping[1])
+            overwritten = (produced & set(likelihood_names)) - consumed
+            if overwritten:
+                raise ValueError(
+                    f"Likelihood transform {transform!r} produces parameter(s) "
+                    f"{sorted(overwritten)} that already exist in the parameter "
+                    "space but are not consumed by this transform. Remove the "
+                    "prior on these parameters or remove the conflicting transform."
+                )
+            likelihood_names = transform.propagate_name(likelihood_names)
 
         if likelihood.fixed_parameters:
-            overlap = set(lh_space_names) & set(likelihood.fixed_parameters.keys())
+            overlap = set(likelihood_names) & set(likelihood.fixed_parameters.keys())
             if overlap:
                 raise ValueError(
                     f"Prior defines parameter(s) {sorted(overlap)} that are "
@@ -172,15 +202,14 @@ class Jim:
 
         consumed: set[str] = set(wf_param_names)
         consumed |= {"ra", "dec", "psi", "t_c"}
-        if isinstance(likelihood, TransientLikelihoodFD):
-            if likelihood.time_marginalization:
-                consumed.discard("t_c")
-            if likelihood.phase_marginalization:
-                consumed.discard("phase_c")
-            if likelihood.distance_marginalization:
-                consumed.discard("d_L")
+        if getattr(likelihood, "time_marginalization", False):
+            consumed.discard("t_c")
+        if getattr(likelihood, "phase_marginalization", False):
+            consumed.discard("phase_c")
+        if getattr(likelihood, "distance_marginalization", False):
+            consumed.discard("d_L")
 
-        provided = set(lh_space_names)
+        provided = set(likelihood_names)
         if likelihood.fixed_parameters:
             provided |= set(likelihood.fixed_parameters.keys())
 

@@ -105,7 +105,10 @@ likelihood = HeterodynedTransientLikelihoodFD(
     f_max=fmax,
     prior=prior,
     likelihood_transforms=likelihood_transforms,
+    phase_marginalization=True,
 )
+
+prior = CombinePrior([p for p in prior.base_prior if p.parameter_names[0] != "phase_c"])
 
 # --- Sample ---
 
@@ -115,7 +118,6 @@ jim = Jim(
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
     periodic={
-        "phase_c": (0.0, 2 * float(jnp.pi)),
         "psi": (0.0, float(jnp.pi)),
         "azimuth": (0.0, 2 * float(jnp.pi)),
     },
@@ -151,7 +153,6 @@ parameter_labels = {
     "iota": r"$\iota$",
     "d_L": r"$d_L\,[\mathrm{Mpc}]$",
     "t_c": r"$t_c\,[\mathrm{s}]$",
-    "phase_c": r"$\phi_c$",
     "psi": r"$\psi$",
     "ra": r"$\alpha$",
     "dec": r"$\delta$",

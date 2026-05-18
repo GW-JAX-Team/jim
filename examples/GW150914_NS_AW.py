@@ -64,7 +64,7 @@ waveform = RippleIMRPhenomXAS(f_ref=20)
 
 # --- Prior ---
 
-M_c_min, M_c_max = 10.0, 80.0
+M_c_min, M_c_max = 20.0, 40.0
 q_min, q_max = 0.125, 1.0
 d_L_min, d_L_max = 1.0, 2000.0
 t_det_min, t_det_max = -0.1, 0.1
@@ -78,7 +78,6 @@ prior = CombinePrior(
         SinePrior(parameter_names=["iota"]),
         PowerLawPrior(d_L_min, d_L_max, 2.0, parameter_names=["d_L"]),
         UniformPrior(t_det_min, t_det_max, parameter_names=["t_det"]),
-        UniformPrior(0.0, 2 * jnp.pi, parameter_names=["phase_c"]),
         UniformPrior(0.0, jnp.pi, parameter_names=["psi"]),
         UniformPrior(0.0, 2 * jnp.pi, parameter_names=["ra"]),
         CosinePrior(parameter_names=["dec"]),
@@ -151,14 +150,7 @@ sample_transforms = [
         target_lower_bound=0.0,
         target_upper_bound=1.0,
     ),
-    # Phase and polarization angle
-    BoundToBound(
-        name_mapping=(["phase_c"], ["phase_c_unit"]),
-        original_lower_bound=0.0,
-        original_upper_bound=2 * jnp.pi,
-        target_lower_bound=0.0,
-        target_upper_bound=1.0,
-    ),
+    # Polarization angle
     BoundToBound(
         name_mapping=(["psi"], ["psi_unit"]),
         original_lower_bound=0.0,
@@ -201,6 +193,7 @@ likelihood = TransientLikelihoodFD(
     trigger_time=gps,
     f_min=fmin,
     f_max=fmax,
+    phase_marginalization=True,
 )
 
 # --- Sample ---
@@ -210,7 +203,7 @@ jim = Jim(
     prior,
     sample_transforms=sample_transforms,
     likelihood_transforms=likelihood_transforms,
-    periodic=["phase_c_unit", "psi_unit", "azimuth_unit"],
+    periodic=["psi_unit", "azimuth_unit"],
     sampler_config=BlackJAXNSAWConfig(
         n_live=1000,
         n_delete_frac=0.5,
@@ -239,7 +232,6 @@ parameter_labels = {
     "iota": r"$\iota$",
     "d_L": r"$d_L\,[\mathrm{Mpc}]$",
     "t_det": r"$t_{\mathrm{det}}\,[\mathrm{s}]$",
-    "phase_c": r"$\phi_c$",
     "psi": r"$\psi$",
     "ra": r"$\alpha$",
     "dec": r"$\delta$",

@@ -511,6 +511,123 @@ class TestJimPriorLikelihoodConsistencyChecks:
         )
         Jim(likelihood=lh, prior=prior, sampler_config=_tiny_flowmc_config())
 
+    def test_sample_transform_overwrites_unconsumed_prior_parameter_raises(self):
+        # Prior defines both M_c and M_c_unbounded; sample transform maps
+        # M_c → M_c_unbounded without consuming M_c_unbounded — silent overwrite.
+        prior = CombinePrior(
+            [
+                UniformPrior(10.0, 80.0, parameter_names=["M_c"]),
+                UniformPrior(0.0, 1.0, parameter_names=["M_c_unbounded"]),  # conflict
+                UniformPrior(0.0, 3.14, parameter_names=["ra"]),
+                UniformPrior(-1.57, 1.57, parameter_names=["dec"]),
+                UniformPrior(0.0, 3.14, parameter_names=["psi"]),
+                UniformPrior(-0.1, 0.1, parameter_names=["t_c"]),
+            ]
+        )
+        lh = self._make_mock_single_event_likelihood(
+            waveform_parameter_names=(
+                "M_c",
+                "M_c_unbounded",
+                "ra",
+                "dec",
+                "psi",
+                "t_c",
+            ),
+        )
+        sample_transform = BoundToUnbound(
+            name_mapping=(["M_c"], ["M_c_unbounded"]),
+            original_lower_bound=10.0,
+            original_upper_bound=80.0,
+        )
+        with pytest.raises(ValueError, match="already exist in the parameter space"):
+            Jim(
+                likelihood=lh,
+                prior=prior,
+                sampler_config=_tiny_flowmc_config(),
+                sample_transforms=[sample_transform],
+            )
+
+    def test_sample_transform_valid_rename_no_error(self):
+        # Prior defines only M_c; sample transform maps M_c → M_c_unbounded. No conflict.
+        prior = CombinePrior(
+            [
+                UniformPrior(10.0, 80.0, parameter_names=["M_c"]),
+                UniformPrior(0.0, 3.14, parameter_names=["ra"]),
+                UniformPrior(-1.57, 1.57, parameter_names=["dec"]),
+                UniformPrior(0.0, 3.14, parameter_names=["psi"]),
+                UniformPrior(-0.1, 0.1, parameter_names=["t_c"]),
+            ]
+        )
+        lh = self._make_mock_single_event_likelihood(
+            waveform_parameter_names=("M_c", "ra", "dec", "psi", "t_c"),
+        )
+        sample_transform = BoundToUnbound(
+            name_mapping=(["M_c"], ["M_c_unbounded"]),
+            original_lower_bound=10.0,
+            original_upper_bound=80.0,
+        )
+        Jim(
+            likelihood=lh,
+            prior=prior,
+            sampler_config=_tiny_flowmc_config(),
+            sample_transforms=[sample_transform],
+        )
+
+    def test_likelihood_transform_overwrites_unconsumed_prior_parameter_raises(self):
+        # Prior defines both q and eta; transform maps q → eta without consuming eta.
+        # The prior-sampled eta would be silently overwritten — this must be caught.
+        from jimgw.core.single_event.transforms import (
+            MassRatioToSymmetricMassRatioTransform,
+        )
+
+        prior = CombinePrior(
+            [
+                UniformPrior(10.0, 80.0, parameter_names=["M_c"]),
+                UniformPrior(0.125, 1.0, parameter_names=["q"]),
+                UniformPrior(0.1, 0.25, parameter_names=["eta"]),
+                UniformPrior(0.0, 3.14, parameter_names=["ra"]),
+                UniformPrior(-1.57, 1.57, parameter_names=["dec"]),
+                UniformPrior(0.0, 3.14, parameter_names=["psi"]),
+                UniformPrior(-0.1, 0.1, parameter_names=["t_c"]),
+            ]
+        )
+        lh = self._make_mock_single_event_likelihood(
+            waveform_parameter_names=("M_c", "eta", "ra", "dec", "psi", "t_c"),
+        )
+        with pytest.raises(ValueError, match="already exist in the parameter space"):
+            Jim(
+                likelihood=lh,
+                prior=prior,
+                sampler_config=_tiny_flowmc_config(),
+                likelihood_transforms=[MassRatioToSymmetricMassRatioTransform],
+            )
+
+    def test_likelihood_transform_valid_rename_no_error(self):
+        # Prior defines only q (not eta); transform maps q → eta. No conflict.
+        from jimgw.core.single_event.transforms import (
+            MassRatioToSymmetricMassRatioTransform,
+        )
+
+        prior = CombinePrior(
+            [
+                UniformPrior(10.0, 80.0, parameter_names=["M_c"]),
+                UniformPrior(0.125, 1.0, parameter_names=["q"]),
+                UniformPrior(0.0, 3.14, parameter_names=["ra"]),
+                UniformPrior(-1.57, 1.57, parameter_names=["dec"]),
+                UniformPrior(0.0, 3.14, parameter_names=["psi"]),
+                UniformPrior(-0.1, 0.1, parameter_names=["t_c"]),
+            ]
+        )
+        lh = self._make_mock_single_event_likelihood(
+            waveform_parameter_names=("M_c", "eta", "ra", "dec", "psi", "t_c"),
+        )
+        Jim(
+            likelihood=lh,
+            prior=prior,
+            sampler_config=_tiny_flowmc_config(),
+            likelihood_transforms=[MassRatioToSymmetricMassRatioTransform],
+        )
+
 
 # ---------------------------------------------------------------------------
 # TestJimNaNPosteriorCheck

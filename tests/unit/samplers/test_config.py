@@ -36,13 +36,13 @@ def test_blackjax_ns_aw_config_defaults():
 def test_blackjax_nss_config_defaults():
     cfg = BlackJAXNSSConfig()
     assert cfg.type == "blackjax-nss"
-    assert cfg.n_live == 1000
+    assert cfg.n_live == 2000
 
 
 def test_blackjax_smc_config_defaults():
     cfg = BlackJAXSMCConfig()
     assert cfg.type == "blackjax-smc"
-    assert cfg.n_particles == 2000
+    assert cfg.n_particles == 5000
 
 
 def test_discriminated_union_dispatch_flowmc():
