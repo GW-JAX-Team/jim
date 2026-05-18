@@ -164,4 +164,4 @@ fig = corner.corner(
     np.stack([chains[key] for key in jim.prior.parameter_names]).T[::10],
     labels=[parameter_labels.get(k, k) for k in jim.prior.parameter_names],
 )
-fig.savefig(Path(__file__).parent / "GW170817.png")
+fig.savefig(Path(__file__).parent / "GW170817_heterodyne.png")

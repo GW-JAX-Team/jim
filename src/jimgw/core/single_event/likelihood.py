@@ -1,11 +1,14 @@
+import logging
+from typing import Any, Callable, Optional, Sequence, Union
+from abc import abstractmethod
 import jax
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, Float
-from typing import Callable, Optional, Sequence, Union
-from abc import abstractmethod
 from scipy.interpolate import interp1d
 from evosax.algorithms import CMA_ES
+from ripplegw.interfaces import Waveform
+
 from jimgw.core.utils import log_i0
 from jimgw.core.prior import Prior
 from jimgw.core.base import LikelihoodBase
@@ -24,8 +27,7 @@ from jimgw.core.single_event.marginalization_config import (
 from jimgw.core.single_event.time_utils import (
     greenwich_mean_sidereal_time as compute_gmst,
 )
-from ripplegw.interfaces import Waveform
-import logging
+from jimgw.core.constants import MTSUN, EARTH_RADIUS_LIGHT_S
 
 logger = logging.getLogger(__name__)
 
@@ -977,6 +979,7 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
 
     Attributes:
         reference_chirp_mass (Float): Reference chirp mass for determining frequency bands.
+        reference_chirp_mass_in_second (Float): Same value converted to seconds.
         highest_mode (int): Maximum magnetic number of GW moments (fixed to 2 for 22-mode).
         accuracy_factor (Float): Parameter L controlling approximation accuracy.
         time_offset (Float): Time offset for band construction.
@@ -989,36 +992,39 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
     Args:
         detectors (Sequence[Detector]): List of detector objects.
         waveform (Waveform): Waveform model to evaluate.
-        reference_chirp_mass (Float): Reference chirp mass (typically prior minimum).
         fixed_parameters (Optional[dict]): Fixed parameters for the likelihood.
         f_min (Float): Minimum frequency for likelihood evaluation.
         f_max (Float): Maximum frequency for likelihood evaluation.
         trigger_time (Float): GPS time of the event trigger.
         highest_mode (int): Maximum magnetic number (default 2, for 22-mode only).
         accuracy_factor (Float): Accuracy parameter L (default 5.0).
-        time_offset (Float): Time offset in seconds (default 2.12).
-        delta_f_end (Float): End frequency taper scale in Hz (default 53.0).
-        maximum_banding_frequency (Optional[Float]): Upper limit on band starting frequency.
-        minimum_banding_duration (Float): Minimum duration for bands.
+        prior (Optional[Prior]): Combined prior object.  Needed when *reference_chirp_mass*,
+            *time_offset*, or *delta_f_end* are ``None`` so they can be inferred
+            automatically from the prior bounds.
+        reference_chirp_mass (Optional[Float]): Reference chirp mass in solar masses.
+            Use the minimum of your chirp-mass prior for maximum speedup.  When
+            ``None``, the value is inferred from the ``M_c`` component of *prior*.
+        time_offset (Optional[Float]): Time offset in seconds.  When ``None``,
+            inferred from the ``t_c`` (or ``t_{ifo}``) prior range; falls back
+            to 2.12 s with a warning when the prior is unavailable.
+        delta_f_end (Optional[Float]): End frequency taper scale in Hz.  When
+            ``None``, inferred from the ``t_c`` prior range; falls back to 53.0 Hz.
+        max_banding_frequency (Optional[Float]): Upper limit on band starting frequency.
+        min_banding_duration (Float): Minimum duration for bands.
     """
 
-    # Class attributes for type hints
-    reference_chirp_mass: Float
     highest_mode: int
     accuracy_factor: Float
+    reference_chirp_mass: Float
+    reference_chirp_mass_in_second: Float
     time_offset: Float
     delta_f_end: Float
-    maximum_banding_frequency: Float
-    minimum_banding_duration: Float
+    max_banding_frequency: Float
+    min_banding_duration: Float
 
     durations: Float[Array, " n_bands"]
-    fb_dfb: Float[Array, " n_bands+1 2"]
-    Nbs: Float[Array, " n_bands"]
-    Mbs: Float[Array, " n_bands"]
-    Ks_Ke: Float[Array, " n_bands 2"]
+    fb_dfb: Float[Array, "n_bands+1 2"]
 
-    banded_frequency_points: Float[Array, " n_total_points"]
-    start_end_idxs: Float[Array, " n_bands 2"]
     unique_frequencies: Float[Array, " n_unique"]
     unique_to_original: Float[Array, " n_total_points"]
 
@@ -1029,36 +1035,83 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
         self,
         detectors: Sequence[Detector],
         waveform: Waveform,
-        reference_chirp_mass: Float,
         fixed_parameters: Optional[dict[str, Float]] = None,
         f_min: Float = 0,
-        f_max: Float = float("inf"),
+        f_max: Float = jnp.inf,
         trigger_time: Float = 0,
         highest_mode: int = 2,
         accuracy_factor: Float = 5.0,
-        time_offset: Float = 2.12,
-        delta_f_end: Float = 53.0,
-        maximum_banding_frequency: Optional[Float] = None,
-        minimum_banding_duration: Float = 0.0,
+        prior: Optional[Prior] = None,
+        reference_chirp_mass: Optional[Float] = None,
+        time_offset: Optional[Float] = None,
+        delta_f_end: Optional[Float] = None,
+        max_banding_frequency: Optional[Float] = None,
+        min_banding_duration: Float = 0.0,
     ):
-        from jimgw.core.constants import MTSUN
 
         super().__init__(detectors, waveform, fixed_parameters)
 
         logger.info("Initializing multi-banded likelihood...")
 
-        # Store parameters
+        # ── Infer reference_chirp_mass from prior when not provided ──────────
+        if reference_chirp_mass is None:
+            if prior is not None:
+                mc_min = self._infer_Mc_min(prior)
+                if mc_min is not None:
+                    reference_chirp_mass = mc_min
+                    logger.info(
+                        "reference_chirp_mass inferred from M_c prior minimum: %.4f M_sun",
+                        reference_chirp_mass,
+                    )
+                else:
+                    raise ValueError(
+                        "reference_chirp_mass=None but no M_c prior found in prior. "
+                        "Pass either reference_chirp_mass or a prior "
+                        "with an M_c component to infer it automatically."
+                    )
+            else:
+                raise ValueError(
+                    "Either reference_chirp_mass or prior with M_c component must be "
+                    "provided to infer reference_chirp_mass automatically."
+                )
+
+        # ── Infer time_offset / delta_f_end from prior when not provided ─────
+        if time_offset is None or delta_f_end is None:
+            inferred_to, inferred_dfe = (
+                self._infer_time_offsets(prior, float(trigger_time), detectors)
+                if prior is not None
+                else (None, None)
+            )
+            if time_offset is None:
+                if inferred_to is not None:
+                    time_offset = inferred_to
+                    logger.info("time_offset inferred from prior: %.4f s", time_offset)
+                else:
+                    time_offset = 2.12
+                    logger.warning(
+                        "time_offset cannot be inferred from prior; using default 2.12 s"
+                    )
+            if delta_f_end is None:
+                if inferred_dfe is not None:
+                    delta_f_end = inferred_dfe
+                    logger.info("delta_f_end inferred from prior: %.4f Hz", delta_f_end)
+                else:
+                    delta_f_end = 53.0
+                    logger.warning(
+                        "delta_f_end cannot be inferred from prior; using default 53.0 Hz"
+                    )
+
+        # Store parameters — reference_chirp_mass is guaranteed non-None here
+        assert reference_chirp_mass is not None
         self.reference_chirp_mass = reference_chirp_mass
         self.reference_chirp_mass_in_second = reference_chirp_mass * MTSUN
         self.highest_mode = highest_mode
         self.accuracy_factor = accuracy_factor
         self.time_offset = time_offset
         self.delta_f_end = delta_f_end
-        self.minimum_banding_duration = minimum_banding_duration
+        self.min_banding_duration = min_banding_duration
 
         # Get frequency bounds from detectors
-        self.f_min = f_min
-        self.f_max = f_max
         _f_mins = []
         _f_maxs = []
         for detector in detectors:
@@ -1077,12 +1130,10 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             * (self.highest_mode / (2 * jnp.pi)) ** (8 / 5)
             / self.reference_chirp_mass_in_second
         )
-        if maximum_banding_frequency is not None:
-            self.maximum_banding_frequency = min(
-                maximum_banding_frequency, fmax_theoretical
-            )
+        if max_banding_frequency is not None:
+            self.max_banding_frequency = min(max_banding_frequency, fmax_theoretical)
         else:
-            self.maximum_banding_frequency = fmax_theoretical
+            self.max_banding_frequency = fmax_theoretical
 
         self.trigger_time = trigger_time
         self.gmst = compute_gmst(trigger_time)
@@ -1094,10 +1145,62 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
         self._setup_linear_coefficients()
         self._setup_quadratic_coefficients()
 
-        logger.info(f"Multi-banding setup complete with {self.number_of_bands} bands")
+        logger.info("Multi-banding setup complete with %d bands", self.n_bands)
+
+    # ── Prior-inference helpers ───────────────────────────────────────────────
+
+    def _find_subprior(self, prior: Any, param_name: str) -> Optional[Any]:
+        """Return the leaf prior responsible for *param_name*, or None."""
+        if param_name not in prior.parameter_names:
+            return None
+        if hasattr(prior, "xmin"):
+            return prior
+        if hasattr(prior, "base_prior"):
+            components = prior.base_prior
+            if hasattr(components, "__iter__"):
+                for p in components:
+                    result = self._find_subprior(p, param_name)
+                    if result is not None:
+                        return result
+        return None
+
+    def _infer_Mc_min(self, prior: Any) -> Optional[float]:
+        """Extract the minimum chirp mass bound from *prior*, or None."""
+        p = self._find_subprior(prior, "M_c")
+        return float(p.xmin) if p is not None else None
+
+    def _infer_time_offsets(
+        self,
+        prior: Any,
+        trigger_time: float,
+        detectors: Any,
+    ) -> tuple[Optional[float], Optional[float]]:
+        """Infer time_offset and delta_f_end from the t_c prior.
+
+        Returns ``(time_offset, delta_f_end)`` or ``(None, None)`` when no
+        ``t_c`` component is found in *prior*.
+
+        Requires ``t_c`` (geocentric coalescence-time offset).  Detector-frame
+        times are not supported because ``t_det = t_c + delay(ra, dec)`` and the
+        delay is sky-position-dependent, so exact bounds on ``t_c`` cannot be
+        derived from a ``t_det`` prior at setup time.
+        """
+        data = detectors[0].data
+        t_end = float(data.start_time) + float(data.duration) - trigger_time
+
+        tc_prior = self._find_subprior(prior, "t_c")
+        if tc_prior is not None:
+            tc_min = float(tc_prior.xmin)
+            tc_max = float(tc_prior.xmax)
+            s = EARTH_RADIUS_LIGHT_S
+            return t_end - tc_min + s, 100.0 / (t_end - tc_max - s)
+
+        return None, None
+
+    # ── Band structure ────────────────────────────────────────────────────────
 
     @property
-    def number_of_bands(self) -> int:
+    def n_bands(self) -> int:
         """Number of frequency bands."""
         return len(self.durations)
 
@@ -1145,19 +1248,19 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
         )
 
     def _find_starting_frequency(
-        self, duration: Float, fnow: Float
+        self, duration: Float, f_now: Float
     ) -> tuple[Optional[Float], Optional[Float]]:
         """Find starting frequency of next band via bisection search.
 
         Finds frequency satisfying conditions (10) and (51) of arXiv:2104.07813:
         - Time containment: tau(f) + L * sqrt(-dtau/df) < duration - time_offset
-        - Smooth transition: f - 1/sqrt(-dtau/df) > fnow
+        - Smooth transition: f - 1/sqrt(-dtau/df) > f_now
 
         Parameters
         ----------
         duration : Float
             Duration of the next band.
-        fnow : Float
+        f_now : Float
             Starting frequency of current band.
 
         Returns
@@ -1173,10 +1276,10 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
                 - self._tau(f)
                 - self.accuracy_factor * jnp.sqrt(-self._dtaudf(f))
             ) > 0
-            cond2 = f - 1.0 / jnp.sqrt(-self._dtaudf(f)) - fnow > 0
+            cond2 = f - 1.0 / jnp.sqrt(-self._dtaudf(f)) - f_now > 0
             return cond1 and cond2
 
-        fmin, fmax = fnow, self.maximum_banding_frequency
+        fmin, fmax = f_now, self.max_banding_frequency
 
         if not _is_above_fnext(fmax):
             return None, None
@@ -1208,12 +1311,12 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
 
         dnext = original_duration / 2
 
-        while dnext > max(self.time_offset, self.minimum_banding_duration):
-            fnow, _ = fb_dfb_list[-1]
-            fnext, dfnext = self._find_starting_frequency(dnext, fnow)
+        while dnext > max(self.time_offset, self.min_banding_duration):
+            f_now, _ = fb_dfb_list[-1]
+            fnext, dfnext = self._find_starting_frequency(dnext, f_now)
 
             if fnext is not None and fnext < min(
-                self.maximum_frequency, self.maximum_banding_frequency
+                self.maximum_frequency, self.max_banding_frequency
             ):
                 durations_list.append(dnext)
                 fb_dfb_list.append([fnext, dfnext])
@@ -1230,7 +1333,7 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
         self.fb_dfb = jnp.array(fb_dfb_list)
 
         logger.info(
-            f"Frequency range divided into {self.number_of_bands} bands with "
+            f"Frequency range divided into {self.n_bands} bands with "
             f"intervals: {', '.join(['1/' + str(d) + ' Hz' for d in durations_list])}"
         )
 
@@ -1248,18 +1351,18 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             self.Mbs: Number of samples in shortened data per band
             self.Ks_Ke: Start/end frequency indices per band
         """
-        import math
-
         original_duration = self.detectors[0].data.duration
+        durations = self.durations.tolist()
+        fb_dfb = self.fb_dfb.tolist()
 
         Nbs_list = []
         Mbs_list = []
         Ks_Ke_list = []
 
-        for b in range(self.number_of_bands):
-            dnow = float(self.durations[b])
-            fnow, dfnow = float(self.fb_dfb[b, 0]), float(self.fb_dfb[b, 1])
-            fnext = float(self.fb_dfb[b + 1, 0])
+        for b in range(self.n_bands):
+            dnow = durations[b]
+            f_now, dfnow = fb_dfb[b]
+            fnext = fb_dfb[b + 1][0]
 
             Nb = max(
                 self._round_up_to_power_of_two(
@@ -1270,7 +1373,7 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             Nbs_list.append(Nb)
             Mbs_list.append(Nb // (2**b))
             Ks_Ke_list.append(
-                [math.ceil((fnow - dfnow) * dnow), math.floor(fnext * dnow)]
+                [jnp.ceil((f_now - dfnow) * dnow), jnp.floor(fnext * dnow)]
             )
 
         self.Nbs = jnp.array(Nbs_list, dtype=jnp.int32)
@@ -1289,38 +1392,28 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
             self.unique_frequencies: Unique frequencies for waveform evaluation
             self.unique_to_original: Mapping from unique back to banded
         """
-        import numpy as np  # Use numpy for setup, convert to jax at end
+        durations = self.durations.tolist()
+        Ks_Ke = self.Ks_Ke.tolist()
 
-        banded_freq_list = []
+        band_freqs_list = []
         start_end_list = []
         start_idx = 0
 
-        for b in range(self.number_of_bands):
-            d = float(self.durations[b])
-            Ks, Ke = int(self.Ks_Ke[b, 0]), int(self.Ks_Ke[b, 1])
-            band_freqs = np.arange(Ks, Ke + 1) / d
-            banded_freq_list.extend(band_freqs)
+        for b in range(self.n_bands):
+            Ks, Ke = Ks_Ke[b]
+            band_freqs = jnp.arange(Ks, Ke + 1) / durations[b]
+            band_freqs_list.append(band_freqs)
             end_idx = start_idx + Ke - Ks
             start_end_list.append([start_idx, end_idx])
             start_idx = end_idx + 1
 
-        banded_freq_array = np.array(banded_freq_list)
-        unique_freqs, idxs = np.unique(banded_freq_array, return_inverse=True)
+        banded_freq_array = jnp.concatenate(band_freqs_list)
+        unique_freqs, idxs = jnp.unique(banded_freq_array, return_inverse=True)
 
-        self.banded_frequency_points = jnp.array(banded_freq_array)
+        self.banded_frequency_points = banded_freq_array
         self.start_end_idxs = jnp.array(start_end_list, dtype=jnp.int32)
-        self.unique_frequencies = jnp.array(unique_freqs)
-        self.unique_to_original = jnp.array(idxs, dtype=jnp.int32)
-
-        logger.info(
-            f"Waveform evaluated at {len(unique_freqs)} unique frequency points"
-        )
-        speedup = (
-            (self.maximum_frequency - self.minimum_frequency)
-            * self.detectors[0].data.duration
-            / len(unique_freqs)
-        )
-        logger.info(f"Multi-banding speedup factor: {speedup:.1f}x")
+        self.unique_frequencies = unique_freqs
+        self.unique_to_original = idxs.astype(jnp.int32)
 
     def _get_window_sequence(
         self, delta_f: Float, start_idx: int, length: int, band: int
@@ -1345,42 +1438,40 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
         Array
             Window sequence of given length.
         """
-        import math
-        import numpy as np  # Use numpy for setup
 
-        fnow = float(self.fb_dfb[band, 0])
-        dfnow = float(self.fb_dfb[band, 1])
-        fnext = float(self.fb_dfb[band + 1, 0])
-        dfnext = float(self.fb_dfb[band + 1, 1])
+        f_now, dfnow = self.fb_dfb[band].tolist()
+        fnext, dfnext = self.fb_dfb[band + 1].tolist()
 
-        window = np.zeros(length)
+        window = jnp.zeros(length)
 
         increase_start = max(
-            0, min(length, math.floor((fnow - dfnow) / delta_f) - start_idx + 1)
+            0, min(length, int(jnp.floor((f_now - dfnow) / delta_f)) - start_idx + 1)
         )
-        unity_start = max(0, min(length, math.ceil(fnow / delta_f) - start_idx))
+        unity_start = max(0, min(length, int(jnp.ceil(f_now / delta_f)) - start_idx))
         decrease_start = max(
-            0, min(length, math.floor((fnext - dfnext) / delta_f) - start_idx + 1)
+            0, min(length, int(jnp.floor((fnext - dfnext) / delta_f)) - start_idx + 1)
         )
-        decrease_stop = max(0, min(length, math.ceil(fnext / delta_f) - start_idx))
+        decrease_stop = max(0, min(length, int(jnp.ceil(fnext / delta_f)) - start_idx))
 
         # Unity region
         window[unity_start:decrease_start] = 1.0
 
         # Increasing taper (avoid overflow from vanishing dfnow)
         if increase_start < unity_start and dfnow > 0:
-            frequencies = (np.arange(increase_start, unity_start) + start_idx) * delta_f
+            frequencies = (
+                jnp.arange(increase_start, unity_start) + start_idx
+            ) * delta_f
             window[increase_start:unity_start] = (
-                1.0 + np.cos(np.pi * (frequencies - fnow) / dfnow)
+                1.0 + jnp.cos(jnp.pi * (frequencies - f_now) / dfnow)
             ) / 2.0
 
         # Decreasing taper
         if decrease_start < decrease_stop:
             frequencies = (
-                np.arange(decrease_start, decrease_stop) + start_idx
+                jnp.arange(decrease_start, decrease_stop) + start_idx
             ) * delta_f
             window[decrease_start:decrease_stop] = (
-                1.0 - np.cos(np.pi * (frequencies - fnext) / dfnext)
+                1.0 - jnp.cos(jnp.pi * (frequencies - fnext) / dfnext)
             ) / 2.0
 
         return jnp.array(window)
@@ -1397,52 +1488,46 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
         Sets:
             self.linear_coeffs: Dict mapping detector name to coefficient array
         """
-        import numpy as np
-
-        N = int(self.Nbs[-1])
+        Ks_Ke = self.Ks_Ke.tolist()
+        Nbs = self.Nbs.tolist()
+        Mbs = self.Mbs.tolist()
+        durations = self.durations.tolist()
+        N = Nbs[-1]
 
         self.linear_coeffs = {}
 
         for detector in self.detectors:
             logger.info(f"Pre-computing linear coefficients for {detector.name}")
+            data_fd = jnp.array(detector.data.fd)
+            psd = jnp.array(detector.psd.values)
+            freq_mask = jnp.array(detector.frequency_mask)
 
-            # Get full frequency domain data divided by PSD
-            data_fd = np.array(detector.data.fd)
-            psd = np.array(detector.psd.values)
-            freq_mask = np.array(detector.frequency_mask)
-
-            # Zero-pad to size N/2 + 1
-            fddata = np.zeros(N // 2 + 1, dtype=complex)
+            fddata = jnp.zeros(N // 2 + 1, dtype=complex)
             valid_len = min(len(data_fd), N // 2 + 1)
             mask_valid = freq_mask[:valid_len]
             fddata[:valid_len][mask_valid] = (
                 data_fd[:valid_len][mask_valid] / psd[:valid_len][mask_valid]
             )
 
-            coeffs_list = []
+            band_coeffs = []
 
-            for b in range(self.number_of_bands):
-                Ks, Ke = int(self.Ks_Ke[b, 0]), int(self.Ks_Ke[b, 1])
-                Nb = int(self.Nbs[b])
-                Mb = int(self.Mbs[b])
-                db = float(self.durations[b])
+            for b in range(self.n_bands):
+                Ks, Ke = Ks_Ke[b]
+                Nb = Nbs[b]
+                Mb = Mbs[b]
+                db = durations[b]
 
-                # Get window for this band
                 window = self._get_window_sequence(1.0 / db, Ks, Ke - Ks + 1, b)
 
-                # Extract data for this band's resolution
-                fddata_band = np.copy(fddata[: Nb // 2 + 1])
-                fddata_band[-1] = 0.0  # Zero Nyquist frequency
+                fddata_band = jnp.copy(fddata[: Nb // 2 + 1])
+                fddata_band[-1] = 0.0
 
-                # IFFT, take last Mb samples, FFT back
-                tddata = np.fft.irfft(fddata_band)[-Mb:]
-                fddata_shortened = np.fft.rfft(tddata)[Ks : Ke + 1]
+                tddata = jnp.fft.irfft(fddata_band)[-Mb:]
+                fddata_shortened = jnp.fft.rfft(tddata)[Ks : Ke + 1]
 
-                # Apply window and normalization
-                coeffs = (4.0 / db) * window * np.conj(fddata_shortened)
-                coeffs_list.extend(coeffs)
+                band_coeffs.append((4.0 / db) * window * jnp.conj(fddata_shortened))
 
-            self.linear_coeffs[detector.name] = jnp.array(coeffs_list)
+            self.linear_coeffs[detector.name] = jnp.concatenate(band_coeffs)
 
     def _setup_quadratic_coefficients(self) -> None:
         """Pre-compute coefficients for (h|h) using linear interpolation.
@@ -1453,38 +1538,33 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
         Sets:
             self.quadratic_coeffs: Dict mapping detector name to coefficient array
         """
-        import math
-        import numpy as np
 
-        original_duration = float(self.detectors[0].data.duration)
+        original_duration = self.detectors[0].data.duration
+        start_end_idxs = self.start_end_idxs.tolist()
+        durations = self.durations.tolist()
+        fb_dfb = self.fb_dfb.tolist()
+        banded_frequency_points = self.banded_frequency_points.tolist()
 
-        logger.info("Using linear interpolation for (h|h) computation")
         self.quadratic_coeffs = {}
 
         for detector in self.detectors:
-            psd = np.array(detector.psd.values)
-            freq_mask = np.array(detector.frequency_mask)
+            psd = jnp.array(detector.psd.values)
+            freq_mask = jnp.array(detector.frequency_mask)
 
-            all_coeffs = []
+            band_coeffs = []
 
-            for b in range(self.number_of_bands):
+            for b in range(self.n_bands):
                 logger.debug(f"Pre-computing quadratic coefficients for band {b}")
 
-                start_idx, end_idx = (
-                    int(self.start_end_idxs[b, 0]),
-                    int(self.start_end_idxs[b, 1]),
-                )
-                banded_freqs = np.array(
-                    self.banded_frequency_points[start_idx : end_idx + 1]
-                )
-                prefactor = 4 * float(self.durations[b]) / original_duration
+                start_idx, end_idx = start_end_idxs[b]
+                banded_freqs = banded_frequency_points[start_idx : end_idx + 1]
+                prefactor = 4 * durations[b] / original_duration
 
-                # Get window for original resolution
-                fnow, dfnow = float(self.fb_dfb[b, 0]), float(self.fb_dfb[b, 1])
-                fnext = float(self.fb_dfb[b + 1, 0])
-                start_idx_orig = math.ceil((fnow - dfnow) * original_duration)
+                f_now, dfnow = fb_dfb[b]
+                fnext = fb_dfb[b + 1][0]
+                start_idx_orig = int(jnp.ceil((f_now - dfnow) * original_duration))
                 window_length = (
-                    math.floor(fnext * original_duration) - start_idx_orig + 1
+                    int(jnp.floor(fnext * original_duration)) - start_idx_orig + 1
                 )
 
                 window = self._get_window_sequence(
@@ -1495,7 +1575,7 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
                 end_idx_orig = min(start_idx_orig + len(window) - 1, len(psd) - 1)
                 valid_len = end_idx_orig - start_idx_orig + 1
 
-                window_over_psd = np.zeros(valid_len)
+                window_over_psd = jnp.zeros(valid_len)
                 local_mask = freq_mask[start_idx_orig : end_idx_orig + 1]
                 window_over_psd[local_mask] = (
                     1.0 / psd[start_idx_orig : end_idx_orig + 1][local_mask]
@@ -1503,42 +1583,44 @@ class MultibandedTransientLikelihoodFD(SingleEventLikelihood):
                 window_over_psd *= window[:valid_len]
 
                 # Compute coefficients using linear interpolation
-                coeffs = np.zeros(len(banded_freqs))
+                n_coeff = len(banded_freqs)
+                coeffs = jnp.zeros(n_coeff)
 
-                for k in range(len(coeffs) - 1):
-                    if k == 0:
-                        sum_start = start_idx_orig
-                    else:
-                        sum_start = max(
+                for k in range(n_coeff - 1):
+                    sum_start = (
+                        start_idx_orig
+                        if k == 0
+                        else max(
                             start_idx_orig,
-                            math.ceil(original_duration * banded_freqs[k]),
+                            int(jnp.ceil(original_duration * banded_freqs[k])),
                         )
-
-                    if k == len(coeffs) - 2:
-                        sum_end = end_idx_orig
-                    else:
-                        sum_end = min(
+                    )
+                    sum_end = (
+                        end_idx_orig
+                        if k == n_coeff - 2
+                        else min(
                             end_idx_orig,
-                            math.ceil(original_duration * banded_freqs[k + 1]) - 1,
+                            int(jnp.ceil(original_duration * banded_freqs[k + 1])) - 1,
                         )
+                    )
 
-                    freqs_in_sum = np.arange(sum_start, sum_end + 1) / original_duration
+                    freqs_in_sum = (
+                        jnp.arange(sum_start, sum_end + 1) / original_duration
+                    )
                     local_start = sum_start - start_idx_orig
                     local_end = sum_end - start_idx_orig + 1
+                    wop = window_over_psd[local_start:local_end]
 
-                    # Linear interpolation weights
-                    coeffs[k] += prefactor * np.sum(
-                        (banded_freqs[k + 1] - freqs_in_sum)
-                        * window_over_psd[local_start:local_end]
+                    coeffs = coeffs.at[k].add(
+                        prefactor * jnp.sum((banded_freqs[k + 1] - freqs_in_sum) * wop)
                     )
-                    coeffs[k + 1] += prefactor * np.sum(
-                        (freqs_in_sum - banded_freqs[k])
-                        * window_over_psd[local_start:local_end]
+                    coeffs = coeffs.at[k + 1].add(
+                        prefactor * jnp.sum((freqs_in_sum - banded_freqs[k]) * wop)
                     )
 
-                all_coeffs.extend(coeffs)
+                band_coeffs.append(coeffs)
 
-            self.quadratic_coeffs[detector.name] = jnp.array(all_coeffs)
+            self.quadratic_coeffs[detector.name] = jnp.concatenate(band_coeffs)
 
     def evaluate(self, params: dict[str, Float], data: dict) -> Float:
         """Evaluate the log-likelihood for given parameters.

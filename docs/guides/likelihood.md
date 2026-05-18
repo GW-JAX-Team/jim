@@ -139,11 +139,21 @@ likelihood = TransientLikelihoodFD(
 
 Both forms are `jax.jit`-compatible. Callables are evaluated in **insertion order**, so later entries in `fixed_parameters` can read values written by earlier ones.
 
-## HeterodynedTransientLikelihoodFD
+## Fast Likelihoods
 
-For faster evaluation, `HeterodynedTransientLikelihoodFD` uses the heterodyne (relative binning) technique.  It requires a set of *reference parameters* around which the binning is constructed.
+`HeterodynedTransientLikelihoodFD` and `MultibandedTransientLikelihoodFD` are both approximations that trade exactness for speed. They are suitable when the full likelihood is computationally expensive (e.g., long duration signals) and the signal is well-approximated by the underlying assumptions of the method.
 
-### Providing reference parameters directly
+| Likelihood | Method |
+| --- | --- |
+| `HeterodynedTransientLikelihoodFD` | Relative binning around a reference waveform |
+| `MultibandedTransientLikelihoodFD` | Geometric frequency banding |
+
+### HeterodynedTransientLikelihoodFD
+
+`HeterodynedTransientLikelihoodFD` uses the heterodyne (relative binning) technique.
+It requires a set of *reference parameters* around which the binning is constructed.
+
+#### Providing reference parameters directly
 
 ```python
 from jimgw.core.single_event.likelihood import HeterodynedTransientLikelihoodFD
@@ -159,7 +169,7 @@ likelihood = HeterodynedTransientLikelihoodFD(
 )
 ```
 
-### Automatic reference-parameter search
+#### Automatic reference-parameter search
 
 If you do not have reference parameters, pass a `prior` (and any `likelihood_transforms`) and the constructor will call `maximize_likelihood` internally using `evosax.CMA_ES` (Covariance Matrix Adaptation Evolution Strategy):
 
@@ -191,11 +201,11 @@ likelihood = HeterodynedTransientLikelihoodFD(
 
 The optimiser runs `evosax.CMA_ES` with a JAX-native ask/tell loop, so the waveform evaluations are fully batched and JIT-compiled on CPU/GPU.
 
-## MultibandedTransientLikelihoodFD
+### MultibandedTransientLikelihoodFD
 
-`MultibandedTransientLikelihoodFD` implements the multi-banding method from [Morisaki (2021)](https://arxiv.org/abs/2104.07813). It divides the frequency range into geometrically spaced bands with different resolutions — coarser at high frequencies — and pre-computes the linear and quadratic inner-product coefficients at initialisation.  Evaluation is then much faster because the waveform is only computed at a small set of unique frequency points, not the full grid.
+`MultibandedTransientLikelihoodFD` implements the multi-banding method.
 
-This is most effective for long signals (e.g. BNS/NSBH) where the number of frequency bins is large.
+Pass a `prior` to let the constructor infer `reference_chirp_mass`, `time_offset`, and `delta_f_end` automatically:
 
 ```python
 from jimgw.core.single_event.likelihood import MultibandedTransientLikelihoodFD
@@ -203,32 +213,24 @@ from jimgw.core.single_event.likelihood import MultibandedTransientLikelihoodFD
 likelihood = MultibandedTransientLikelihoodFD(
     detectors=[H1, L1],
     waveform=waveform,
-    reference_chirp_mass=1.2,  # M_sun — use the minimum of your chirp-mass prior
-    trigger_time=gps_time,
     f_min=20.0,
     f_max=1024.0,
+    trigger_time=gps_time,
+    prior=prior,
 )
 ```
 
-### Key Parameters
+Or supply `reference_chirp_mass` explicitly when you do not have a prior object:
 
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `reference_chirp_mass` | — (required) | Chirp mass in solar masses used to define the band structure. Use the minimum of your chirp-mass prior for maximum speedup. |
-| `accuracy_factor` | `5.0` | Controls approximation accuracy (parameter $L$ in Morisaki 2021). Higher values are more accurate but reduce the speedup. |
-| `time_offset` | `2.12` s | Time buffer added when computing band durations to allow for merger-time uncertainty. |
-| `delta_f_end` | `53.0` Hz | Frequency scale for high-frequency tapering at the end of each band. |
-| `maximum_banding_frequency` | `None` | Optional upper limit on the band starting frequency. Defaults to the stationary-phase-approximation validity limit. |
-| `minimum_banding_duration` | `0.0` s | Minimum allowed band duration; prevents very short bands at high frequencies. |
+```python
+likelihood = MultibandedTransientLikelihoodFD(
+    detectors=[H1, L1],
+    waveform=waveform,
+    f_min=20.0,
+    f_max=1024.0,
+    trigger_time=gps_time,
+    reference_chirp_mass=1.2,
+)
+```
 
-The speedup relative to the standard likelihood is printed to the log at initialisation. For typical BBH parameters the speedup is modest, but for BNS with `f_min=20 Hz` it can be 10–100×.
-
-### When to use it
-
-Use `MultibandedTransientLikelihoodFD` when:
-
-- The signal is long (BNS or NSBH at low `f_min`), so the frequency grid has many points.
-- You do not need the reference-parameter optimisation of `HeterodynedTransientLikelihoodFD`.
-- You want analytic phase marginalization: combine with standard parameter sampling that includes `phase_c` in the prior, or marginalise manually on top.
-
-For shorter BBH signals the heterodyned likelihood (`HeterodynedTransientLikelihoodFD`) is typically faster; try both and compare.
+**Choosing `reference_chirp_mass`:** use the **minimum** of your chirp-mass prior. A lower chirp mass means a longer signal and finer frequency resolution; setting the reference to the prior minimum ensures the bands are correct for all systems in the prior.

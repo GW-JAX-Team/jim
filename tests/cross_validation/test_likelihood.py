@@ -23,7 +23,6 @@ import os
 
 os.environ["JAX_PLATFORMS"] = "cpu"
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -348,10 +347,11 @@ def setup():
 # ─── Tests ────────────────────────────────────────────────────────────────────
 
 
-class TestBaseTransientLikelihood:
-    """TransientLikelihoodFD vs GravitationalWaveTransient (no marginalization)."""
+class TestTransientLikelihoodFD:
+    """TransientLikelihoodFD cross-validation against GravitationalWaveTransient."""
 
-    def test_log_likelihood_ratio(self, setup):
+    def test_base(self, setup):
+        """No marginalization."""
         from jimgw.core.single_event.likelihood import TransientLikelihoodFD
 
         jim_ll = TransientLikelihoodFD(
@@ -373,23 +373,20 @@ class TestBaseTransientLikelihood:
             f"bilby={float(bilby_ll):.6f}"
         )
 
+    def test_phase_marginalized(self, setup):
+        """Phase marginalization.
 
-class TestPhaseMarginalizedLikelihood:
-    """TransientLikelihoodFD(phase_marginalization=True) vs GravitationalWaveTransient(phase_marginalization=True).
+        TransientLikelihoodFD.evaluate() always overrides phase_c=0 when
+        phase_marginalization is active before projecting the waveform.  The Cartesian spin
+        components in jim_params are derived from bilby_to_lalsimulation_spins(phase=...).
+        If those spins were computed for a non-zero phase, the resulting (spins, phase_c=0)
+        pair is inconsistent and gives a different waveform than bilby evaluates.
 
-    TransientLikelihoodFD.evaluate() always overrides phase_c=0 when
-    phase_marginalization is active before projecting the waveform.  The Cartesian spin
-    components in jim_params are derived from bilby_to_lalsimulation_spins(phase=...).
-    If those spins were computed for a non-zero phase, the resulting (spins, phase_c=0)
-    pair is inconsistent and gives a different waveform than bilby evaluates.
-
-    Fix: compute jim_params with phase=0 so that the spins and the phase that
-    evaluate() uses (phase_c=0) are consistent.  bilby ignores the input 'phase'
-    when phase_marginalization=True (it evaluates at phase=0 internally), so
-    both sides produce the same waveform.
-    """
-
-    def test_log_likelihood_ratio(self, setup):
+        Fix: compute jim_params with phase=0 so that the spins and the phase that
+        evaluate() uses (phase_c=0) are consistent.  bilby ignores the input 'phase'
+        when phase_marginalization=True (it evaluates at phase=0 internally), so
+        both sides produce the same waveform.
+        """
         from jimgw.core.single_event.likelihood import TransientLikelihoodFD
 
         # Use phase=0 for jim: spins computed at phase=0 are consistent with
@@ -424,23 +421,20 @@ class TestPhaseMarginalizedLikelihood:
             f"bilby={float(bilby_ll):.6f}"
         )
 
+    def test_time_marginalized(self, setup):
+        """Time marginalization.
 
-class TestTimeMarginalizedLikelihood:
-    """TransientLikelihoodFD(time_marginalization={...}) vs GravitationalWaveTransient(time_marginalization=True).
+        To get exact normalisation agreement we make both sides integrate over the
+        **full segment** [start_time, start_time+duration]:
 
-    To get exact normalisation agreement we make both sides integrate over the
-    **full segment** [start_time, start_time+duration]:
+        * Jim uses ``tc_range = (-duration/2 - margin, duration/2 + margin)`` so
+          that every FFT bin is in range and the denominator is ``-log(N_fft)``.
+        * bilby gets a ``Uniform(start_time, start_time+duration)`` prior, which gives the
+          same weight ``log(dt / duration) = -log(N_fft)`` per bin.
 
-    * Jim uses ``tc_range = (-duration/2 - margin, duration/2 + margin)`` so
-      that every FFT bin is in range and the denominator is ``-log(N_fft)``.
-    * bilby gets a ``Uniform(start_time, start_time+duration)`` prior, which gives the
-      same weight ``log(dt / duration) = -log(N_fft)`` per bin.
-
-    Out-of-band FD strain is zeroed in ``build_bilby_ifo_from_jim`` so that
-    bilby's unmasked FFT sees the same in-band-only data as jim.
-    """
-
-    def test_log_likelihood_ratio(self, setup):
+        Out-of-band FD strain is zeroed in ``build_bilby_ifo_from_jim`` so that
+        bilby's unmasked FFT sees the same in-band-only data as jim.
+        """
         from jimgw.core.single_event.likelihood import TransientLikelihoodFD
 
         duration = float(setup["jim_ifos"][0].data.duration)
@@ -479,16 +473,13 @@ class TestTimeMarginalizedLikelihood:
             f"bilby={float(bilby_ll):.6f}"
         )
 
-
-class TestDistanceMarginalizedLikelihood:
-    """TransientLikelihoodFD(distance_marginalization={...}) vs GravitationalWaveTransient(distance_marginalization=True).
-
-    Jim uses direct logsumexp over a fine distance grid;
-    bilby uses a 2-D spline look-up table.
-    """
-
     @pytest.mark.slow
-    def test_log_likelihood_ratio(self, setup):
+    def test_distance_marginalized(self, setup):
+        """Distance marginalization.
+
+        Jim uses direct logsumexp over a fine distance grid;
+        bilby uses a 2-D spline look-up table.
+        """
         from jimgw.core.single_event.likelihood import TransientLikelihoodFD
         from jimgw.core.prior import PowerLawPrior
 
@@ -540,16 +531,13 @@ class TestDistanceMarginalizedLikelihood:
             f"bilby={float(bilby_ll):.6f}"
         )
 
-
-class TestPhaseDistanceMarginalizedLikelihood:
-    """TransientLikelihoodFD(phase+distance marginalization) vs bilby phase+distance marginalization.
-
-    Uses phase=0 for parameter conversion so that jim's forced ``phase_c=0`` remains
-    consistent with the cartesian spin components.
-    """
-
     @pytest.mark.slow
-    def test_log_likelihood_ratio(self, setup):
+    def test_phase_distance_marginalized(self, setup):
+        """Phase+distance marginalization.
+
+        Uses phase=0 for parameter conversion so that jim's forced ``phase_c=0`` remains
+        consistent with the cartesian spin components.
+        """
         from jimgw.core.single_event.likelihood import TransientLikelihoodFD
         from jimgw.core.prior import PowerLawPrior
 
@@ -611,19 +599,16 @@ class TestPhaseDistanceMarginalizedLikelihood:
             f"bilby={float(bilby_ll):.6f}"
         )
 
+    def test_phase_time_marginalized(self, setup):
+        """Phase+time marginalization.
 
-class TestPhaseTimeMarginalizedLikelihood:
-    """TransientLikelihoodFD(time+phase marginalization) vs GravitationalWaveTransient(time+phase marginalization).
+        Same phase-consistency caveat as test_phase_marginalized: jim_params
+        must be derived with phase=0 so that the cartesian spins and the phase_c=0
+        that TransientLikelihoodFD.evaluate() enforces are consistent.
 
-    Same phase-consistency caveat as TestPhaseMarginalizedLikelihood: jim_params
-    must be derived with phase=0 so that the cartesian spins and the phase_c=0
-    that TransientLikelihoodFD.evaluate() enforces are consistent.
-
-    Same time-normalisation fix as TestTimeMarginalizedLikelihood: use the full
-    segment as the time prior so jim and bilby share the same -log(N_fft) norm.
-    """
-
-    def test_log_likelihood_ratio(self, setup):
+        Same time-normalisation fix as test_time_marginalized: use the full
+        segment as the time prior so jim and bilby share the same -log(N_fft) norm.
+        """
         from jimgw.core.single_event.likelihood import TransientLikelihoodFD
 
         bilby_params_ph0 = {**setup["bilby_params"], "phase": 0.0}
@@ -669,8 +654,8 @@ class TestPhaseTimeMarginalizedLikelihood:
         )
 
 
-class TestHeterodynedLikelihood:
-    """HeterodynedTransientLikelihoodFD vs RelativeBinningGravitationalWaveTransient.
+class TestHeterodynedTransientLikelihoodFD:
+    """HeterodynedTransientLikelihoodFD cross-validation against RelativeBinningGravitationalWaveTransient.
 
     Both are evaluated using the *same* fiducial/reference parameters so that the
     summary data arrays are computed at the same point.  The log-likelihood is
@@ -681,7 +666,8 @@ class TestHeterodynedLikelihood:
     (phase-based) and bilby (chi/epsilon-based).
     """
 
-    def test_log_likelihood_ratio(self, setup):
+    def test_base(self, setup):
+        """No marginalization."""
         from jimgw.core.single_event.likelihood import HeterodynedTransientLikelihoodFD
 
         # Use the shared test point as fiducial/reference
@@ -726,20 +712,17 @@ class TestHeterodynedLikelihood:
             f"bilby={float(bilby_ll):.6f}"
         )
 
+    def test_phase_marginalized(self, setup):
+        """Phase marginalization.
 
-class TestHeterodynedPhaseMarginalizedLikelihood:
-    """HeterodynedTransientLikelihoodFD(phase_marginalization=True) vs RelativeBinningGravitationalWaveTransient
-    with phase_marginalization=True.
-    """
-
-    def test_log_likelihood_ratio(self, setup):
+        Use phase=0 for jim reference: HeterodynedTransientLikelihoodFD
+        internally sets phase_c=0 when building the summary data, so the
+        reference waveform must also be computed at phase_c=0 for consistency.
+        """
         from jimgw.core.single_event.likelihood import (
             HeterodynedTransientLikelihoodFD,
         )
 
-        # Use phase=0 for jim reference: HeterodynedTransientLikelihoodFD
-        # internally sets phase_c=0 when building the summary data, so the
-        # reference waveform must also be computed at phase_c=0 for consistency.
         bilby_ref_params = setup["bilby_params"].copy()
         bilby_ref_params_ph0 = {**bilby_ref_params, "phase": 0.0}
         jim_ref_params = bilby_to_jim_params(bilby_ref_params_ph0)
@@ -796,8 +779,8 @@ class TestHeterodynedPhaseMarginalizedLikelihood:
         )
 
 
-class TestMultibandedLikelihood:
-    """MultibandedTransientLikelihoodFD vs MBGravitationalWaveTransient.
+class TestMultibandedTransientLikelihoodFD:
+    """MultibandedTransientLikelihoodFD cross-validation against MBGravitationalWaveTransient.
 
     Both use reference_chirp_mass=20.0 M_sun, accuracy_factor=5, time_offset=2.12,
     delta_f_end=53.0.  Band structure and all precomputed coefficients are identical
@@ -809,7 +792,7 @@ class TestMultibandedLikelihood:
     correct MB frequencies before being remapped to banded points.
     """
 
-    def test_log_likelihood_ratio(self, setup):
+    def test_base(self, setup):
         from jimgw.core.single_event.likelihood import MultibandedTransientLikelihoodFD
 
         REFERENCE_CHIRP_MASS = 20.0  # M_sun
@@ -817,11 +800,11 @@ class TestMultibandedLikelihood:
         jim_ll = MultibandedTransientLikelihoodFD(
             detectors=setup["jim_ifos"],
             waveform=setup["waveform"],
-            reference_chirp_mass=REFERENCE_CHIRP_MASS,
             f_min=F_MIN,
             f_max=F_MAX,
             trigger_time=GPS,
             accuracy_factor=5.0,
+            reference_chirp_mass=REFERENCE_CHIRP_MASS,
             time_offset=2.12,
             delta_f_end=53.0,
         ).evaluate(setup["jim_params"].copy(), {})
