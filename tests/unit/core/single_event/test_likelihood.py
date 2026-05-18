@@ -1357,9 +1357,12 @@ class TestMultibandedTransientLikelihoodFD:
             reference_chirp_mass=20.0,
         )
         params = example_params()
-        params_copy = dict(params)
+        keys_before = set(params.keys())
+        values_before = {k: float(v) for k, v in params.items()}
         likelihood.evaluate(params, {})
-        assert set(params.keys()) == set(params_copy.keys())
+        assert set(params.keys()) == keys_before
+        for k, v in values_before.items():
+            assert float(params[k]) == v
 
     def test_different_accuracy_factors(self, detectors_and_waveform):
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
