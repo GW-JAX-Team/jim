@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../../../assets/images/favicon.png">
-      <meta name="generator" content="zensical-0.0.42">
+      <meta name="generator" content="zensical-0.0.43">
     
     
       
@@ -1427,6 +1427,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        MultibandedTransientLikelihoodFD
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2146,6 +2157,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        MultibandedTransientLikelihoodFD
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2205,7 +2227,7 @@
 
 
 <h4 id="jimgw.core.single_event.likelihood.likelihood_presets" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">likelihood_presets</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;TransientLikelihoodFD&#39;</span><span class="p">:</span> <span class="n">TransientLikelihoodFD</span><span class="p">,</span> <span class="s1">&#39;HeterodynedTransientLikelihoodFD&#39;</span><span class="p">:</span> <span class="n">HeterodynedTransientLikelihoodFD</span><span class="p">}</span></code>
+            <code class="highlight language-python"><span class="n">likelihood_presets</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;TransientLikelihoodFD&#39;</span><span class="p">:</span> <span class="n">TransientLikelihoodFD</span><span class="p">,</span> <span class="s1">&#39;HeterodynedTransientLikelihoodFD&#39;</span><span class="p">:</span> <span class="n">HeterodynedTransientLikelihoodFD</span><span class="p">,</span> <span class="s1">&#39;MultibandedTransientLikelihoodFD&#39;</span><span class="p">:</span> <span class="n">MultibandedTransientLikelihoodFD</span><span class="p">}</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
@@ -4630,6 +4652,1443 @@ Defaults to 1000.</p>
           </tr>
       </tbody>
     </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD" class="doc doc-heading">
+            <code>MultibandedTransientLikelihoodFD</code>
+
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" href="./#jimgw.core.single_event.likelihood.SingleEventLikelihood">SingleEventLikelihood</a></code></p>
+
+
+
+        <p>Multi-banded likelihood for gravitational wave transient events.</p>
+<p>This implements the multi-banding method described in S. Morisaki, 2021, arXiv:2104.07813.
+The method divides the frequency range into bands with different resolutions,
+using coarser grids at higher frequencies to speed up likelihood evaluation.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;highlight language-python&quot;&gt;&lt;span class=&quot;n&quot;&gt;reference_chirp_mass&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Float&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reference_chirp_mass&lt;/span&gt;&lt;/code&gt;
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="./#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.reference_chirp_mass">reference_chirp_mass</a></code></td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Reference chirp mass for determining frequency bands.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;highlight language-python&quot;&gt;&lt;span class=&quot;n&quot;&gt;reference_chirp_mass_in_second&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Float&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reference_chirp_mass&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;MTSUN&lt;/span&gt;&lt;/code&gt;
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="./#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.reference_chirp_mass_in_second">reference_chirp_mass_in_second</a></code></td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Same value converted to seconds.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;highlight language-python&quot;&gt;&lt;span class=&quot;n&quot;&gt;highest_mode&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;highest_mode&lt;/span&gt;&lt;/code&gt;
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="./#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.highest_mode">highest_mode</a></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum magnetic number of GW moments (fixed to 2 for 22-mode).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;highlight language-python&quot;&gt;&lt;span class=&quot;n&quot;&gt;accuracy_factor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Float&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;accuracy_factor&lt;/span&gt;&lt;/code&gt;
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="./#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.accuracy_factor">accuracy_factor</a></code></td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parameter L controlling approximation accuracy.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;highlight language-python&quot;&gt;&lt;span class=&quot;n&quot;&gt;time_offset&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Float&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;time_offset&lt;/span&gt;&lt;/code&gt;
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="./#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.time_offset">time_offset</a></code></td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Time offset for band construction.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;highlight language-python&quot;&gt;&lt;span class=&quot;n&quot;&gt;delta_f_end&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Float&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;delta_f_end&lt;/span&gt;&lt;/code&gt;
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="./#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.delta_f_end">delta_f_end</a></code></td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Frequency scale for high-frequency tapering.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;highlight language-python&quot;&gt;&lt;span class=&quot;n&quot;&gt;durations&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Float&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Array&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39; n_bands&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;/code&gt;
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="./#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.durations">durations</a></code></td>
+            <td>
+                  <code><span title="jaxtyping.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Durations of each band.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;highlight language-python&quot;&gt;&lt;span class=&quot;n&quot;&gt;fb_dfb&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Float&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Array&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39;n_bands+1 2&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;/code&gt;
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="./#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.fb_dfb">fb_dfb</a></code></td>
+            <td>
+                  <code><span title="jaxtyping.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Starting frequencies and taper widths for each band.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;highlight language-python&quot;&gt;&lt;span class=&quot;n&quot;&gt;linear_coeffs&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;dict&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;str&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Float&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Array&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39; n_total_points&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt;&lt;/code&gt;
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="./#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.linear_coeffs">linear_coeffs</a></code></td>
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pre-computed coefficients for (d|h) inner product.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;highlight language-python&quot;&gt;&lt;span class=&quot;n&quot;&gt;quadratic_coeffs&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;dict&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;str&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Float&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Array&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39; n_total_points&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt;&lt;/code&gt;
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="./#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.quadratic_coeffs">quadratic_coeffs</a></code></td>
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pre-computed coefficients for (h|h) inner product.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>detectors</code>
+            </td>
+            <td>
+                  <code><span title="typing.Sequence">Sequence</span>[<a class="autorefs autorefs-internal" href="../detector/#jimgw.core.single_event.detector.Detector">Detector</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>List of detector objects.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>waveform</code>
+            </td>
+            <td>
+                  <code><span title="ripplegw.interfaces.Waveform">Waveform</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Waveform model to evaluate.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fixed_parameters</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="dict">dict</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fixed parameters for the likelihood.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>f_min</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span> | <span title="dict">dict</span>[<span title="str">str</span>, <span title="jaxtyping.Float">Float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Minimum frequency for likelihood
+evaluation, or a dict mapping detector name to per-detector Float.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>f_max</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span> | <span title="dict">dict</span>[<span title="str">str</span>, <span title="jaxtyping.Float">Float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum frequency for likelihood
+evaluation, or a dict mapping detector name to per-detector Float.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="jax.numpy.inf">inf</span></code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>trigger_time</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>GPS time of the event trigger.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>highest_mode</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum magnetic number (default 2, for 22-mode only).</p>
+              </div>
+            </td>
+            <td>
+                  <code>2</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>accuracy_factor</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Accuracy parameter L (default 5.0).</p>
+              </div>
+            </td>
+            <td>
+                  <code>5.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>prior</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<a class="autorefs autorefs-internal" href="../../prior/#jimgw.core.prior.Prior">Prior</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Combined prior object.  Needed when <em>reference_chirp_mass</em>,
+<em>time_offset</em>, or <em>delta_f_end</em> are <code>None</code> so they can be inferred
+automatically from the prior bounds.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>reference_chirp_mass</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="jaxtyping.Float">Float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Reference chirp mass in solar masses.
+Use the minimum of your chirp-mass prior for maximum speedup.  When
+<code>None</code>, the value is inferred from the <code>M_c</code> component of <em>prior</em>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>time_offset</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="jaxtyping.Float">Float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Time offset in seconds.  When <code>None</code>,
+inferred from the <code>t_c</code> (or <code>t_{ifo}</code>) prior range; falls back
+to 2.12 s with a warning when the prior is unavailable.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>delta_f_end</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="jaxtyping.Float">Float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>End frequency taper scale in Hz.  When
+<code>None</code>, inferred from the <code>t_c</code> prior range; falls back to 53.0 Hz.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_banding_frequency</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="jaxtyping.Float">Float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Upper limit on band starting frequency.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>min_banding_duration</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Minimum duration for bands.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.0</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.durations" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">durations</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39; n_bands&#39;</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.durations" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.fb_dfb" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fb_dfb</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;n_bands+1 2&#39;</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.fb_dfb" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.unique_frequencies" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">unique_frequencies</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39; n_unique&#39;</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.unique_frequencies" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.unique_to_original" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">unique_to_original</span><span class="p">:</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.unique_to_original" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.linear_coeffs" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">linear_coeffs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39; n_total_points&#39;</span><span class="p">]]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.linear_coeffs" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.quadratic_coeffs" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">quadratic_coeffs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39; n_total_points&#39;</span><span class="p">]]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.quadratic_coeffs" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.reference_chirp_mass" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reference_chirp_mass</span><span class="p">:</span> <span class="n">Float</span> <span class="o">=</span> <span class="n">reference_chirp_mass</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.reference_chirp_mass" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.reference_chirp_mass_in_second" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reference_chirp_mass_in_second</span><span class="p">:</span> <span class="n">Float</span> <span class="o">=</span> <span class="n">reference_chirp_mass</span> <span class="o">*</span> <span class="n">MTSUN</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.reference_chirp_mass_in_second" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.highest_mode" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">highest_mode</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">highest_mode</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.highest_mode" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.accuracy_factor" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">accuracy_factor</span><span class="p">:</span> <span class="n">Float</span> <span class="o">=</span> <span class="n">accuracy_factor</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.accuracy_factor" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.time_offset" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">time_offset</span><span class="p">:</span> <span class="n">Float</span> <span class="o">=</span> <span class="n">time_offset</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.time_offset" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.delta_f_end" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">delta_f_end</span><span class="p">:</span> <span class="n">Float</span> <span class="o">=</span> <span class="n">delta_f_end</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.delta_f_end" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.min_banding_duration" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">min_banding_duration</span><span class="p">:</span> <span class="n">Float</span> <span class="o">=</span> <span class="n">min_banding_duration</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.min_banding_duration" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.minimum_frequency" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">minimum_frequency</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">_f_mins</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.minimum_frequency" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.maximum_frequency" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">maximum_frequency</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">_f_maxs</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.maximum_frequency" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.max_banding_frequency" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">max_banding_frequency</span><span class="p">:</span> <span class="n">Float</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">max_banding_frequency</span><span class="p">,</span> <span class="n">fmax_spa</span><span class="p">)</span> <span class="k">if</span> <span class="n">max_banding_frequency</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">fmax_spa</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.max_banding_frequency" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.trigger_time" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">trigger_time</span> <span class="o">=</span> <span class="n">trigger_time</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.trigger_time" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.gmst" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">gmst</span> <span class="o">=</span> <span class="n">compute_gmst</span><span class="p">(</span><span class="n">trigger_time</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.gmst" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.n_bands" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">n_bands</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.n_bands" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Number of frequency bands.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._model" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_model</span><span class="p">:</span> <span class="nb">object</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._model" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._data" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_data</span><span class="p">:</span> <span class="nb">object</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._data" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.model" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">model</span><span class="p">:</span> <span class="nb">object</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.model" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The model used by the likelihood.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.data" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">data</span><span class="p">:</span> <span class="nb">object</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.data" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The data used by the likelihood.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.detectors" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">detectors</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Detector</span><span class="p">]</span> <span class="o">=</span> <span class="n">detectors</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.detectors" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.waveform" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">waveform</span><span class="p">:</span> <span class="n">Waveform</span> <span class="o">=</span> <span class="n">waveform</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.waveform" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.fixed_parameters" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fixed_parameters</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span> <span class="o">|</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">]],</span> <span class="n">Float</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">]]]</span> <span class="o">=</span> <span class="n">fixed_parameters</span> <span class="k">if</span> <span class="n">fixed_parameters</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{}</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.fixed_parameters" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.duration" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">duration</span><span class="p">:</span> <span class="n">Float</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.duration" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Duration of the data segment in seconds (taken from the first detector).</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.detector_names" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">detector_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.detector_names" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Names of the detectors used in this likelihood.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">detectors</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Detector</span><span class="p">],</span> <span class="n">waveform</span><span class="p">:</span> <span class="n">Waveform</span><span class="p">,</span> <span class="n">fixed_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span> <span class="o">|</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">]],</span> <span class="n">Float</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">f_min</span><span class="p">:</span> <span class="n">Float</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">f_max</span><span class="p">:</span> <span class="n">Float</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">]</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="n">trigger_time</span><span class="p">:</span> <span class="n">Float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">highest_mode</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> <span class="n">accuracy_factor</span><span class="p">:</span> <span class="n">Float</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span> <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Prior</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">reference_chirp_mass</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">time_offset</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">delta_f_end</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">max_banding_frequency</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">min_banding_duration</span><span class="p">:</span> <span class="n">Float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._find_leaf_prior" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_find_leaf_prior</span><span class="p">(</span><span class="n">prior</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">param_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._find_leaf_prior" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Recursively search <em>prior</em> for the bounded leaf that owns <em>param_name</em>.</p>
+<p>Returns the first component that has <code>xmin</code>/<code>xmax</code> attributes and
+lists <em>param_name</em> in its <code>parameter_names</code>, or <code>None</code> if not found.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._resolve_reference_chirp_mass" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_resolve_reference_chirp_mass</span><span class="p">(</span><span class="n">reference_chirp_mass</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">],</span> <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">float</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._resolve_reference_chirp_mass" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return <code>reference_chirp_mass</code>, inferring from the M_c prior minimum when not provided.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._resolve_time_params" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_resolve_time_params</span><span class="p">(</span><span class="n">time_offset</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">],</span> <span class="n">delta_f_end</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">],</span> <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">trigger_time</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">detectors</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Float</span><span class="p">,</span> <span class="n">Float</span><span class="p">]</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._resolve_time_params" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return <code>(time_offset, delta_f_end)</code>, inferring from t_c prior bounds when not provided.</p>
+<p>Inference uses the geocentric coalescence time <code>t_c</code> only.
+Detector-frame time <code>t_det</code> is not supported because
+<code>t_det = t_c + sky_delay(ra, dec)</code> and the delay is sky-position-dependent,
+so <code>t_c</code> bounds cannot be derived from a <code>t_det</code> prior at setup time.
+Falls back to bilby defaults (2.12 s, 53.0 Hz) when inference is not possible.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._validate_banding_params" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_validate_banding_params</span><span class="p">(</span><span class="n">reference_chirp_mass</span><span class="p">:</span> <span class="n">Float</span><span class="p">,</span> <span class="n">highest_mode</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">accuracy_factor</span><span class="p">:</span> <span class="n">Float</span><span class="p">,</span> <span class="n">time_offset</span><span class="p">:</span> <span class="n">Float</span><span class="p">,</span> <span class="n">delta_f_end</span><span class="p">:</span> <span class="n">Float</span><span class="p">,</span> <span class="n">min_banding_duration</span><span class="p">:</span> <span class="n">Float</span><span class="p">,</span> <span class="n">max_banding_frequency</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._validate_banding_params" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Raise ValueError for any out-of-range banding parameter.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._tau" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_tau</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._tau" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute time-to-merger using 0PN formula.</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._tau--parameters">Parameters<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._tau--parameters" title="Permanent link">¤</a></h6>
+<p>f : Float
+    Input frequency in Hz.</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._tau--returns">Returns<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._tau--returns" title="Permanent link">¤</a></h6>
+<p>Float
+    Time-to-merger in seconds.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._dtaudf" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_dtaudf</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._dtaudf" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute derivative of time-to-merger using 0PN formula.</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._dtaudf--parameters">Parameters<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._dtaudf--parameters" title="Permanent link">¤</a></h6>
+<p>f : Float
+    Input frequency in Hz.</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._dtaudf--returns">Returns<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._dtaudf--returns" title="Permanent link">¤</a></h6>
+<p>Float
+    Derivative of time-to-merger (negative, in seconds/Hz).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._find_starting_frequency" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_find_starting_frequency</span><span class="p">(</span><span class="n">duration</span><span class="p">:</span> <span class="n">Float</span><span class="p">,</span> <span class="n">f_now</span><span class="p">:</span> <span class="n">Float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">]]</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._find_starting_frequency" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Find starting frequency of next band via bisection search.</p>
+<p>Finds frequency satisfying conditions (10) and (51) of arXiv:2104.07813:
+- Time containment: tau(f) + L * sqrt(-dtau/df) &lt; duration - time_offset
+- Smooth transition: f - 1/sqrt(-dtau/df) &gt; f_now</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._find_starting_frequency--parameters">Parameters<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._find_starting_frequency--parameters" title="Permanent link">¤</a></h6>
+<p>duration : Float
+    Duration of the next band.
+f_now : Float
+    Starting frequency of current band.</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._find_starting_frequency--returns">Returns<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._find_starting_frequency--returns" title="Permanent link">¤</a></h6>
+<p>tuple[Optional[Float], Optional[Float]]
+    (fnext, dfnext) or (None, None) if no valid frequency exists.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._setup_frequency_bands" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_setup_frequency_bands</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._setup_frequency_bands" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Set up frequency bands with geometrically decreasing durations.</p>
+<p>Bands have durations T, T/2, T/4, ... where T is the original data duration.</p>
+
+
+<details class="sets" open>
+  <summary>Sets</summary>
+  <p>self.durations: Array of band durations
+self.fb_dfb: Array of [starting_freq, taper_width] for each band</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._round_up_to_power_of_two" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_round_up_to_power_of_two</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._round_up_to_power_of_two" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Round up to the nearest power of two.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._setup_integers" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_setup_integers</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._setup_integers" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Set up integer indices for each band.</p>
+
+
+<details class="sets" open>
+  <summary>Sets</summary>
+  <p>self.Nbs: Number of samples in downsampled data per band
+self.Mbs: Number of samples in shortened data per band
+self.Ks_Ke: Start/end frequency indices per band</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._setup_waveform_frequency_points" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_setup_waveform_frequency_points</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._setup_waveform_frequency_points" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Set up frequency points where waveforms are evaluated.</p>
+<p>Creates banded frequency points and finds unique frequencies to avoid
+redundant waveform evaluations.</p>
+
+
+<details class="sets" open>
+  <summary>Sets</summary>
+  <p>self.banded_frequency_points: All frequency points across bands
+self.start_end_idxs: Start/end indices for each band
+self.unique_frequencies: Unique frequencies for waveform evaluation
+self.unique_to_original: Mapping from unique back to banded</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._get_window_sequence" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_get_window_sequence</span><span class="p">(</span><span class="n">delta_f</span><span class="p">:</span> <span class="n">Float</span><span class="p">,</span> <span class="n">start_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">length</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">band</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._get_window_sequence" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute cosine-tapered window function for a frequency band.</p>
+<p>Window is 1 in band interior, with smooth cosine tapers at edges.</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._get_window_sequence--parameters">Parameters<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._get_window_sequence--parameters" title="Permanent link">¤</a></h6>
+<p>delta_f : Float
+    Frequency interval.
+start_idx : int
+    Starting frequency index (frequency = start_idx * delta_f).
+length : int
+    Number of frequency points.
+band : int
+    Band index.</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._get_window_sequence--returns">Returns<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._get_window_sequence--returns" title="Permanent link">¤</a></h6>
+<p>Array
+    Window sequence of given length.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._setup_linear_coefficients" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_setup_linear_coefficients</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._setup_linear_coefficients" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Pre-compute coefficients for (d|h) inner product.</p>
+<p>For each band:
+1. Apply frequency mask and divide by PSD
+2. IFFT to time domain, take last M^(b) samples
+3. FFT back to get shortened data
+4. Multiply by window and normalization factor</p>
+
+
+<details class="sets" open>
+  <summary>Sets</summary>
+  <p>self.linear_coeffs: Dict mapping detector name to coefficient array</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._setup_quadratic_coefficients" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_setup_quadratic_coefficients</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._setup_quadratic_coefficients" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Pre-compute coefficients for (h|h) using linear interpolation.</p>
+<p>For each band and coarse frequency point, compute the weighted sum
+of 1/PSD values using linear interpolation weights.</p>
+
+
+<details class="sets" open>
+  <summary>Sets</summary>
+  <p>self.quadratic_coeffs: Dict mapping detector name to coefficient array</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Evaluate the log-likelihood for given parameters.</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate--parameters">Parameters<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate--parameters" title="Permanent link">¤</a></h6>
+<p>params : dict[str, Float]
+    Dictionary of model parameters.
+data : dict
+    Data dictionary (not used, data stored in detectors).</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate--returns">Returns<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate--returns" title="Permanent link">¤</a></h6>
+<p>Float
+    Log-likelihood value.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_likelihood</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+
+<a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Core likelihood evaluation using multi-banding.</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood--parameters">Parameters<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood--parameters" title="Permanent link">¤</a></h6>
+<p>params : dict[str, Float]
+    Dictionary of model parameters.
+data : dict
+    Data dictionary (not used).</p>
+<h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood--returns">Returns<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood--returns" title="Permanent link">¤</a></h6>
+<p>Float
+    Log-likelihood value.</p>
 
 
     </div>

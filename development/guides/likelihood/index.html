@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="zensical-0.0.42">
+      <meta name="generator" content="zensical-0.0.43">
     
     
       
@@ -912,6 +912,18 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#fast-likelihoods" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fast Likelihoods
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fast Likelihoods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#heterodynedtransientlikelihoodfd" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -939,6 +951,22 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Automatic reference-parameter search
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multibandedtransientlikelihoodfd" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        MultibandedTransientLikelihoodFD
       </span>
     </span>
   </a>
@@ -2201,6 +2229,18 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#fast-likelihoods" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fast Likelihoods
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fast Likelihoods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#heterodynedtransientlikelihoodfd" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2228,6 +2268,22 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Automatic reference-parameter search
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multibandedtransientlikelihoodfd" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        MultibandedTransientLikelihoodFD
       </span>
     </span>
   </a>
@@ -2387,9 +2443,30 @@
 <span class="p">)</span>
 </code></pre></div>
 <p>Both forms are <code>jax.jit</code>-compatible. Callables are evaluated in <strong>insertion order</strong>, so later entries in <code>fixed_parameters</code> can read values written by earlier ones.</p>
-<h2 id="heterodynedtransientlikelihoodfd">HeterodynedTransientLikelihoodFD<a class="headerlink" href="#heterodynedtransientlikelihoodfd" title="Permanent link">¤</a></h2>
-<p>For faster evaluation, <code>HeterodynedTransientLikelihoodFD</code> uses the heterodyne (relative binning) technique.  It requires a set of <em>reference parameters</em> around which the binning is constructed.</p>
-<h3 id="providing-reference-parameters-directly">Providing reference parameters directly<a class="headerlink" href="#providing-reference-parameters-directly" title="Permanent link">¤</a></h3>
+<h2 id="fast-likelihoods">Fast Likelihoods<a class="headerlink" href="#fast-likelihoods" title="Permanent link">¤</a></h2>
+<p><code>HeterodynedTransientLikelihoodFD</code> and <code>MultibandedTransientLikelihoodFD</code> are both approximations that trade exactness for speed. They are suitable when the full likelihood is computationally expensive (e.g., long duration signals) and the signal is well-approximated by the underlying assumptions of the method.</p>
+<table>
+<thead>
+<tr>
+<th>Likelihood</th>
+<th>Method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HeterodynedTransientLikelihoodFD</code></td>
+<td>Relative binning around a reference waveform</td>
+</tr>
+<tr>
+<td><code>MultibandedTransientLikelihoodFD</code></td>
+<td>Geometric frequency banding</td>
+</tr>
+</tbody>
+</table>
+<h3 id="heterodynedtransientlikelihoodfd">HeterodynedTransientLikelihoodFD<a class="headerlink" href="#heterodynedtransientlikelihoodfd" title="Permanent link">¤</a></h3>
+<p><code>HeterodynedTransientLikelihoodFD</code> uses the heterodyne (relative binning) technique.
+It requires a set of <em>reference parameters</em> around which the binning is constructed.</p>
+<h4 id="providing-reference-parameters-directly">Providing reference parameters directly<a class="headerlink" href="#providing-reference-parameters-directly" title="Permanent link">¤</a></h4>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">jimgw.core.single_event.likelihood</span><span class="w"> </span><span class="kn">import</span> <span class="n">HeterodynedTransientLikelihoodFD</span>
 
 <span class="n">likelihood</span> <span class="o">=</span> <span class="n">HeterodynedTransientLikelihoodFD</span><span class="p">(</span>
@@ -2402,7 +2479,7 @@
     <span class="n">phase_marginalization</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
-<h3 id="automatic-reference-parameter-search">Automatic reference-parameter search<a class="headerlink" href="#automatic-reference-parameter-search" title="Permanent link">¤</a></h3>
+<h4 id="automatic-reference-parameter-search">Automatic reference-parameter search<a class="headerlink" href="#automatic-reference-parameter-search" title="Permanent link">¤</a></h4>
 <p>If you do not have reference parameters, pass a <code>prior</code> (and any <code>likelihood_transforms</code>) and the constructor will call <code>maximize_likelihood</code> internally using <code>evosax.CMA_ES</code> (Covariance Matrix Adaptation Evolution Strategy):</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">jimgw.core.single_event.likelihood</span><span class="w"> </span><span class="kn">import</span> <span class="n">HeterodynedTransientLikelihoodFD</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jimgw.core.prior</span><span class="w"> </span><span class="kn">import</span> <span class="n">CombinePrior</span><span class="p">,</span> <span class="n">UniformPrior</span><span class="p">,</span> <span class="n">SinePrior</span><span class="p">,</span> <span class="n">CosinePrior</span>
@@ -2429,6 +2506,31 @@
 <span class="p">)</span>
 </code></pre></div>
 <p>The optimiser runs <code>evosax.CMA_ES</code> with a JAX-native ask/tell loop, so the waveform evaluations are fully batched and JIT-compiled on CPU/GPU.</p>
+<h3 id="multibandedtransientlikelihoodfd">MultibandedTransientLikelihoodFD<a class="headerlink" href="#multibandedtransientlikelihoodfd" title="Permanent link">¤</a></h3>
+<p><code>MultibandedTransientLikelihoodFD</code> implements the multi-banding method.</p>
+<p>Pass a <code>prior</code> to let the constructor infer <code>reference_chirp_mass</code>, <code>time_offset</code>, and <code>delta_f_end</code> automatically:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">jimgw.core.single_event.likelihood</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultibandedTransientLikelihoodFD</span>
+
+<span class="n">likelihood</span> <span class="o">=</span> <span class="n">MultibandedTransientLikelihoodFD</span><span class="p">(</span>
+    <span class="n">detectors</span><span class="o">=</span><span class="p">[</span><span class="n">H1</span><span class="p">,</span> <span class="n">L1</span><span class="p">],</span>
+    <span class="n">waveform</span><span class="o">=</span><span class="n">waveform</span><span class="p">,</span>
+    <span class="n">f_min</span><span class="o">=</span><span class="mf">20.0</span><span class="p">,</span>
+    <span class="n">f_max</span><span class="o">=</span><span class="mf">1024.0</span><span class="p">,</span>
+    <span class="n">trigger_time</span><span class="o">=</span><span class="n">gps_time</span><span class="p">,</span>
+    <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Or supply <code>reference_chirp_mass</code> explicitly when you do not have a prior object:</p>
+<div class="highlight"><pre><span></span><code><span class="n">likelihood</span> <span class="o">=</span> <span class="n">MultibandedTransientLikelihoodFD</span><span class="p">(</span>
+    <span class="n">detectors</span><span class="o">=</span><span class="p">[</span><span class="n">H1</span><span class="p">,</span> <span class="n">L1</span><span class="p">],</span>
+    <span class="n">waveform</span><span class="o">=</span><span class="n">waveform</span><span class="p">,</span>
+    <span class="n">f_min</span><span class="o">=</span><span class="mf">20.0</span><span class="p">,</span>
+    <span class="n">f_max</span><span class="o">=</span><span class="mf">1024.0</span><span class="p">,</span>
+    <span class="n">trigger_time</span><span class="o">=</span><span class="n">gps_time</span><span class="p">,</span>
+    <span class="n">reference_chirp_mass</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p><strong>Choosing <code>reference_chirp_mass</code>:</strong> use the <strong>minimum</strong> of your chirp-mass prior. A lower chirp mass means a longer signal and finer frequency resolution; setting the reference to the prior minimum ensures the bands are correct for all systems in the prior.</p>
 
 
 
