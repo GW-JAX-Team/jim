@@ -937,9 +937,7 @@ class TestTransientLikelihoodFD:
         )
         params_with_tdet = {**example_params(), "t_det": 0.0}
         result_tr = transform_likelihood.evaluate(dict(params_with_tdet))
-        result_tr_jit = jax.jit(transform_likelihood.evaluate)(
-            dict(params_with_tdet), {}
-        )
+        result_tr_jit = jax.jit(transform_likelihood.evaluate)(dict(params_with_tdet))
         assert jnp.isfinite(result_tr_jit)
         assert jnp.allclose(result_tr, result_tr_jit)
 
