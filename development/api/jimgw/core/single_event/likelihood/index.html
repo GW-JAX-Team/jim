@@ -2580,7 +2580,7 @@ order. Defaults to None (no fixed parameters).</p>
 
 
 <h5 id="jimgw.core.single_event.likelihood.SingleEventLikelihood.evaluate" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
 
 <a href="#jimgw.core.single_event.likelihood.SingleEventLikelihood.evaluate" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -2601,7 +2601,7 @@ Callables are applied in insertion order.</p>
 
 
 <h5 id="jimgw.core.single_event.likelihood.SingleEventLikelihood._likelihood" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">_likelihood</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+            <code class="highlight language-python"><span class="n">_likelihood</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
@@ -2772,7 +2772,7 @@ Callables are applied in insertion order.</p>
 
 
 <h5 id="jimgw.core.single_event.likelihood.ZeroLikelihood.evaluate" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
 
 <a href="#jimgw.core.single_event.likelihood.ZeroLikelihood.evaluate" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -2799,22 +2799,6 @@ Callables are applied in insertion order.</p>
             </td>
             <td>
                   <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="jaxtyping.Float">Float</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Ignored.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>data</code>
-            </td>
-            <td>
-                  <code><span title="dict">dict</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3075,7 +3059,7 @@ dict or <code>DistanceMargConfig</code> instead.</p>
 ...     phase_marginalization=True,
 ...     time_marginalization={"tc_range": (-0.1, 0.1)},
 ... )
-logL = likelihood.evaluate(params, data)</p>
+logL = likelihood.evaluate(params)</p>
 </blockquote>
 </blockquote>
 </blockquote>
@@ -3469,7 +3453,7 @@ logL = likelihood.evaluate(params, data)</p>
 
 
 <h5 id="jimgw.core.single_event.likelihood.TransientLikelihoodFD.evaluate" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
 
 <a href="#jimgw.core.single_event.likelihood.TransientLikelihoodFD.evaluate" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -3485,7 +3469,7 @@ logL = likelihood.evaluate(params, data)</p>
 
 
 <h5 id="jimgw.core.single_event.likelihood.TransientLikelihoodFD._likelihood" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">_likelihood</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+            <code class="highlight language-python"><span class="n">_likelihood</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
 
 <a href="#jimgw.core.single_event.likelihood.TransientLikelihoodFD._likelihood" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -4464,7 +4448,7 @@ object, a plain dict <code>{}</code>, or <code>True</code> (shorthand for <code>
 
 
 <h5 id="jimgw.core.single_event.likelihood.HeterodynedTransientLikelihoodFD.evaluate" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
 
 <a href="#jimgw.core.single_event.likelihood.HeterodynedTransientLikelihoodFD.evaluate" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -4480,7 +4464,7 @@ object, a plain dict <code>{}</code>, or <code>True</code> (shorthand for <code>
 
 
 <h5 id="jimgw.core.single_event.likelihood.HeterodynedTransientLikelihoodFD._likelihood" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">_likelihood</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+            <code class="highlight language-python"><span class="n">_likelihood</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
 
 <a href="#jimgw.core.single_event.likelihood.HeterodynedTransientLikelihoodFD._likelihood" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -6047,7 +6031,7 @@ of 1/PSD values using linear interpolation weights.</p>
 
 
 <h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
 
 <a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -6057,9 +6041,7 @@ of 1/PSD values using linear interpolation weights.</p>
         <p>Evaluate the log-likelihood for given parameters.</p>
 <h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate--parameters">Parameters<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate--parameters" title="Permanent link">¤</a></h6>
 <p>params : dict[str, Float]
-    Dictionary of model parameters.
-data : dict
-    Data dictionary (not used, data stored in detectors).</p>
+    Dictionary of model parameters.</p>
 <h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate--returns">Returns<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD.evaluate--returns" title="Permanent link">¤</a></h6>
 <p>Float
     Log-likelihood value.</p>
@@ -6073,7 +6055,7 @@ data : dict
 
 
 <h5 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">_likelihood</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
+            <code class="highlight language-python"><span class="n">_likelihood</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span></code>
 
 <a href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -6083,9 +6065,7 @@ data : dict
         <p>Core likelihood evaluation using multi-banding.</p>
 <h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood--parameters">Parameters<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood--parameters" title="Permanent link">¤</a></h6>
 <p>params : dict[str, Float]
-    Dictionary of model parameters.
-data : dict
-    Data dictionary (not used).</p>
+    Dictionary of model parameters.</p>
 <h6 id="jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood--returns">Returns<a class="headerlink" href="#jimgw.core.single_event.likelihood.MultibandedTransientLikelihoodFD._likelihood--returns" title="Permanent link">¤</a></h6>
 <p>Float
     Log-likelihood value.</p>
