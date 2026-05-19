@@ -285,7 +285,13 @@ class TestTransientLikelihoodFD:
         assert jnp.isfinite(likelihood.evaluate(example_params(), {}))
 
     def test_time_marg_geq_base(self, detectors_and_waveform):
-        """Time-marginalized likelihood must be >= the base likelihood."""
+        """Time-marginalized log-likelihood is >= base - log(N_total).
+
+        _reduce_time returns logsumexp(tc_range terms) - log(N_total), where
+        N_total = len(tc_array) is the full FFT size.  Since t_c=0 lies within
+        the default tc_range (-0.1, 0.1), the t=0 term is always included in
+        the logsumexp, giving the tight lower bound marg ≥ base - log(N_total).
+        """
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         marg = TransientLikelihoodFD(
             detectors=ifos,
@@ -305,7 +311,7 @@ class TestTransientLikelihoodFD:
         marg_result = marg.evaluate(example_params(), {})
         base_result = base.evaluate(example_params(), {})
         assert jnp.isfinite(marg_result)
-        assert marg_result >= base_result
+        assert marg_result >= base_result - jnp.log(len(marg.tc_array))
 
     # ── Phase marginalization ──────────────────────────────────────────────────
 
@@ -457,6 +463,13 @@ class TestTransientLikelihoodFD:
         assert jnp.isfinite(likelihood.evaluate(example_params(), {}))
 
     def test_phase_time_marg_geq_base(self, detectors_and_waveform):
+        """Phase+time marg log-likelihood is >= base - log(N_total).
+
+        Same reasoning as test_time_marg_geq_base: the time marginalisation
+        normalises by len(tc_array), so the result is offset by -log(N_total)
+        relative to the point estimate.  The t=0 term is always included,
+        giving marg ≥ base - log(N_total).
+        """
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         marg = TransientLikelihoodFD(
             detectors=ifos,
@@ -477,10 +490,15 @@ class TestTransientLikelihoodFD:
         marg_result = marg.evaluate(example_params(), {})
         base_result = base.evaluate(example_params(), {})
         assert jnp.isfinite(marg_result)
-        assert marg_result >= base_result
+        assert marg_result >= base_result - jnp.log(len(marg.tc_array))
 
     def test_phase_time_marg_geq_phase_only(self, detectors_and_waveform):
-        """Phase+time-marginalized must be >= phase-only-marginalized."""
+        """Phase+time marg log-likelihood is >= phase-only - log(N_total).
+
+        The time marginalisation normalises by len(tc_array), so the result
+        is offset by -log(N_total).  The t=0 term is always included in the
+        logsumexp, giving pt ≥ p - log(N_total).
+        """
         ifos, waveform, fmin, fmax, gps = detectors_and_waveform
         pt = TransientLikelihoodFD(
             detectors=ifos,
@@ -502,7 +520,7 @@ class TestTransientLikelihoodFD:
         pt_result = pt.evaluate(example_params(), {})
         p_result = p.evaluate(example_params(), {})
         assert jnp.isfinite(pt_result)
-        assert pt_result >= p_result
+        assert pt_result >= p_result - jnp.log(len(pt.tc_array))
 
     # ── Distance marginalization ───────────────────────────────────────────────
 
@@ -1122,7 +1140,7 @@ class TestHeterodynedTransientLikelihoodFD:
             "gmst",
         }
         assert set(result.keys()) == expected_keys
-        for key, val in result.items():
+        for val in result.values():
             assert jnp.isfinite(val)
         assert jnp.isfinite(likelihood.evaluate(result, {}))
         assert jnp.isclose(float(base.evaluate(result, {})), ll_injected)

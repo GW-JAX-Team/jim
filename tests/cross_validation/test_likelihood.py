@@ -234,19 +234,11 @@ def ripple_pv2_bilby_source(
     #   0 → likelihood evaluation            → return bin-edge array
     # bilby's MB likelihood sets waveform_arguments['frequencies'] to the unique
     # MB frequencies so the waveform is only evaluated at those points.
-    # For non-relative-binning, non-MB calls we always use the full frequency_array.
-    # NOTE: check `frequencies` (MB key) BEFORE `fiducial` (relative-binning key).
-    # After a relative-binning test, the shared WaveformGenerator retains
-    # fiducial=0 and frequency_bin_edges in waveform_arguments.  The MB likelihood
-    # then adds frequencies=unique_mb_freqs.  Without the early exit here, fiducial=0
-    # would cause the else-branch to use frequency_bin_edges (~62 pts) instead of the
-    # 4229 unique MB frequencies, producing an IndexError in calculate_snrs.
+    # Check 'frequencies' (MB key) before 'fiducial' (relative-binning key) so that
+    # MB evaluations use the correct frequency array.
     fiducial = kwargs.get("fiducial", 1)
     mb_frequencies = kwargs.get("frequencies", None)
     if mb_frequencies is not None:
-        # MB likelihood: evaluate only at the unique MB frequency points.
-        # Takes priority over fiducial flag which may be a leftover from a
-        # relative-binning likelihood sharing the same WaveformGenerator.
         eval_freqs = mb_frequencies
     elif fiducial == 1:
         # Full-grid evaluation (fiducial setup, or standard likelihoods)
@@ -327,7 +319,6 @@ def setup():
     waveform = RippleIMRPhenomPv2(f_ref=F_REF)
     duration = float(jim_ifos[0].data.duration)
     sampling_frequency = float(jim_ifos[0].data.sampling_frequency)
-    wfg = build_bilby_waveform_generator(duration, sampling_frequency)
 
     jim_params = bilby_to_jim_params(BILBY_PARAMS)
     bilby_params = BILBY_PARAMS.copy()
@@ -336,7 +327,6 @@ def setup():
         "jim_ifos": jim_ifos,
         "bilby_ifos": bilby_ifos,
         "waveform": waveform,
-        "wfg": wfg,
         "jim_params": jim_params,
         "bilby_params": bilby_params,
         "duration": duration,
@@ -364,7 +354,9 @@ class TestTransientLikelihoodFD:
 
         bilby_ll = bilby.gw.likelihood.GravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
-            waveform_generator=setup["wfg"],
+            waveform_generator=build_bilby_waveform_generator(
+                setup["duration"], setup["sampling_frequency"]
+            ),
         ).log_likelihood_ratio(setup["bilby_params"].copy())
 
         print(f"\n[BaseTransient] jim={float(jim_ll):.4f}  bilby={float(bilby_ll):.4f}")
@@ -410,7 +402,9 @@ class TestTransientLikelihoodFD:
 
         bilby_ll = bilby.gw.likelihood.GravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
-            waveform_generator=setup["wfg"],
+            waveform_generator=build_bilby_waveform_generator(
+                setup["duration"], setup["sampling_frequency"]
+            ),
             phase_marginalization=True,
             priors=priors,
         ).log_likelihood_ratio(bilby_params_ph0.copy())
@@ -461,7 +455,9 @@ class TestTransientLikelihoodFD:
 
         bilby_ll = bilby.gw.likelihood.GravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
-            waveform_generator=setup["wfg"],
+            waveform_generator=build_bilby_waveform_generator(
+                setup["duration"], setup["sampling_frequency"]
+            ),
             time_marginalization=True,
             jitter_time=False,
             priors=priors,
@@ -519,7 +515,9 @@ class TestTransientLikelihoodFD:
         )
         bilby_ll = bilby.gw.likelihood.GravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
-            waveform_generator=setup["wfg"],
+            waveform_generator=build_bilby_waveform_generator(
+                setup["duration"], setup["sampling_frequency"]
+            ),
             distance_marginalization=True,
             distance_marginalization_lookup_table=_lookup_table,
             priors=bilby_priors,
@@ -586,7 +584,9 @@ class TestTransientLikelihoodFD:
         )
         bilby_ll = bilby.gw.likelihood.GravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
-            waveform_generator=setup["wfg"],
+            waveform_generator=build_bilby_waveform_generator(
+                setup["duration"], setup["sampling_frequency"]
+            ),
             phase_marginalization=True,
             distance_marginalization=True,
             distance_marginalization_lookup_table=_lookup_table,
@@ -640,7 +640,9 @@ class TestTransientLikelihoodFD:
 
         bilby_ll = bilby.gw.likelihood.GravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
-            waveform_generator=setup["wfg"],
+            waveform_generator=build_bilby_waveform_generator(
+                setup["duration"], setup["sampling_frequency"]
+            ),
             time_marginalization=True,
             phase_marginalization=True,
             jitter_time=False,
@@ -680,7 +682,9 @@ class TestHeterodynedTransientLikelihoodFD:
         bilby_likelihood = (
             bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
                 interferometers=setup["bilby_ifos"],
-                waveform_generator=setup["wfg"],
+                waveform_generator=build_bilby_waveform_generator(
+                setup["duration"], setup["sampling_frequency"]
+            ),
                 fiducial_parameters=bilby_ref_params,
             )
         )
@@ -738,7 +742,9 @@ class TestHeterodynedTransientLikelihoodFD:
         bilby_likelihood = (
             bilby.gw.likelihood.RelativeBinningGravitationalWaveTransient(
                 interferometers=setup["bilby_ifos"],
-                waveform_generator=setup["wfg"],
+                waveform_generator=build_bilby_waveform_generator(
+                setup["duration"], setup["sampling_frequency"]
+            ),
                 fiducial_parameters=bilby_ref_params,
                 phase_marginalization=True,
                 priors=priors,
@@ -811,7 +817,9 @@ class TestMultibandedTransientLikelihoodFD:
 
         bilby_ll = bilby.gw.likelihood.MBGravitationalWaveTransient(
             interferometers=setup["bilby_ifos"],
-            waveform_generator=setup["wfg"],
+            waveform_generator=build_bilby_waveform_generator(
+                setup["duration"], setup["sampling_frequency"]
+            ),
             reference_chirp_mass=REFERENCE_CHIRP_MASS,
             accuracy_factor=5.0,
             time_offset=2.12,
