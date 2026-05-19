@@ -144,8 +144,16 @@ def build_likelihood(
                 None,
             )
             if tdet_comp is not None:
-                data = ifos[0].data
-                t_end = float(data.start_time) + float(data.duration) - trigger_time
+                ref_ifo = (
+                    ifos[0]
+                    if time_frame == "detector"
+                    else next(ifo for ifo in ifos if ifo.name == time_frame)
+                )
+                t_end = (
+                    float(ref_ifo.data.start_time)
+                    + float(ref_ifo.data.duration)
+                    - trigger_time
+                )
                 s = EARTH_RADIUS_LIGHT_S
                 if mb_time_offset is None:
                     mb_time_offset = t_end - float(getattr(tdet_comp, "xmin")) + s
